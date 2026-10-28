@@ -1,0 +1,49 @@
+name: Runtime Certification
+
+on:
+  pull_request:
+    paths:
+      - 'pssalesforcebridge/**'
+      - 'tests/runtime/**'
+      - '.github/workflows/runtime-certification.yml'
+      - 'ROADMAP.md'
+      - 'RUNTIME_CERTIFICATION.md'
+  push:
+    branches: [main]
+    paths:
+      - 'pssalesforcebridge/**'
+      - 'tests/runtime/**'
+      - '.github/workflows/runtime-certification.yml'
+      - 'ROADMAP.md'
+      - 'RUNTIME_CERTIFICATION.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: runtime-certification-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  prestashop-runtime:
+    name: PrestaShop ${{ matrix.prestashop }} runtime
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        prestashop:
+          - '1.7.8.11'
+          - '8.2.8'
+          - '9.1.5'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Show Docker environment
+        run: |
+          docker version
+          docker info --format '{{.ServerVersion}}'
+      - name: Run exact runtime certification
+        run: bash tests/runtime/run-prestashop-certification.sh '${{ matrix.prestashop }}'
