@@ -11,11 +11,13 @@ final class OrderEventService
     private $ledger;
     private $recovery;
 
-    public function __construct(QueueRepository $queue, OrderSyncLedger $ledger, RecoveryTokenRepository $recovery = null)
+    public function __construct(QueueRepository $queue, OrderSyncLedger $ledger, $recovery = null)
     {
         $this->queue = $queue;
         $this->ledger = $ledger;
-        $this->recovery = $recovery ?: new RecoveryTokenRepository();
+        $this->recovery = $recovery instanceof RecoveryTokenRepository
+            ? $recovery
+            : new RecoveryTokenRepository();
     }
 
     public function enqueue($eventType, $order, $customer, $cart, $currencyIso, $shopId, $stateId = null, $paid = null)
