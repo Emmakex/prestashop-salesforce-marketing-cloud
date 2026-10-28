@@ -96,6 +96,7 @@ jobs:
         run: |
           php tests/release-contract.php
           php tests/db-single-row-contract.php
+          php tests/db-namespace-contract.php
 
   package:
     name: Build release package
