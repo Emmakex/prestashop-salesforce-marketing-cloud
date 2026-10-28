@@ -1,0 +1,14 @@
+{
+  "name": "emmakex/prestashop-salesforce-marketing-cloud",
+  "description": "PrestaShop bridge for Salesforce Marketing Cloud Engagement",
+  "type": "prestashop-module",
+  "license": "MIT",
+  "require": {
+    "php": ">=7.4"
+  },
+  "autoload": {
+    "psr-4": {
+      "Emmakex\\PrestaShopSalesforceMarketingCloud\\": "src/"
+    }
+  }
+}
