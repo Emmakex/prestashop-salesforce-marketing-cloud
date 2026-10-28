@@ -39,7 +39,7 @@ $composer = json_decode(file_get_contents($composerFile), true);
 $platform = file_get_contents($platformFile);
 $upgrade = file_get_contents($upgradeFile);
 
-releaseAssert(strpos($module, "$this->version = '0.7.0';") !== false, 'Module version must be 0.7.0.');
+releaseAssert(strpos($module, "\$this->version = '0.7.0';") !== false, 'Module version must be 0.7.0.');
 releaseAssert(isset($composer['require']['php']) && $composer['require']['php'] === '>=7.1', 'Composer PHP requirement must match the PHP 7.1 compatibility floor.');
 releaseAssert(strpos($platform, "const MIN_PRESTASHOP = '1.7.8.0';") !== false, 'Minimum PrestaShop version must remain 1.7.8.0.');
 releaseAssert(strpos($platform, "const MAX_PRESTASHOP = '9.99.99';") !== false, 'Maximum PrestaShop version must remain within the declared PrestaShop 9 family.');
