@@ -17,7 +17,7 @@ Defaults:
 - processed queue: 30 days;
 - local logs: 30 days;
 - Journey audit: 90 days;
-- terminal cart snapshots: 30 days;
+- cart snapshots: 30 days;
 - recovery tokens: 30 days.
 
 These are technical defaults, not a substitute for the merchant's legal, contractual or business retention policy.
@@ -52,16 +52,21 @@ Only terminal, non-error Journey audit rows are deleted automatically:
 
 ## Cart snapshots
 
-Cart snapshots can contain email addresses and normalized cart payloads. The connector therefore removes old snapshots only when they are unambiguously terminal:
+Cart snapshots can contain email addresses and normalized cart payloads. Old snapshots are automatically removable when they are explicitly terminal:
 
 - `empty`;
 - `ineligible`;
 - `converted`;
 - `recovered`.
 
+Old `abandoned` snapshots also become removable, but only after two additional fail-closed checks prove they are no longer operationally required:
+
+1. there is no unused, unexpired recovery token for that shop/cart;
+2. there is no `CART_ABANDONED` queue row in `pending`, `processing`, `retry` or `failed` state.
+
 Matching `sfmc_cart_item` rows are removed before their parent cart snapshot.
 
-The connector does not automatically purge `active` or `abandoned` snapshots because they may still be required for abandonment detection, Journey revalidation or a valid recovery link.
+`active` snapshots are never auto-purged. An `abandoned` snapshot with a valid recovery link, outstanding delivery attempt or terminal delivery failure is also retained.
 
 ## Recovery tokens
 
@@ -96,7 +101,8 @@ Retention must never:
 - delete undelivered queue work;
 - delete terminal failures that still require investigation;
 - invalidate an active recovery link by deleting its abandoned snapshot prematurely;
+- delete an abandoned snapshot while its Journey event is unresolved;
 - delete recovered-order attribution merely to remove token identity;
 - expose raw exception messages or secrets through cron responses.
 
-The CI retention contract verifies the safety selectors on PHP 7.1 and PHP 8.5.
+The CI retention contract verifies these safety selectors on PHP 7.1 and PHP 8.5.
