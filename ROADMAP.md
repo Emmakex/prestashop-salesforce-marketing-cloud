@@ -162,8 +162,9 @@
 - [x] processed queue cleanup never deletes pending / processing / retry / failed work
 - [x] local log retention
 - [x] Journey audit cleanup restricted to sent / suppressed rows
-- [x] terminal cart snapshot + item cleanup for empty / ineligible / converted / recovered states
-- [x] active and abandoned cart snapshots retained for operational/recovery safety
+- [x] old empty / ineligible / converted / recovered cart snapshots and items are removable
+- [x] old abandoned snapshots are removable only without active recovery tokens or unresolved/failed `CART_ABANDONED` queue work
+- [x] active snapshots and operationally required abandoned snapshots are retained
 - [x] expired or unusable recovery token cleanup
 - [x] recovered-token anonymization preserves order/revenue attribution without customer identity
 - [x] automatic retention at most once per day from the protected cron
