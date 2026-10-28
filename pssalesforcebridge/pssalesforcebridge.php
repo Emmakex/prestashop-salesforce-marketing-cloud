@@ -7,6 +7,7 @@ if (!defined('_PS_VERSION_')) {
 require_once __DIR__ . '/src/Compatibility/Platform.php';
 require_once __DIR__ . '/src/Compatibility/CustomerHookAdapter.php';
 require_once __DIR__ . '/src/Compatibility/OrderHookAdapter.php';
+require_once __DIR__ . '/src/Compatibility/CartHookAdapter.php';
 require_once __DIR__ . '/src/Compatibility/ShopResolver.php';
 require_once __DIR__ . '/src/Salesforce/AuthClient.php';
 require_once __DIR__ . '/src/Salesforce/RestClient.php';
@@ -23,7 +24,17 @@ require_once __DIR__ . '/src/Order/OrderNormalizer.php';
 require_once __DIR__ . '/src/Order/OrderSyncLedger.php';
 require_once __DIR__ . '/src/Order/OrderEventService.php';
 require_once __DIR__ . '/src/Order/OrderDataExtensionWriter.php';
+require_once __DIR__ . '/src/Cart/CartNormalizer.php';
+require_once __DIR__ . '/src/Cart/CartEligibilityPolicy.php';
+require_once __DIR__ . '/src/Cart/CartRepository.php';
+require_once __DIR__ . '/src/Cart/CartCaptureService.php';
+require_once __DIR__ . '/src/Cart/CartAbandonmentDetector.php';
 
+use Emmakex\PrestaShopSalesforceMarketingCloud\Cart\CartAbandonmentDetector;
+use Emmakex\PrestaShopSalesforceMarketingCloud\Cart\CartCaptureService;
+use Emmakex\PrestaShopSalesforceMarketingCloud\Cart\CartEligibilityPolicy;
+use Emmakex\PrestaShopSalesforceMarketingCloud\Cart\CartRepository;
+use Emmakex\PrestaShopSalesforceMarketingCloud\Compatibility\CartHookAdapter;
 use Emmakex\PrestaShopSalesforceMarketingCloud\Compatibility\CustomerHookAdapter;
 use Emmakex\PrestaShopSalesforceMarketingCloud\Compatibility\OrderHookAdapter;
 use Emmakex\PrestaShopSalesforceMarketingCloud\Compatibility\Platform;
@@ -51,6 +62,7 @@ class PsSalesforceBridge extends Module
     const CONFIG_ACCOUNT_ID = 'PS_SFMC_ACCOUNT_ID';
     const CONFIG_MODE = 'PS_SFMC_MODE';
     const CONFIG_CART_ABANDON_MINUTES = 'PS_SFMC_CART_ABANDON_MINUTES';
+    const CONFIG_CART_CONSENT_MODE = 'PS_SFMC_CART_CONSENT_MODE';
     const CONFIG_CUSTOMER_DE_KEY = 'PS_SFMC_CUSTOMER_DE_KEY';
     const CONFIG_ORDER_DE_KEY = 'PS_SFMC_ORDER_DE_KEY';
     const CONFIG_CRON_TOKEN = 'PS_SFMC_CRON_TOKEN';
@@ -60,7 +72,7 @@ class PsSalesforceBridge extends Module
     {
         $this->name = 'pssalesforcebridge';
         $this->tab = 'advertising_marketing';
-        $this->version = '0.3.0';
+        $this->version = '0.4.0';
         $this->author = 'Emmakex';
         $this->need_instance = 0;
         $this->bootstrap = true;
@@ -88,7 +100,8 @@ class PsSalesforceBridge extends Module
             && $this->registerHook('actionCustomerAccountAdd')
             && $this->registerHook('actionCustomerAccountUpdate')
             && $this->registerHook('actionValidateOrder')
-            && $this->registerHook('actionOrderStatusPostUpdate');
+            && $this->registerHook('actionOrderStatusPostUpdate')
+            && $this->registerHook('actionCartSave');
     }
 
     public function uninstall()
@@ -106,6 +119,21 @@ class PsSalesforceBridge extends Module
     public function hookActionCustomerAccountUpdate($params)
     {
         return $this->captureCustomerEvent('CUSTOMER_UPDATED', is_array($params) ? $params : []);
+    }
+
+    public function hookActionCartSave($params)
+    {
+        $cart = CartHookAdapter::cartFromParams(is_array($params) ? $params : []);
+        if (!$cart) {
+            return false;
+        }
+
+        return $this->cartCaptureService()->capture(
+            $cart,
+            isset($this->context) ? $this->context : null,
+            (int) Configuration::get(self::CONFIG_CART_ABANDON_MINUTES),
+            (string) Configuration::get(self::CONFIG_CART_CONSENT_MODE)
+        );
     }
 
     public function hookActionValidateOrder($params)
@@ -159,6 +187,17 @@ class PsSalesforceBridge extends Module
         }
 
         return $this->customerBackfillService()->process($batchSize > 0 ? $batchSize : 50);
+    }
+
+    public function processCartAbandonmentCandidates($limit = 100)
+    {
+        $detector = new CartAbandonmentDetector(
+            new CartRepository(),
+            new OrderSyncLedger(),
+            new QueueRepository()
+        );
+
+        return $detector->process($limit);
     }
 
     public function processCustomerQueue($limit = 50)
@@ -240,10 +279,20 @@ class PsSalesforceBridge extends Module
         );
     }
 
+    private function cartCaptureService()
+    {
+        return new CartCaptureService(
+            new CartRepository(),
+            new OrderSyncLedger(),
+            new CartEligibilityPolicy()
+        );
+    }
+
     private function installConfiguration()
     {
         return Configuration::updateValue(self::CONFIG_MODE, 'test')
             && Configuration::updateValue(self::CONFIG_CART_ABANDON_MINUTES, 60)
+            && Configuration::updateValue(self::CONFIG_CART_CONSENT_MODE, CartEligibilityPolicy::MODE_MARKETING_OPTIN)
             && Configuration::updateValue(self::CONFIG_CUSTOMER_DE_KEY, 'PS_CUSTOMERS')
             && Configuration::updateValue(self::CONFIG_ORDER_DE_KEY, 'PS_ORDERS')
             && Configuration::updateValue(self::CONFIG_CUSTOMER_BACKFILL_BATCH, 50)
@@ -260,6 +309,7 @@ class PsSalesforceBridge extends Module
             self::CONFIG_ACCOUNT_ID,
             self::CONFIG_MODE,
             self::CONFIG_CART_ABANDON_MINUTES,
+            self::CONFIG_CART_CONSENT_MODE,
             self::CONFIG_CUSTOMER_DE_KEY,
             self::CONFIG_ORDER_DE_KEY,
             self::CONFIG_CRON_TOKEN,
@@ -336,6 +386,52 @@ class PsSalesforceBridge extends Module
                 KEY `idx_sfmc_order_cart` (`id_shop`, `id_cart`),
                 KEY `idx_sfmc_order_contact` (`contact_key`)
             ) ENGINE={$engine} DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+            "CREATE TABLE IF NOT EXISTS `{$prefix}sfmc_cart` (
+                `id_sfmc_cart` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+                `id_shop` INT UNSIGNED NOT NULL,
+                `id_cart` INT UNSIGNED NOT NULL,
+                `id_customer` INT UNSIGNED NOT NULL DEFAULT 0,
+                `contact_key` VARCHAR(191) NOT NULL DEFAULT '',
+                `email` VARCHAR(255) NOT NULL DEFAULT '',
+                `currency` VARCHAR(8) NOT NULL DEFAULT '',
+                `total` DECIMAL(20,6) NOT NULL DEFAULT 0,
+                `product_count` INT UNSIGNED NOT NULL DEFAULT 0,
+                `item_count` INT UNSIGNED NOT NULL DEFAULT 0,
+                `consent_mode` VARCHAR(32) NOT NULL DEFAULT 'marketing_optin',
+                `eligible` TINYINT(1) NOT NULL DEFAULT 0,
+                `eligibility_reason` VARCHAR(64) NOT NULL DEFAULT '',
+                `status` VARCHAR(16) NOT NULL DEFAULT 'active',
+                `last_activity` DATETIME NOT NULL,
+                `abandon_after` DATETIME NOT NULL,
+                `abandoned_at` DATETIME NULL,
+                `snapshot_hash` CHAR(40) NOT NULL,
+                `payload` LONGTEXT NOT NULL,
+                `created_at` DATETIME NOT NULL,
+                `updated_at` DATETIME NOT NULL,
+                PRIMARY KEY (`id_sfmc_cart`),
+                UNIQUE KEY `uniq_sfmc_cart_shop` (`id_shop`, `id_cart`),
+                KEY `idx_sfmc_cart_candidate` (`status`, `eligible`, `abandon_after`),
+                KEY `idx_sfmc_cart_contact` (`contact_key`)
+            ) ENGINE={$engine} DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+            "CREATE TABLE IF NOT EXISTS `{$prefix}sfmc_cart_item` (
+                `id_sfmc_cart_item` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+                `id_shop` INT UNSIGNED NOT NULL,
+                `id_cart` INT UNSIGNED NOT NULL,
+                `line_key` VARCHAR(160) NOT NULL,
+                `id_product` INT UNSIGNED NOT NULL DEFAULT 0,
+                `id_product_attribute` INT UNSIGNED NOT NULL DEFAULT 0,
+                `id_customization` INT UNSIGNED NOT NULL DEFAULT 0,
+                `sku` VARCHAR(128) NOT NULL DEFAULT '',
+                `name` VARCHAR(255) NOT NULL DEFAULT '',
+                `quantity` INT NOT NULL DEFAULT 0,
+                `unit_price` DECIMAL(20,6) NOT NULL DEFAULT 0,
+                `line_total` DECIMAL(20,6) NOT NULL DEFAULT 0,
+                `payload_hash` CHAR(40) NOT NULL,
+                `updated_at` DATETIME NOT NULL,
+                PRIMARY KEY (`id_sfmc_cart_item`),
+                UNIQUE KEY `uniq_sfmc_cart_item` (`id_shop`, `id_cart`, `line_key`),
+                KEY `idx_sfmc_cart_item_cart` (`id_shop`, `id_cart`)
+            ) ENGINE={$engine} DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
             "CREATE TABLE IF NOT EXISTS `{$prefix}sfmc_customer_backfill` (
                 `id_sfmc_customer_backfill` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
                 `id_shop` INT UNSIGNED NOT NULL,
@@ -365,7 +461,9 @@ class PsSalesforceBridge extends Module
     {
         $prefix = _DB_PREFIX_;
 
-        return Db::getInstance()->execute("DROP TABLE IF EXISTS `{$prefix}sfmc_customer_backfill`")
+        return Db::getInstance()->execute("DROP TABLE IF EXISTS `{$prefix}sfmc_cart_item`")
+            && Db::getInstance()->execute("DROP TABLE IF EXISTS `{$prefix}sfmc_cart`")
+            && Db::getInstance()->execute("DROP TABLE IF EXISTS `{$prefix}sfmc_customer_backfill`")
             && Db::getInstance()->execute("DROP TABLE IF EXISTS `{$prefix}sfmc_order_sync`")
             && Db::getInstance()->execute("DROP TABLE IF EXISTS `{$prefix}sfmc_customer_sync`")
             && Db::getInstance()->execute("DROP TABLE IF EXISTS `{$prefix}sfmc_queue`")
@@ -388,7 +486,7 @@ class PsSalesforceBridge extends Module
             $output .= $this->startCustomerBackfill();
         }
 
-        return $output . $this->renderBackfillStatus() . $this->renderForm();
+        return $output . $this->renderBackfillStatus() . $this->renderCartStatus() . $this->renderForm();
     }
 
     private function startCustomerBackfill()
@@ -427,6 +525,21 @@ class PsSalesforceBridge extends Module
         return $this->displayInformation($this->l('Customer backfill status: ') . implode(' | ', $parts));
     }
 
+    private function renderCartStatus()
+    {
+        $rows = (new CartRepository())->summary();
+        if (empty($rows)) {
+            return $this->displayInformation($this->l('No cart snapshots have been captured yet.'));
+        }
+
+        $parts = [];
+        foreach ($rows as $row) {
+            $parts[] = (isset($row['status']) ? (string) $row['status'] : 'unknown') . ': ' . (isset($row['total']) ? (int) $row['total'] : 0);
+        }
+
+        return $this->displayInformation($this->l('Cart snapshot status: ') . implode(' | ', $parts));
+    }
+
     private function saveConfiguration()
     {
         $authBaseUri = rtrim(trim((string) Tools::getValue(self::CONFIG_AUTH_BASE_URI)), '/');
@@ -436,6 +549,9 @@ class PsSalesforceBridge extends Module
         $accountId = trim((string) Tools::getValue(self::CONFIG_ACCOUNT_ID));
         $mode = Tools::getValue(self::CONFIG_MODE) === 'production' ? 'production' : 'test';
         $abandonMinutes = max(15, (int) Tools::getValue(self::CONFIG_CART_ABANDON_MINUTES));
+        $consentMode = Tools::getValue(self::CONFIG_CART_CONSENT_MODE) === CartEligibilityPolicy::MODE_KNOWN_CONTACT
+            ? CartEligibilityPolicy::MODE_KNOWN_CONTACT
+            : CartEligibilityPolicy::MODE_MARKETING_OPTIN;
         $customerDeKey = trim((string) Tools::getValue(self::CONFIG_CUSTOMER_DE_KEY));
         $orderDeKey = trim((string) Tools::getValue(self::CONFIG_ORDER_DE_KEY));
         $backfillBatch = max(10, min(500, (int) Tools::getValue(self::CONFIG_CUSTOMER_BACKFILL_BATCH)));
@@ -462,6 +578,7 @@ class PsSalesforceBridge extends Module
         Configuration::updateValue(self::CONFIG_ACCOUNT_ID, $accountId);
         Configuration::updateValue(self::CONFIG_MODE, $mode);
         Configuration::updateValue(self::CONFIG_CART_ABANDON_MINUTES, $abandonMinutes);
+        Configuration::updateValue(self::CONFIG_CART_CONSENT_MODE, $consentMode);
         Configuration::updateValue(self::CONFIG_CUSTOMER_DE_KEY, $customerDeKey);
         Configuration::updateValue(self::CONFIG_ORDER_DE_KEY, $orderDeKey);
         Configuration::updateValue(self::CONFIG_CUSTOMER_BACKFILL_BATCH, $backfillBatch);
@@ -520,6 +637,7 @@ class PsSalesforceBridge extends Module
             self::CONFIG_ACCOUNT_ID => (string) Configuration::get(self::CONFIG_ACCOUNT_ID),
             self::CONFIG_MODE => (string) Configuration::get(self::CONFIG_MODE),
             self::CONFIG_CART_ABANDON_MINUTES => (int) Configuration::get(self::CONFIG_CART_ABANDON_MINUTES),
+            self::CONFIG_CART_CONSENT_MODE => (string) Configuration::get(self::CONFIG_CART_CONSENT_MODE),
             self::CONFIG_CUSTOMER_DE_KEY => (string) Configuration::get(self::CONFIG_CUSTOMER_DE_KEY),
             self::CONFIG_ORDER_DE_KEY => (string) Configuration::get(self::CONFIG_ORDER_DE_KEY),
             self::CONFIG_CRON_TOKEN => $cronToken,
@@ -558,6 +676,20 @@ class PsSalesforceBridge extends Module
                     ['type' => 'text', 'label' => $this->l('Cron URL'), 'name' => 'PS_SFMC_CRON_URL', 'readonly' => true, 'desc' => $this->l('Call this protected URL from the server cron every 5 minutes.')],
                     ['type' => 'text', 'label' => $this->l('Cron token'), 'name' => self::CONFIG_CRON_TOKEN, 'readonly' => true],
                     ['type' => 'text', 'label' => $this->l('Abandoned cart threshold (minutes)'), 'name' => self::CONFIG_CART_ABANDON_MINUTES, 'suffix' => $this->l('minutes')],
+                    [
+                        'type' => 'select',
+                        'label' => $this->l('Abandoned cart eligibility'),
+                        'name' => self::CONFIG_CART_CONSENT_MODE,
+                        'desc' => $this->l('Marketing opt-in is the strict default. Use known contact only when your documented legal basis permits it.'),
+                        'options' => [
+                            'query' => [
+                                ['id' => CartEligibilityPolicy::MODE_MARKETING_OPTIN, 'name' => $this->l('Require newsletter or marketing opt-in')],
+                                ['id' => CartEligibilityPolicy::MODE_KNOWN_CONTACT, 'name' => $this->l('Known active contact with valid email')],
+                            ],
+                            'id' => 'id',
+                            'name' => 'name',
+                        ],
+                    ],
                 ],
                 'submit' => ['title' => $this->l('Save')],
                 'buttons' => [
