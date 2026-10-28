@@ -48,18 +48,23 @@ final class OrderEventService
             return false;
         }
 
-        // Recovery attribution is intentionally best-effort and local. It must never
-        // prevent the authoritative order event from entering the outbound queue.
-        $this->recovery->attributeOrder(
-            isset($payload['shop_id']) ? (int) $payload['shop_id'] : 0,
-            isset($payload['cart_id']) ? (int) $payload['cart_id'] : 0,
-            $orderId,
-            isset($payload['total_paid']) ? (float) $payload['total_paid'] : 0.0,
-            isset($payload['currency']) ? (string) $payload['currency'] : '',
-            isset($payload['state_id']) ? (int) $payload['state_id'] : 0,
-            !empty($payload['paid']),
-            !empty($payload['valid'])
-        );
+        // Recovery attribution is intentionally best-effort and local. A broken or
+        // partially upgraded attribution table must never block the authoritative
+        // order event from entering the outbound queue.
+        try {
+            $this->recovery->attributeOrder(
+                isset($payload['shop_id']) ? (int) $payload['shop_id'] : 0,
+                isset($payload['cart_id']) ? (int) $payload['cart_id'] : 0,
+                $orderId,
+                isset($payload['total_paid']) ? (float) $payload['total_paid'] : 0.0,
+                isset($payload['currency']) ? (string) $payload['currency'] : '',
+                isset($payload['state_id']) ? (int) $payload['state_id'] : 0,
+                !empty($payload['paid']),
+                !empty($payload['valid'])
+            );
+        } catch (\Exception $e) {
+            // The order synchronization path remains authoritative and continues.
+        }
 
         return $this->queue->enqueue(
             $eventType,
