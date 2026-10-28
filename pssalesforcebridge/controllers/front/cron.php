@@ -18,6 +18,7 @@ class PsSalesforceBridgeCronModuleFrontController extends ModuleFrontController
             $cartDetection = $this->module->processCartAbandonmentCandidates(100);
             $customerDelivery = $this->module->processCustomerQueue(50);
             $orderDelivery = $this->module->processOrderQueue(50);
+            $journeyDelivery = $this->module->processAbandonedCartJourneyQueue(20);
 
             $this->respond([
                 'ok' => true,
@@ -26,6 +27,7 @@ class PsSalesforceBridgeCronModuleFrontController extends ModuleFrontController
                     'cart_detection' => $cartDetection,
                     'customer_delivery' => $customerDelivery,
                     'order_delivery' => $orderDelivery,
+                    'journey_delivery' => $journeyDelivery,
                 ],
             ], 200);
         } catch (Exception $e) {

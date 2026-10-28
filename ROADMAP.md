@@ -59,34 +59,40 @@
 - [x] cart conversion lookup prepared for abandoned-cart suppression
 - [x] queue locking/retry through the shared queue infrastructure
 - [x] upgrade path from 0.2.2
+- [x] queue worker claims every supported order event type
 - [ ] order historical backfill (only if required by first production deployment)
 
 ## 0.4.0 — Abandoned carts
 
-- [x] `actionCartSave` activity capture across PrestaShop 1.7.8, 8 and 9
-- [x] configurable inactivity threshold (default 60 minutes, minimum 15)
-- [x] canonical cart + cart item snapshots
-- [x] configurable eligibility policy with strict marketing-opt-in default
-- [x] fail-closed conversion check through both `sfmc_order_sync` and native `orders`
-- [x] deterministic snapshot hash and `CART_ABANDONED` queue deduplication
-- [x] local detector runs from protected cron without Salesforce calls
-- [x] cart status summary in module configuration
+- [x] cart activity capture
+- [x] configurable inactivity threshold (default 60 minutes)
+- [x] cart + cart item snapshot
+- [x] configurable eligibility checks
+- [x] fail-closed order conversion check through connector ledger and native orders
+- [x] snapshot-based deduplication
+- [x] local `CART_ABANDONED` queue events
+- [x] cart adapter contract shared by supported PrestaShop families
 - [x] upgrade path from 0.3.0
 
 ## 0.5.0 — Journey Builder
 
-- API Entry Event integration
-- `PRESTASHOP_ABANDONED_CART`
-- stale-snapshot validation immediately before delivery
-- final order-conversion recheck immediately before delivery
-- journey event audit trail
-- retry/backoff and dead-letter handling
+- [x] API Entry Event integration through `POST /interaction/v1/events`
+- [x] configurable `PRESTASHOP_ABANDONED_CART` Event Definition Key
+- [x] just-in-time snapshot/order/eligibility revalidation before send
+- [x] local Journey event audit trail
+- [x] `eventInstanceId` persistence
+- [x] suppression reasons for stale/converted/ineligible carts
+- [x] retry/backoff and terminal failure handling
+- [x] test mode blocks Journey delivery
+- [x] upgrade path from 0.4.0
+- [ ] live Marketing Cloud Journey certification
 
 ## 0.6.0 — Cart recovery
 
 - signed opaque recovery tokens
 - expiration / one-time-use controls
 - restore cart flow
+- `RecoveryUrl` population in Journey events
 - recovered cart / recovered revenue attribution
 
 ## 0.7.0 — Production hardening

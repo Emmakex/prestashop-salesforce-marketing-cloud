@@ -113,6 +113,21 @@ final class CartRepository
         return is_array($rows) ? $rows : [];
     }
 
+    public function find($shopId, $cartId)
+    {
+        if ((int) $shopId <= 0 || (int) $cartId <= 0) {
+            return null;
+        }
+
+        $sql = 'SELECT * FROM `' . _DB_PREFIX_ . 'sfmc_cart`'
+            . ' WHERE `id_shop` = ' . (int) $shopId
+            . ' AND `id_cart` = ' . (int) $cartId
+            . ' LIMIT 1';
+        $row = Db::getInstance()->getRow($sql);
+
+        return is_array($row) ? $row : null;
+    }
+
     public function markConverted($shopId, $cartId)
     {
         return (bool) Db::getInstance()->update(

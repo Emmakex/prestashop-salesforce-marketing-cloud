@@ -11,9 +11,11 @@ require_once __DIR__ . '/src/Compatibility/CartHookAdapter.php';
 require_once __DIR__ . '/src/Compatibility/ShopResolver.php';
 require_once __DIR__ . '/src/Salesforce/AuthClient.php';
 require_once __DIR__ . '/src/Salesforce/RestClient.php';
+require_once __DIR__ . '/src/Salesforce/JourneyClient.php';
 require_once __DIR__ . '/src/Queue/QueueRepository.php';
 require_once __DIR__ . '/src/Queue/CustomerQueueProcessor.php';
 require_once __DIR__ . '/src/Queue/OrderQueueProcessor.php';
+require_once __DIR__ . '/src/Queue/AbandonedCartJourneyProcessor.php';
 require_once __DIR__ . '/src/Customer/CustomerNormalizer.php';
 require_once __DIR__ . '/src/Customer/CustomerSyncLedger.php';
 require_once __DIR__ . '/src/Customer/CustomerEventService.php';
@@ -29,6 +31,7 @@ require_once __DIR__ . '/src/Cart/CartEligibilityPolicy.php';
 require_once __DIR__ . '/src/Cart/CartRepository.php';
 require_once __DIR__ . '/src/Cart/CartCaptureService.php';
 require_once __DIR__ . '/src/Cart/CartAbandonmentDetector.php';
+require_once __DIR__ . '/src/Journey/JourneyEventAuditRepository.php';
 
 use Emmakex\PrestaShopSalesforceMarketingCloud\Cart\CartAbandonmentDetector;
 use Emmakex\PrestaShopSalesforceMarketingCloud\Cart\CartCaptureService;
@@ -44,13 +47,16 @@ use Emmakex\PrestaShopSalesforceMarketingCloud\Customer\CustomerBackfillService;
 use Emmakex\PrestaShopSalesforceMarketingCloud\Customer\CustomerDataExtensionWriter;
 use Emmakex\PrestaShopSalesforceMarketingCloud\Customer\CustomerEventService;
 use Emmakex\PrestaShopSalesforceMarketingCloud\Customer\CustomerSyncLedger;
+use Emmakex\PrestaShopSalesforceMarketingCloud\Journey\JourneyEventAuditRepository;
 use Emmakex\PrestaShopSalesforceMarketingCloud\Order\OrderDataExtensionWriter;
 use Emmakex\PrestaShopSalesforceMarketingCloud\Order\OrderEventService;
 use Emmakex\PrestaShopSalesforceMarketingCloud\Order\OrderSyncLedger;
+use Emmakex\PrestaShopSalesforceMarketingCloud\Queue\AbandonedCartJourneyProcessor;
 use Emmakex\PrestaShopSalesforceMarketingCloud\Queue\CustomerQueueProcessor;
 use Emmakex\PrestaShopSalesforceMarketingCloud\Queue\OrderQueueProcessor;
 use Emmakex\PrestaShopSalesforceMarketingCloud\Queue\QueueRepository;
 use Emmakex\PrestaShopSalesforceMarketingCloud\Salesforce\AuthClient;
+use Emmakex\PrestaShopSalesforceMarketingCloud\Salesforce\JourneyClient;
 use Emmakex\PrestaShopSalesforceMarketingCloud\Salesforce\RestClient;
 
 class PsSalesforceBridge extends Module
@@ -65,14 +71,17 @@ class PsSalesforceBridge extends Module
     const CONFIG_CART_CONSENT_MODE = 'PS_SFMC_CART_CONSENT_MODE';
     const CONFIG_CUSTOMER_DE_KEY = 'PS_SFMC_CUSTOMER_DE_KEY';
     const CONFIG_ORDER_DE_KEY = 'PS_SFMC_ORDER_DE_KEY';
+    const CONFIG_JOURNEY_EVENT_DEFINITION_KEY = 'PS_SFMC_JOURNEY_EVENT_DEFINITION_KEY';
     const CONFIG_CRON_TOKEN = 'PS_SFMC_CRON_TOKEN';
     const CONFIG_CUSTOMER_BACKFILL_BATCH = 'PS_SFMC_CUSTOMER_BACKFILL_BATCH';
+
+    private $salesforceRestClientCache;
 
     public function __construct()
     {
         $this->name = 'pssalesforcebridge';
         $this->tab = 'advertising_marketing';
-        $this->version = '0.4.0';
+        $this->version = '0.5.0';
         $this->author = 'Emmakex';
         $this->need_instance = 0;
         $this->bootstrap = true;
@@ -211,10 +220,9 @@ class PsSalesforceBridge extends Module
             throw new RuntimeException('Customer Data Extension external key is not configured.');
         }
 
-        $rest = $this->salesforceRestClient();
         $processor = new CustomerQueueProcessor(
             new QueueRepository(),
-            new CustomerDataExtensionWriter($rest, $externalKey),
+            new CustomerDataExtensionWriter($this->salesforceRestClient(), $externalKey),
             new CustomerSyncLedger()
         );
 
@@ -232,11 +240,35 @@ class PsSalesforceBridge extends Module
             throw new RuntimeException('Order Data Extension external key is not configured.');
         }
 
-        $rest = $this->salesforceRestClient();
         $processor = new OrderQueueProcessor(
             new QueueRepository(),
-            new OrderDataExtensionWriter($rest, $externalKey),
+            new OrderDataExtensionWriter($this->salesforceRestClient(), $externalKey),
             new OrderSyncLedger()
+        );
+
+        return $processor->process($limit);
+    }
+
+    public function processAbandonedCartJourneyQueue($limit = 20)
+    {
+        if ((string) Configuration::get(self::CONFIG_MODE) !== 'production') {
+            return ['skipped' => 'test_mode', 'claimed' => 0, 'processed' => 0, 'suppressed' => 0, 'retry' => 0, 'failed' => 0];
+        }
+
+        $eventDefinitionKey = trim((string) Configuration::get(self::CONFIG_JOURNEY_EVENT_DEFINITION_KEY));
+        if ($eventDefinitionKey === '') {
+            throw new RuntimeException('Journey Event Definition Key is not configured.');
+        }
+
+        $processor = new AbandonedCartJourneyProcessor(
+            new QueueRepository(),
+            new CartRepository(),
+            new OrderSyncLedger(),
+            new CartEligibilityPolicy(),
+            new JourneyClient($this->salesforceRestClient(), $eventDefinitionKey),
+            new JourneyEventAuditRepository(),
+            (string) Configuration::get(self::CONFIG_CART_CONSENT_MODE),
+            $eventDefinitionKey
         );
 
         return $processor->process($limit);
@@ -244,6 +276,10 @@ class PsSalesforceBridge extends Module
 
     private function salesforceRestClient()
     {
+        if ($this->salesforceRestClientCache instanceof RestClient) {
+            return $this->salesforceRestClientCache;
+        }
+
         $auth = new AuthClient(
             (string) Configuration::get(self::CONFIG_AUTH_BASE_URI),
             (string) Configuration::get(self::CONFIG_CLIENT_ID),
@@ -252,10 +288,12 @@ class PsSalesforceBridge extends Module
         );
         $token = $auth->requestAccessToken();
 
-        return new RestClient(
+        $this->salesforceRestClientCache = new RestClient(
             (string) Configuration::get(self::CONFIG_REST_BASE_URI),
             isset($token['access_token']) ? (string) $token['access_token'] : ''
         );
+
+        return $this->salesforceRestClientCache;
     }
 
     private function captureCustomerEvent($eventType, array $params)
@@ -295,6 +333,7 @@ class PsSalesforceBridge extends Module
             && Configuration::updateValue(self::CONFIG_CART_CONSENT_MODE, CartEligibilityPolicy::MODE_MARKETING_OPTIN)
             && Configuration::updateValue(self::CONFIG_CUSTOMER_DE_KEY, 'PS_CUSTOMERS')
             && Configuration::updateValue(self::CONFIG_ORDER_DE_KEY, 'PS_ORDERS')
+            && Configuration::updateValue(self::CONFIG_JOURNEY_EVENT_DEFINITION_KEY, 'PRESTASHOP_ABANDONED_CART')
             && Configuration::updateValue(self::CONFIG_CUSTOMER_BACKFILL_BATCH, 50)
             && Configuration::updateValue(self::CONFIG_CRON_TOKEN, bin2hex(random_bytes(24)));
     }
@@ -312,6 +351,7 @@ class PsSalesforceBridge extends Module
             self::CONFIG_CART_CONSENT_MODE,
             self::CONFIG_CUSTOMER_DE_KEY,
             self::CONFIG_ORDER_DE_KEY,
+            self::CONFIG_JOURNEY_EVENT_DEFINITION_KEY,
             self::CONFIG_CRON_TOKEN,
             self::CONFIG_CUSTOMER_BACKFILL_BATCH,
         ];
@@ -432,6 +472,28 @@ class PsSalesforceBridge extends Module
                 UNIQUE KEY `uniq_sfmc_cart_item` (`id_shop`, `id_cart`, `line_key`),
                 KEY `idx_sfmc_cart_item_cart` (`id_shop`, `id_cart`)
             ) ENGINE={$engine} DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+            "CREATE TABLE IF NOT EXISTS `{$prefix}sfmc_journey_event` (
+                `id_sfmc_journey_event` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+                `id_sfmc_queue` BIGINT UNSIGNED NOT NULL,
+                `id_shop` INT UNSIGNED NOT NULL,
+                `id_cart` INT UNSIGNED NOT NULL,
+                `contact_key` VARCHAR(191) NOT NULL,
+                `event_definition_key` VARCHAR(191) NOT NULL,
+                `snapshot_hash` CHAR(40) NOT NULL,
+                `bridge_event_key` VARCHAR(191) NOT NULL,
+                `status` VARCHAR(16) NOT NULL DEFAULT 'processing',
+                `event_instance_id` VARCHAR(191) NULL,
+                `suppression_reason` VARCHAR(191) NULL,
+                `last_error` TEXT NULL,
+                `sent_at` DATETIME NULL,
+                `created_at` DATETIME NOT NULL,
+                `updated_at` DATETIME NOT NULL,
+                PRIMARY KEY (`id_sfmc_journey_event`),
+                UNIQUE KEY `uniq_sfmc_journey_queue` (`id_sfmc_queue`),
+                KEY `idx_sfmc_journey_cart` (`id_shop`, `id_cart`),
+                KEY `idx_sfmc_journey_status` (`status`),
+                KEY `idx_sfmc_journey_contact` (`contact_key`)
+            ) ENGINE={$engine} DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
             "CREATE TABLE IF NOT EXISTS `{$prefix}sfmc_customer_backfill` (
                 `id_sfmc_customer_backfill` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
                 `id_shop` INT UNSIGNED NOT NULL,
@@ -461,7 +523,8 @@ class PsSalesforceBridge extends Module
     {
         $prefix = _DB_PREFIX_;
 
-        return Db::getInstance()->execute("DROP TABLE IF EXISTS `{$prefix}sfmc_cart_item`")
+        return Db::getInstance()->execute("DROP TABLE IF EXISTS `{$prefix}sfmc_journey_event`")
+            && Db::getInstance()->execute("DROP TABLE IF EXISTS `{$prefix}sfmc_cart_item`")
             && Db::getInstance()->execute("DROP TABLE IF EXISTS `{$prefix}sfmc_cart`")
             && Db::getInstance()->execute("DROP TABLE IF EXISTS `{$prefix}sfmc_customer_backfill`")
             && Db::getInstance()->execute("DROP TABLE IF EXISTS `{$prefix}sfmc_order_sync`")
@@ -486,7 +549,11 @@ class PsSalesforceBridge extends Module
             $output .= $this->startCustomerBackfill();
         }
 
-        return $output . $this->renderBackfillStatus() . $this->renderCartStatus() . $this->renderForm();
+        return $output
+            . $this->renderBackfillStatus()
+            . $this->renderCartStatus()
+            . $this->renderJourneyStatus()
+            . $this->renderForm();
     }
 
     private function startCustomerBackfill()
@@ -540,6 +607,21 @@ class PsSalesforceBridge extends Module
         return $this->displayInformation($this->l('Cart snapshot status: ') . implode(' | ', $parts));
     }
 
+    private function renderJourneyStatus()
+    {
+        $rows = (new JourneyEventAuditRepository())->summary();
+        if (empty($rows)) {
+            return $this->displayInformation($this->l('No Journey Builder delivery attempts have been recorded yet.'));
+        }
+
+        $parts = [];
+        foreach ($rows as $row) {
+            $parts[] = (isset($row['status']) ? (string) $row['status'] : 'unknown') . ': ' . (isset($row['total']) ? (int) $row['total'] : 0);
+        }
+
+        return $this->displayInformation($this->l('Journey delivery status: ') . implode(' | ', $parts));
+    }
+
     private function saveConfiguration()
     {
         $authBaseUri = rtrim(trim((string) Tools::getValue(self::CONFIG_AUTH_BASE_URI)), '/');
@@ -554,6 +636,7 @@ class PsSalesforceBridge extends Module
             : CartEligibilityPolicy::MODE_MARKETING_OPTIN;
         $customerDeKey = trim((string) Tools::getValue(self::CONFIG_CUSTOMER_DE_KEY));
         $orderDeKey = trim((string) Tools::getValue(self::CONFIG_ORDER_DE_KEY));
+        $journeyEventDefinitionKey = trim((string) Tools::getValue(self::CONFIG_JOURNEY_EVENT_DEFINITION_KEY));
         $backfillBatch = max(10, min(500, (int) Tools::getValue(self::CONFIG_CUSTOMER_BACKFILL_BATCH)));
 
         if (!$this->isHttpsUri($authBaseUri) || !$this->isHttpsUri($restBaseUri)) {
@@ -572,6 +655,10 @@ class PsSalesforceBridge extends Module
             return $this->displayError($this->l('Order Data Extension External Key is required.'));
         }
 
+        if ($journeyEventDefinitionKey === '' || !preg_match('/^[A-Za-z0-9_-]+$/', $journeyEventDefinitionKey)) {
+            return $this->displayError($this->l('Journey Event Definition Key is required and may contain only letters, numbers, underscores and hyphens.'));
+        }
+
         Configuration::updateValue(self::CONFIG_AUTH_BASE_URI, $authBaseUri);
         Configuration::updateValue(self::CONFIG_REST_BASE_URI, $restBaseUri);
         Configuration::updateValue(self::CONFIG_CLIENT_ID, $clientId);
@@ -581,11 +668,14 @@ class PsSalesforceBridge extends Module
         Configuration::updateValue(self::CONFIG_CART_CONSENT_MODE, $consentMode);
         Configuration::updateValue(self::CONFIG_CUSTOMER_DE_KEY, $customerDeKey);
         Configuration::updateValue(self::CONFIG_ORDER_DE_KEY, $orderDeKey);
+        Configuration::updateValue(self::CONFIG_JOURNEY_EVENT_DEFINITION_KEY, $journeyEventDefinitionKey);
         Configuration::updateValue(self::CONFIG_CUSTOMER_BACKFILL_BATCH, $backfillBatch);
 
         if ($clientSecret !== '') {
             Configuration::updateValue(self::CONFIG_CLIENT_SECRET, $clientSecret);
         }
+
+        $this->salesforceRestClientCache = null;
 
         return $this->displayConfirmation($this->l('Configuration saved.'));
     }
@@ -640,6 +730,7 @@ class PsSalesforceBridge extends Module
             self::CONFIG_CART_CONSENT_MODE => (string) Configuration::get(self::CONFIG_CART_CONSENT_MODE),
             self::CONFIG_CUSTOMER_DE_KEY => (string) Configuration::get(self::CONFIG_CUSTOMER_DE_KEY),
             self::CONFIG_ORDER_DE_KEY => (string) Configuration::get(self::CONFIG_ORDER_DE_KEY),
+            self::CONFIG_JOURNEY_EVENT_DEFINITION_KEY => (string) Configuration::get(self::CONFIG_JOURNEY_EVENT_DEFINITION_KEY),
             self::CONFIG_CRON_TOKEN => $cronToken,
             self::CONFIG_CUSTOMER_BACKFILL_BATCH => (int) Configuration::get(self::CONFIG_CUSTOMER_BACKFILL_BATCH),
             'PS_SFMC_CRON_URL' => $cronUrl,
@@ -659,6 +750,7 @@ class PsSalesforceBridge extends Module
                     ['type' => 'text', 'label' => $this->l('Business Unit MID / Account ID'), 'name' => self::CONFIG_ACCOUNT_ID],
                     ['type' => 'text', 'label' => $this->l('Customer Data Extension External Key'), 'name' => self::CONFIG_CUSTOMER_DE_KEY, 'required' => true],
                     ['type' => 'text', 'label' => $this->l('Order Data Extension External Key'), 'name' => self::CONFIG_ORDER_DE_KEY, 'required' => true],
+                    ['type' => 'text', 'label' => $this->l('Journey Event Definition Key'), 'name' => self::CONFIG_JOURNEY_EVENT_DEFINITION_KEY, 'required' => true, 'desc' => $this->l('Default: PRESTASHOP_ABANDONED_CART. Create and activate the matching API Entry Event in Journey Builder before enabling Production.')],
                     [
                         'type' => 'select',
                         'label' => $this->l('Mode'),

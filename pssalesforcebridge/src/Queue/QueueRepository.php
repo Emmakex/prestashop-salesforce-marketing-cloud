@@ -41,7 +41,16 @@ final class QueueRepository
 
     public function claimOrderBatch($limit, $lockToken)
     {
-        return $this->claimBatchByEventTypes(['ORDER_CREATED'], $limit, $lockToken);
+        return $this->claimBatchByEventTypes(
+            ['ORDER_CREATED', 'ORDER_UPDATED', 'ORDER_PAID', 'ORDER_CANCELLED'],
+            $limit,
+            $lockToken
+        );
+    }
+
+    public function claimAbandonedCartBatch($limit, $lockToken)
+    {
+        return $this->claimBatchByEventTypes(['CART_ABANDONED'], $limit, $lockToken);
     }
 
     private function claimBatchByEventTypes(array $eventTypes, $limit, $lockToken)
