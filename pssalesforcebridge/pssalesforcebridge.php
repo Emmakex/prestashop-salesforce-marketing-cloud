@@ -34,6 +34,9 @@ require_once __DIR__ . '/src/Cart/CartAbandonmentDetector.php';
 require_once __DIR__ . '/src/Journey/JourneyEventAuditRepository.php';
 require_once __DIR__ . '/src/Recovery/RecoveryTokenRepository.php';
 require_once __DIR__ . '/src/Recovery/RecoveryLinkService.php';
+require_once __DIR__ . '/src/Operations/HealthService.php';
+require_once __DIR__ . '/src/Operations/BackOfficeHealthDashboard.php';
+require_once __DIR__ . '/src/Operations/ModuleHealthTrait.php';
 
 use Emmakex\PrestaShopSalesforceMarketingCloud\Cart\CartAbandonmentDetector;
 use Emmakex\PrestaShopSalesforceMarketingCloud\Cart\CartCaptureService;
@@ -65,6 +68,8 @@ use Emmakex\PrestaShopSalesforceMarketingCloud\Salesforce\RestClient;
 
 class PsSalesforceBridge extends Module
 {
+    use \Emmakex\PrestaShopSalesforceMarketingCloud\Operations\ModuleHealthTrait;
+
     const CONFIG_AUTH_BASE_URI = 'PS_SFMC_AUTH_BASE_URI';
     const CONFIG_REST_BASE_URI = 'PS_SFMC_REST_BASE_URI';
     const CONFIG_CLIENT_ID = 'PS_SFMC_CLIENT_ID';
@@ -607,10 +612,7 @@ class PsSalesforceBridge extends Module
         }
 
         return $output
-            . $this->renderBackfillStatus()
-            . $this->renderCartStatus()
-            . $this->renderJourneyStatus()
-            . $this->renderRecoveryStatus()
+            . $this->renderHealthDashboard()
             . $this->renderForm();
     }
 
