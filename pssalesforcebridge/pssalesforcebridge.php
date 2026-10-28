@@ -101,7 +101,7 @@ class PsSalesforceBridge extends Module
     {
         $this->name = 'pssalesforcebridge';
         $this->tab = 'advertising_marketing';
-        $this->version = '0.6.1';
+        $this->version = '0.7.0';
         $this->author = 'Emmakex';
         $this->need_instance = 0;
         $this->bootstrap = true;
