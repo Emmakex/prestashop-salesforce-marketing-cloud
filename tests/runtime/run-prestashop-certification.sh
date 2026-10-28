@@ -55,6 +55,23 @@ wait_for_shop() {
   fi
 }
 
+fetch_endpoint() {
+  local name="$1"
+  local url="$2"
+  local output="$3"
+  local timeout="$4"
+  local status
+
+  status="$(curl -sS --max-time "$timeout" -o "$output" -w '%{http_code}' "$url")"
+  if [ "$status" != '200' ]; then
+    echo "${name} endpoint returned HTTP ${status}" >&2
+    echo "--- ${name} response body ---" >&2
+    cat "$output" >&2 || true
+    echo >&2
+    exit 1
+  fi
+}
+
 echo "==> Preparing exact module fixtures"
 rm -rf /tmp/pssfmc-runtime-061 /tmp/pssfmc-runtime-070 "$ROOT/build/runtime"
 mkdir -p /tmp/pssfmc-runtime-061 /tmp/pssfmc-runtime-070 "$ROOT/build/runtime"
@@ -163,7 +180,11 @@ echo "==> Verifying protected health and cron endpoints"
 TOKEN="$(sql "SELECT value FROM ps_configuration WHERE name='PS_SFMC_CRON_TOKEN' ORDER BY id_configuration DESC LIMIT 1")"
 test -n "$TOKEN"
 
-curl -fsS --max-time 10 "http://127.0.0.1:${PORT}/module/pssalesforcebridge/health?token=${TOKEN}" > /tmp/pssfmc-health.json
+fetch_endpoint \
+  'health' \
+  "http://127.0.0.1:${PORT}/module/pssalesforcebridge/health?token=${TOKEN}" \
+  /tmp/pssfmc-health.json \
+  10
 python3 - <<'PY'
 import json
 with open('/tmp/pssfmc-health.json', 'r', encoding='utf-8') as fh:
@@ -173,7 +194,11 @@ assert report['module_version'] == '0.7.0', report
 assert report['ok'] is True, report
 PY
 
-curl -fsS --max-time 20 "http://127.0.0.1:${PORT}/module/pssalesforcebridge/cron?token=${TOKEN}" > /tmp/pssfmc-cron.json
+fetch_endpoint \
+  'cron' \
+  "http://127.0.0.1:${PORT}/module/pssalesforcebridge/cron?token=${TOKEN}" \
+  /tmp/pssfmc-cron.json \
+  20
 python3 - <<'PY'
 import json
 with open('/tmp/pssfmc-cron.json', 'r', encoding='utf-8') as fh:
