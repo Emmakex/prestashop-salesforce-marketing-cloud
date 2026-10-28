@@ -10,6 +10,15 @@
 - [x] queue/log persistence foundations
 - [x] package ZIP CI artifact
 
+## 0.1.1 — Cross-version compatibility foundation
+
+- [x] support target defined for PrestaShop 1.7.8.x, 8.x and 9.x
+- [x] centralized PrestaShop compatibility contract
+- [x] module installation range widened to 1.7.8.0–9.x
+- [x] compatibility/adaptor architecture rule documented
+- [x] PHP syntax CI expanded across representative legacy/current runtimes
+- [ ] runtime certification against real PrestaShop fixtures/containers per supported family
+
 ## 0.2.0 — Customer synchronization
 
 - customer create/update hooks
@@ -18,6 +27,7 @@
 - Marketing Cloud customer Data Extension contract
 - consent/newsletter mapping
 - initial backfill command
+- customer adapter contract shared by PrestaShop 1.7.8, 8 and 9
 
 ## 0.3.0 — Orders
 
@@ -25,6 +35,7 @@
 - order Data Extension contract
 - cart-to-order conversion tracking
 - suppression of abandoned-cart candidates after conversion
+- order adapter contract shared by supported PrestaShop families
 
 ## 0.4.0 — Abandoned carts
 
@@ -33,6 +44,7 @@
 - cart + cart item snapshot
 - eligibility checks
 - deduplication
+- cart adapter contract shared by supported PrestaShop families
 
 ## 0.5.0 — Journey Builder
 
@@ -55,4 +67,4 @@
 - queue metrics
 - privacy/log retention controls
 - release ZIP and upgrade scripts
-- PrestaShop 9 compatibility certification
+- runtime certification matrix for PrestaShop 1.7.8.x, 8.x and 9.x

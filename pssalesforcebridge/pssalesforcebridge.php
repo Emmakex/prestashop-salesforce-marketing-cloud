@@ -4,8 +4,10 @@ if (!defined('_PS_VERSION_')) {
     exit;
 }
 
+require_once __DIR__ . '/src/Compatibility/Platform.php';
 require_once __DIR__ . '/src/Salesforce/AuthClient.php';
 
+use Emmakex\PrestaShopSalesforceMarketingCloud\Compatibility\Platform;
 use Emmakex\PrestaShopSalesforceMarketingCloud\Salesforce\AuthClient;
 
 class PsSalesforceBridge extends Module
@@ -22,11 +24,14 @@ class PsSalesforceBridge extends Module
     {
         $this->name = 'pssalesforcebridge';
         $this->tab = 'advertising_marketing';
-        $this->version = '0.1.0';
+        $this->version = '0.1.1';
         $this->author = 'Emmakex';
         $this->need_instance = 0;
         $this->bootstrap = true;
-        $this->ps_versions_compliancy = ['min' => '8.0.0', 'max' => '9.99.99'];
+        $this->ps_versions_compliancy = [
+            'min' => Platform::MIN_PRESTASHOP,
+            'max' => Platform::MAX_PRESTASHOP,
+        ];
 
         parent::__construct();
 
@@ -37,6 +42,10 @@ class PsSalesforceBridge extends Module
 
     public function install()
     {
+        if (!Platform::isSupported()) {
+            return false;
+        }
+
         return parent::install()
             && $this->installConfiguration()
             && $this->installDatabase();
