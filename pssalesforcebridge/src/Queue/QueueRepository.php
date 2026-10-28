@@ -157,6 +157,7 @@ final class QueueRepository
         $rows = Db::getInstance()->executeS(
             'SELECT `event_type`, `status`, COUNT(*) AS `total` '
             . 'FROM `' . _DB_PREFIX_ . 'sfmc_queue` '
+            . "WHERE `status` IN ('pending', 'processing', 'retry', 'failed') "
             . 'GROUP BY `event_type`, `status` '
             . 'ORDER BY `event_type` ASC, `status` ASC'
         );
