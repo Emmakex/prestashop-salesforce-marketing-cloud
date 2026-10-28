@@ -7,18 +7,23 @@ if (!defined('_PS_VERSION_')) {
 require_once __DIR__ . '/src/Compatibility/Platform.php';
 require_once __DIR__ . '/src/Compatibility/CustomerHookAdapter.php';
 require_once __DIR__ . '/src/Salesforce/AuthClient.php';
+require_once __DIR__ . '/src/Salesforce/RestClient.php';
 require_once __DIR__ . '/src/Queue/QueueRepository.php';
+require_once __DIR__ . '/src/Queue/CustomerQueueProcessor.php';
 require_once __DIR__ . '/src/Customer/CustomerNormalizer.php';
 require_once __DIR__ . '/src/Customer/CustomerSyncLedger.php';
 require_once __DIR__ . '/src/Customer/CustomerEventService.php';
+require_once __DIR__ . '/src/Customer/CustomerDataExtensionWriter.php';
 
 use Emmakex\PrestaShopSalesforceMarketingCloud\Compatibility\CustomerHookAdapter;
 use Emmakex\PrestaShopSalesforceMarketingCloud\Compatibility\Platform;
+use Emmakex\PrestaShopSalesforceMarketingCloud\Customer\CustomerDataExtensionWriter;
 use Emmakex\PrestaShopSalesforceMarketingCloud\Customer\CustomerEventService;
-use Emmakex\PrestaShopSalesforceMarketingCloud\Customer\CustomerNormalizer;
 use Emmakex\PrestaShopSalesforceMarketingCloud\Customer\CustomerSyncLedger;
+use Emmakex\PrestaShopSalesforceMarketingCloud\Queue\CustomerQueueProcessor;
 use Emmakex\PrestaShopSalesforceMarketingCloud\Queue\QueueRepository;
 use Emmakex\PrestaShopSalesforceMarketingCloud\Salesforce\AuthClient;
+use Emmakex\PrestaShopSalesforceMarketingCloud\Salesforce\RestClient;
 
 class PsSalesforceBridge extends Module
 {
@@ -29,12 +34,14 @@ class PsSalesforceBridge extends Module
     const CONFIG_ACCOUNT_ID = 'PS_SFMC_ACCOUNT_ID';
     const CONFIG_MODE = 'PS_SFMC_MODE';
     const CONFIG_CART_ABANDON_MINUTES = 'PS_SFMC_CART_ABANDON_MINUTES';
+    const CONFIG_CUSTOMER_DE_KEY = 'PS_SFMC_CUSTOMER_DE_KEY';
+    const CONFIG_CRON_TOKEN = 'PS_SFMC_CRON_TOKEN';
 
     public function __construct()
     {
         $this->name = 'pssalesforcebridge';
         $this->tab = 'advertising_marketing';
-        $this->version = '0.2.0';
+        $this->version = '0.2.1';
         $this->author = 'Emmakex';
         $this->need_instance = 0;
         $this->bootstrap = true;
@@ -80,6 +87,39 @@ class PsSalesforceBridge extends Module
         return $this->captureCustomerEvent('CUSTOMER_UPDATED', is_array($params) ? $params : []);
     }
 
+    public function processCustomerQueue($limit = 20)
+    {
+        if ((string) Configuration::get(self::CONFIG_MODE) !== 'production') {
+            return ['skipped' => 'test_mode', 'claimed' => 0, 'processed' => 0, 'retry' => 0, 'failed' => 0];
+        }
+
+        $externalKey = trim((string) Configuration::get(self::CONFIG_CUSTOMER_DE_KEY));
+        if ($externalKey === '') {
+            throw new RuntimeException('Customer Data Extension external key is not configured.');
+        }
+
+        $auth = new AuthClient(
+            (string) Configuration::get(self::CONFIG_AUTH_BASE_URI),
+            (string) Configuration::get(self::CONFIG_CLIENT_ID),
+            (string) Configuration::get(self::CONFIG_CLIENT_SECRET),
+            (string) Configuration::get(self::CONFIG_ACCOUNT_ID)
+        );
+        $token = $auth->requestAccessToken();
+
+        $rest = new RestClient(
+            (string) Configuration::get(self::CONFIG_REST_BASE_URI),
+            isset($token['access_token']) ? (string) $token['access_token'] : ''
+        );
+
+        $processor = new CustomerQueueProcessor(
+            new QueueRepository(),
+            new CustomerDataExtensionWriter($rest, $externalKey),
+            new CustomerSyncLedger()
+        );
+
+        return $processor->process($limit);
+    }
+
     private function captureCustomerEvent($eventType, array $params)
     {
         $customer = CustomerHookAdapter::customerFromParams($params);
@@ -96,7 +136,9 @@ class PsSalesforceBridge extends Module
     private function installConfiguration()
     {
         return Configuration::updateValue(self::CONFIG_MODE, 'test')
-            && Configuration::updateValue(self::CONFIG_CART_ABANDON_MINUTES, 60);
+            && Configuration::updateValue(self::CONFIG_CART_ABANDON_MINUTES, 60)
+            && Configuration::updateValue(self::CONFIG_CUSTOMER_DE_KEY, 'PS_CUSTOMERS')
+            && Configuration::updateValue(self::CONFIG_CRON_TOKEN, bin2hex(random_bytes(24)));
     }
 
     private function uninstallConfiguration()
@@ -109,6 +151,8 @@ class PsSalesforceBridge extends Module
             self::CONFIG_ACCOUNT_ID,
             self::CONFIG_MODE,
             self::CONFIG_CART_ABANDON_MINUTES,
+            self::CONFIG_CUSTOMER_DE_KEY,
+            self::CONFIG_CRON_TOKEN,
         ];
 
         foreach ($keys as $key) {
@@ -137,9 +181,12 @@ class PsSalesforceBridge extends Module
                 `created_at` DATETIME NOT NULL,
                 `processed_at` DATETIME NULL,
                 `last_error` TEXT NULL,
+                `lock_token` VARCHAR(64) NULL,
+                `locked_at` DATETIME NULL,
                 PRIMARY KEY (`id_sfmc_queue`),
                 UNIQUE KEY `uniq_sfmc_dedupe` (`dedupe_key`),
-                KEY `idx_sfmc_queue_ready` (`status`, `available_at`)
+                KEY `idx_sfmc_queue_ready` (`status`, `available_at`),
+                KEY `idx_sfmc_queue_lock` (`lock_token`)
             ) ENGINE={$engine} DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
             "CREATE TABLE IF NOT EXISTS `{$prefix}sfmc_log` (
                 `id_sfmc_log` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -207,6 +254,7 @@ class PsSalesforceBridge extends Module
         $accountId = trim((string) Tools::getValue(self::CONFIG_ACCOUNT_ID));
         $mode = Tools::getValue(self::CONFIG_MODE) === 'production' ? 'production' : 'test';
         $abandonMinutes = max(15, (int) Tools::getValue(self::CONFIG_CART_ABANDON_MINUTES));
+        $customerDeKey = trim((string) Tools::getValue(self::CONFIG_CUSTOMER_DE_KEY));
 
         if (!$this->isHttpsUri($authBaseUri) || !$this->isHttpsUri($restBaseUri)) {
             return $this->displayError($this->l('Authentication and REST Base URIs must be valid HTTPS URLs.'));
@@ -216,12 +264,17 @@ class PsSalesforceBridge extends Module
             return $this->displayError($this->l('Client ID is required.'));
         }
 
+        if ($customerDeKey === '') {
+            return $this->displayError($this->l('Customer Data Extension External Key is required.'));
+        }
+
         Configuration::updateValue(self::CONFIG_AUTH_BASE_URI, $authBaseUri);
         Configuration::updateValue(self::CONFIG_REST_BASE_URI, $restBaseUri);
         Configuration::updateValue(self::CONFIG_CLIENT_ID, $clientId);
         Configuration::updateValue(self::CONFIG_ACCOUNT_ID, $accountId);
         Configuration::updateValue(self::CONFIG_MODE, $mode);
         Configuration::updateValue(self::CONFIG_CART_ABANDON_MINUTES, $abandonMinutes);
+        Configuration::updateValue(self::CONFIG_CUSTOMER_DE_KEY, $customerDeKey);
 
         if ($clientSecret !== '') {
             Configuration::updateValue(self::CONFIG_CLIENT_SECRET, $clientSecret);
@@ -263,6 +316,12 @@ class PsSalesforceBridge extends Module
         $helper->default_form_language = (int) Configuration::get('PS_LANG_DEFAULT');
         $helper->allow_employee_form_lang = (int) Configuration::get('PS_BO_ALLOW_EMPLOYEE_FORM_LANG');
 
+        $cronToken = (string) Configuration::get(self::CONFIG_CRON_TOKEN);
+        $cronUrl = '';
+        if (isset($this->context->link)) {
+            $cronUrl = $this->context->link->getModuleLink($this->name, 'cron', ['token' => $cronToken], true);
+        }
+
         $helper->fields_value = [
             self::CONFIG_AUTH_BASE_URI => (string) Configuration::get(self::CONFIG_AUTH_BASE_URI),
             self::CONFIG_REST_BASE_URI => (string) Configuration::get(self::CONFIG_REST_BASE_URI),
@@ -271,6 +330,9 @@ class PsSalesforceBridge extends Module
             self::CONFIG_ACCOUNT_ID => (string) Configuration::get(self::CONFIG_ACCOUNT_ID),
             self::CONFIG_MODE => (string) Configuration::get(self::CONFIG_MODE),
             self::CONFIG_CART_ABANDON_MINUTES => (int) Configuration::get(self::CONFIG_CART_ABANDON_MINUTES),
+            self::CONFIG_CUSTOMER_DE_KEY => (string) Configuration::get(self::CONFIG_CUSTOMER_DE_KEY),
+            self::CONFIG_CRON_TOKEN => $cronToken,
+            'PS_SFMC_CRON_URL' => $cronUrl,
         ];
 
         $form = [
@@ -285,19 +347,22 @@ class PsSalesforceBridge extends Module
                     ['type' => 'text', 'label' => $this->l('Client ID'), 'name' => self::CONFIG_CLIENT_ID, 'required' => true],
                     ['type' => 'password', 'label' => $this->l('Client Secret'), 'name' => self::CONFIG_CLIENT_SECRET, 'desc' => $this->l('Leave blank to keep the existing secret.')],
                     ['type' => 'text', 'label' => $this->l('Business Unit MID / Account ID'), 'name' => self::CONFIG_ACCOUNT_ID],
+                    ['type' => 'text', 'label' => $this->l('Customer Data Extension External Key'), 'name' => self::CONFIG_CUSTOMER_DE_KEY, 'required' => true],
                     [
                         'type' => 'select',
                         'label' => $this->l('Mode'),
                         'name' => self::CONFIG_MODE,
                         'options' => [
                             'query' => [
-                                ['id' => 'test', 'name' => $this->l('Test')],
+                                ['id' => 'test', 'name' => $this->l('Test (no outbound customer writes)')],
                                 ['id' => 'production', 'name' => $this->l('Production')],
                             ],
                             'id' => 'id',
                             'name' => 'name',
                         ],
                     ],
+                    ['type' => 'text', 'label' => $this->l('Cron URL'), 'name' => 'PS_SFMC_CRON_URL', 'readonly' => true, 'desc' => $this->l('Call this protected URL from the server cron every 5 minutes.')],
+                    ['type' => 'text', 'label' => $this->l('Cron token'), 'name' => self::CONFIG_CRON_TOKEN, 'readonly' => true],
                     ['type' => 'text', 'label' => $this->l('Abandoned cart threshold (minutes)'), 'name' => self::CONFIG_CART_ABANDON_MINUTES, 'suffix' => $this->l('minutes')],
                 ],
                 'submit' => ['title' => $this->l('Save')],

@@ -19,7 +19,7 @@
 - [x] PHP syntax CI expanded across representative legacy/current runtimes
 - [ ] runtime certification against real PrestaShop fixtures/containers per supported family
 
-## 0.2.0 — Customer synchronization foundation
+## 0.2.0 — Customer event foundation
 
 - [x] customer create/update hooks
 - [x] canonical ContactKey: `ps_{shop_id}_{customer_id}`
@@ -27,7 +27,17 @@
 - [x] normalized customer Data Extension contract
 - [x] newsletter/opt-in source mapping
 - [x] customer hook compatibility adapter for PrestaShop 1.7.8, 8 and 9
-- [ ] Salesforce Data Extension writer / worker
+
+## 0.2.1 — Customer delivery worker
+
+- [x] Salesforce REST client
+- [x] Data Extension upsert by External Key
+- [x] configurable customer Data Extension key
+- [x] protected cron endpoint
+- [x] queue claiming with concurrency lock
+- [x] exponential retry and terminal failure after five attempts
+- [x] test mode blocks outbound customer writes
+- [x] upgrade path from 0.2.0
 - [ ] initial customer backfill command
 
 ## 0.3.0 — Orders
@@ -63,7 +73,6 @@
 
 ## 0.7.0 — Production hardening
 
-- CLI/cron worker
 - health/status dashboard
 - queue metrics
 - privacy/log retention controls
