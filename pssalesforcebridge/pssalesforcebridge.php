@@ -86,7 +86,7 @@ class PsSalesforceBridge extends Module
     {
         $this->name = 'pssalesforcebridge';
         $this->tab = 'advertising_marketing';
-        $this->version = '0.6.0';
+        $this->version = '0.6.1';
         $this->author = 'Emmakex';
         $this->need_instance = 0;
         $this->bootstrap = true;
@@ -528,6 +528,27 @@ class PsSalesforceBridge extends Module
                 KEY `idx_sfmc_recovery_expiry` (`expires_at`, `used_at`),
                 KEY `idx_sfmc_recovery_cart` (`recovered_cart_id`)
             ) ENGINE={$engine} DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+            "CREATE TABLE IF NOT EXISTS `{$prefix}sfmc_recovery_order` (
+                `id_sfmc_recovery_order` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+                `id_sfmc_recovery_token` BIGINT UNSIGNED NOT NULL,
+                `id_shop` INT UNSIGNED NOT NULL,
+                `source_cart_id` INT UNSIGNED NOT NULL,
+                `recovered_cart_id` INT UNSIGNED NOT NULL,
+                `id_order` INT UNSIGNED NOT NULL,
+                `order_total` DECIMAL(20,6) NOT NULL DEFAULT 0,
+                `currency` VARCHAR(8) NOT NULL DEFAULT '',
+                `state_id` INT UNSIGNED NOT NULL DEFAULT 0,
+                `paid` TINYINT(1) NOT NULL DEFAULT 0,
+                `valid` TINYINT(1) NOT NULL DEFAULT 0,
+                `converted_at` DATETIME NOT NULL,
+                `created_at` DATETIME NOT NULL,
+                `updated_at` DATETIME NOT NULL,
+                PRIMARY KEY (`id_sfmc_recovery_order`),
+                UNIQUE KEY `uniq_sfmc_recovery_order` (`id_shop`, `id_order`),
+                KEY `idx_sfmc_recovery_order_token` (`id_sfmc_recovery_token`),
+                KEY `idx_sfmc_recovery_order_cart` (`id_shop`, `recovered_cart_id`),
+                KEY `idx_sfmc_recovery_order_paid` (`paid`, `currency`)
+            ) ENGINE={$engine} DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
             "CREATE TABLE IF NOT EXISTS `{$prefix}sfmc_customer_backfill` (
                 `id_sfmc_customer_backfill` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
                 `id_shop` INT UNSIGNED NOT NULL,
@@ -557,7 +578,8 @@ class PsSalesforceBridge extends Module
     {
         $prefix = _DB_PREFIX_;
 
-        return Db::getInstance()->execute("DROP TABLE IF EXISTS `{$prefix}sfmc_recovery_token`")
+        return Db::getInstance()->execute("DROP TABLE IF EXISTS `{$prefix}sfmc_recovery_order`")
+            && Db::getInstance()->execute("DROP TABLE IF EXISTS `{$prefix}sfmc_recovery_token`")
             && Db::getInstance()->execute("DROP TABLE IF EXISTS `{$prefix}sfmc_journey_event`")
             && Db::getInstance()->execute("DROP TABLE IF EXISTS `{$prefix}sfmc_cart_item`")
             && Db::getInstance()->execute("DROP TABLE IF EXISTS `{$prefix}sfmc_cart`")
@@ -660,17 +682,40 @@ class PsSalesforceBridge extends Module
 
     private function renderRecoveryStatus()
     {
-        $row = (new RecoveryTokenRepository())->summary();
+        $repository = new RecoveryTokenRepository();
+        $row = $repository->summary();
         if (empty($row)) {
             return $this->displayInformation($this->l('No cart recovery links have been generated yet.'));
         }
 
-        return $this->displayInformation(sprintf(
-            $this->l('Recovery links: active %d, used %d, expired %d.'),
+        $message = sprintf(
+            $this->l('Recovery: active links %d, used links %d, expired links %d, recovered carts %d, attributed orders %d, paid recovered orders %d.'),
             isset($row['active_tokens']) ? (int) $row['active_tokens'] : 0,
             isset($row['used_tokens']) ? (int) $row['used_tokens'] : 0,
-            isset($row['expired_tokens']) ? (int) $row['expired_tokens'] : 0
-        ));
+            isset($row['expired_tokens']) ? (int) $row['expired_tokens'] : 0,
+            isset($row['recovered_carts']) ? (int) $row['recovered_carts'] : 0,
+            isset($row['recovered_orders']) ? (int) $row['recovered_orders'] : 0,
+            isset($row['paid_recovered_orders']) ? (int) $row['paid_recovered_orders'] : 0
+        );
+
+        $revenueParts = [];
+        foreach ($repository->revenueByCurrency() as $revenue) {
+            $currency = isset($revenue['currency']) && (string) $revenue['currency'] !== ''
+                ? (string) $revenue['currency']
+                : $this->l('unknown currency');
+            $revenueParts[] = sprintf(
+                '%s %.2f (%d)',
+                $currency,
+                isset($revenue['revenue']) ? (float) $revenue['revenue'] : 0.0,
+                isset($revenue['paid_orders']) ? (int) $revenue['paid_orders'] : 0
+            );
+        }
+
+        if (!empty($revenueParts)) {
+            $message .= ' ' . $this->l('Paid recovered revenue by currency: ') . implode(' | ', $revenueParts);
+        }
+
+        return $this->displayInformation($message);
     }
 
     private function saveConfiguration()

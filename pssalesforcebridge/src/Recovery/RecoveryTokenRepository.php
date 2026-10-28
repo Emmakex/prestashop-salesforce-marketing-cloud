@@ -102,16 +102,100 @@ final class RecoveryTokenRepository
         );
     }
 
+    public function attributeOrder($shopId, $recoveredCartId, $orderId, $orderTotal, $currency, $stateId, $paid, $valid)
+    {
+        $shopId = (int) $shopId;
+        $recoveredCartId = (int) $recoveredCartId;
+        $orderId = (int) $orderId;
+
+        if ($shopId <= 0 || $recoveredCartId <= 0 || $orderId <= 0) {
+            return true;
+        }
+
+        $db = Db::getInstance();
+        $token = $db->getRow(
+            'SELECT `id_sfmc_recovery_token`, `id_cart` FROM `' . _DB_PREFIX_ . 'sfmc_recovery_token`'
+            . ' WHERE `id_shop` = ' . $shopId
+            . ' AND `recovered_cart_id` = ' . $recoveredCartId
+            . ' AND `used_at` IS NOT NULL'
+            . ' ORDER BY `id_sfmc_recovery_token` DESC LIMIT 1'
+        );
+
+        if (!is_array($token) || empty($token['id_sfmc_recovery_token'])) {
+            return true;
+        }
+
+        $tokenId = (int) $token['id_sfmc_recovery_token'];
+        $sourceCartId = isset($token['id_cart']) ? (int) $token['id_cart'] : 0;
+        $currency = substr(trim((string) $currency), 0, 8);
+        $now = date('Y-m-d H:i:s');
+
+        $sql = 'INSERT INTO `' . _DB_PREFIX_ . 'sfmc_recovery_order` '
+            . '(`id_sfmc_recovery_token`, `id_shop`, `source_cart_id`, `recovered_cart_id`, `id_order`, '
+            . '`order_total`, `currency`, `state_id`, `paid`, `valid`, `converted_at`, `created_at`, `updated_at`) VALUES ('
+            . $tokenId . ', '
+            . $shopId . ', '
+            . $sourceCartId . ', '
+            . $recoveredCartId . ', '
+            . $orderId . ', '
+            . (float) $orderTotal . ", '"
+            . pSQL($currency) . "', "
+            . (int) $stateId . ', '
+            . ((bool) $paid ? 1 : 0) . ', '
+            . ((bool) $valid ? 1 : 0) . ", '"
+            . pSQL($now) . "', '"
+            . pSQL($now) . "', '"
+            . pSQL($now) . "') "
+            . 'ON DUPLICATE KEY UPDATE '
+            . '`id_sfmc_recovery_token` = VALUES(`id_sfmc_recovery_token`), '
+            . '`source_cart_id` = VALUES(`source_cart_id`), '
+            . '`recovered_cart_id` = VALUES(`recovered_cart_id`), '
+            . '`order_total` = VALUES(`order_total`), '
+            . '`currency` = VALUES(`currency`), '
+            . '`state_id` = VALUES(`state_id`), '
+            . '`paid` = VALUES(`paid`), '
+            . '`valid` = VALUES(`valid`), '
+            . '`updated_at` = VALUES(`updated_at`)';
+
+        return (bool) $db->execute($sql);
+    }
+
     public function summary()
     {
         $now = pSQL(date('Y-m-d H:i:s'));
-        $sql = 'SELECT '
+        $tokenSql = 'SELECT '
             . "SUM(CASE WHEN `used_at` IS NULL AND `expires_at` >= '{$now}' THEN 1 ELSE 0 END) AS active_tokens, "
             . 'SUM(CASE WHEN `used_at` IS NOT NULL THEN 1 ELSE 0 END) AS used_tokens, '
-            . "SUM(CASE WHEN `used_at` IS NULL AND `expires_at` < '{$now}' THEN 1 ELSE 0 END) AS expired_tokens "
+            . "SUM(CASE WHEN `used_at` IS NULL AND `expires_at` < '{$now}' THEN 1 ELSE 0 END) AS expired_tokens, "
+            . 'SUM(CASE WHEN `recovered_cart_id` > 0 THEN 1 ELSE 0 END) AS recovered_carts '
             . 'FROM `' . _DB_PREFIX_ . 'sfmc_recovery_token`';
-        $row = Db::getInstance()->getRow($sql);
+        $tokens = Db::getInstance()->getRow($tokenSql);
 
-        return is_array($row) ? $row : [];
+        $orderSql = 'SELECT COUNT(*) AS recovered_orders, '
+            . 'SUM(CASE WHEN `paid` = 1 THEN 1 ELSE 0 END) AS paid_recovered_orders '
+            . 'FROM `' . _DB_PREFIX_ . 'sfmc_recovery_order`';
+        $orders = Db::getInstance()->getRow($orderSql);
+
+        $summary = is_array($tokens) ? $tokens : [];
+        $summary['recovered_orders'] = is_array($orders) && isset($orders['recovered_orders'])
+            ? (int) $orders['recovered_orders']
+            : 0;
+        $summary['paid_recovered_orders'] = is_array($orders) && isset($orders['paid_recovered_orders'])
+            ? (int) $orders['paid_recovered_orders']
+            : 0;
+
+        return $summary;
+    }
+
+    public function revenueByCurrency()
+    {
+        $rows = Db::getInstance()->executeS(
+            'SELECT `currency`, COUNT(*) AS `paid_orders`, SUM(`order_total`) AS `revenue` '
+            . 'FROM `' . _DB_PREFIX_ . 'sfmc_recovery_order` '
+            . 'WHERE `paid` = 1 '
+            . 'GROUP BY `currency` ORDER BY `currency` ASC'
+        );
+
+        return is_array($rows) ? $rows : [];
     }
 }
