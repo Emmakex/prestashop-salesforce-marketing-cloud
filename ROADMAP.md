@@ -17,7 +17,7 @@
 - [x] module installation range widened to 1.7.8.0–9.x
 - [x] compatibility/adaptor architecture rule documented
 - [x] PHP syntax CI expanded across representative legacy/current runtimes
-- [ ] runtime certification against real PrestaShop fixtures/containers per supported family
+- [x] runtime certification against real PrestaShop fixtures/containers per supported family
 
 ## 0.2.0 — Customer event foundation
 
@@ -187,6 +187,14 @@
 - [x] PHP 7.1 and PHP 8.5 release/upgrade contract coverage in CI
 - [x] exact-head and post-merge release gate policy documented
 
-### Remaining hardening
+### 0.7.0-E — Runtime certification
 
-- [ ] 0.7.0-E runtime certification matrix for PrestaShop 1.7.8.x, 8.x and 9.x
+- [x] PrestaShop 1.7.8.11: real `0.6.1 -> 0.7.0` upgrade plus clean `0.7.0` install
+- [x] PrestaShop 8.2.8: real `0.6.1 -> 0.7.0` upgrade plus clean `0.7.0` install
+- [x] PrestaShop 9.1.5: real `0.6.1 -> 0.7.0` upgrade plus clean `0.7.0` install
+- [x] customer/cart/order hook smoke paths use real PrestaShop core objects
+- [x] customer backfill, abandoned-cart detection and privacy retention execute in the real runtime
+- [x] customer/order/Journey outbound delivery remains fail-closed in `test` mode
+- [x] protected health and cron endpoints return successfully and Front Office remains reachable
+- [x] exact PR head `de0753fd76584069e22510dc4396e15a429685bb` certified with CI + 3/3 runtime
+- [x] merged `main` tree `49e0c22e8e839607fe4fd6694259a5812698d396` preserved the exact certified code tree
