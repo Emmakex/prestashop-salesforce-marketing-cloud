@@ -63,18 +63,22 @@
 
 ## 0.4.0 — Abandoned carts
 
-- cart activity capture
-- configurable inactivity threshold (default 60 minutes)
-- cart + cart item snapshot
-- eligibility checks
-- fail-closed order conversion check through `sfmc_order_sync`
-- deduplication
-- cart adapter contract shared by supported PrestaShop families
+- [x] `actionCartSave` activity capture across PrestaShop 1.7.8, 8 and 9
+- [x] configurable inactivity threshold (default 60 minutes, minimum 15)
+- [x] canonical cart + cart item snapshots
+- [x] configurable eligibility policy with strict marketing-opt-in default
+- [x] fail-closed conversion check through both `sfmc_order_sync` and native `orders`
+- [x] deterministic snapshot hash and `CART_ABANDONED` queue deduplication
+- [x] local detector runs from protected cron without Salesforce calls
+- [x] cart status summary in module configuration
+- [x] upgrade path from 0.3.0
 
 ## 0.5.0 — Journey Builder
 
 - API Entry Event integration
 - `PRESTASHOP_ABANDONED_CART`
+- stale-snapshot validation immediately before delivery
+- final order-conversion recheck immediately before delivery
 - journey event audit trail
 - retry/backoff and dead-letter handling
 
