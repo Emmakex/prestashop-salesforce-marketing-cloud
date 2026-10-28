@@ -36,11 +36,30 @@ final class QueueRepository
 
     public function claimCustomerBatch($limit, $lockToken)
     {
+        return $this->claimBatchByEventTypes(['CUSTOMER_CREATED', 'CUSTOMER_UPDATED'], $limit, $lockToken);
+    }
+
+    public function claimOrderBatch($limit, $lockToken)
+    {
+        return $this->claimBatchByEventTypes(['ORDER_CREATED'], $limit, $lockToken);
+    }
+
+    private function claimBatchByEventTypes(array $eventTypes, $limit, $lockToken)
+    {
         $limit = max(1, min(100, (int) $limit));
         $lockToken = pSQL((string) $lockToken);
         $prefix = _DB_PREFIX_;
         $staleBefore = pSQL(date('Y-m-d H:i:s', time() - 600));
         $now = pSQL(date('Y-m-d H:i:s'));
+        $quotedEvents = [];
+
+        foreach ($eventTypes as $eventType) {
+            $quotedEvents[] = "'" . pSQL((string) $eventType) . "'";
+        }
+
+        if (empty($quotedEvents)) {
+            return [];
+        }
 
         Db::getInstance()->execute(
             "UPDATE `{$prefix}sfmc_queue`
@@ -56,7 +75,7 @@ final class QueueRepository
                     FROM `{$prefix}sfmc_queue`
                     WHERE `status` IN ('pending', 'retry')
                       AND `available_at` <= '{$now}'
-                      AND `event_type` IN ('CUSTOMER_CREATED', 'CUSTOMER_UPDATED')
+                      AND `event_type` IN (" . implode(',', $quotedEvents) . ")
                     ORDER BY `id_sfmc_queue` ASC
                     LIMIT {$limit}
                 ) AS `claimable`

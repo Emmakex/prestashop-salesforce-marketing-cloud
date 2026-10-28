@@ -15,13 +15,15 @@ class PsSalesforceBridgeCronModuleFrontController extends ModuleFrontController
 
         try {
             $backfill = $this->module->processCustomerBackfill();
-            $delivery = $this->module->processCustomerQueue(50);
+            $customerDelivery = $this->module->processCustomerQueue(50);
+            $orderDelivery = $this->module->processOrderQueue(50);
 
             $this->respond([
                 'ok' => true,
                 'result' => [
                     'customer_backfill' => $backfill,
-                    'customer_delivery' => $delivery,
+                    'customer_delivery' => $customerDelivery,
+                    'order_delivery' => $orderDelivery,
                 ],
             ], 200);
         } catch (Exception $e) {

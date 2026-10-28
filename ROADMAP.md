@@ -41,23 +41,25 @@
 
 ## 0.2.2 — Customer backfill
 
-- [x] persistent per-shop backfill state
-- [x] cursor-based traversal without large OFFSET queries
-- [x] configurable batch size from 10 to 500 (default 50)
-- [x] multishop discovery through compatibility boundary
-- [x] customer-shop association support with legacy fallback
-- [x] same normalizer, ledger and queue as live customer hooks
-- [x] cron advances backfill incrementally before queue delivery
-- [x] Back Office start/resume action and progress summary
+- [x] resumable per-shop backfill cursor
+- [x] multishop historical customer scan
+- [x] configurable 10–500 customer batch size
+- [x] shared live/backfill normalization and queue pipeline
+- [x] backfill progress summary in module configuration
 - [x] upgrade path from 0.2.1
 
 ## 0.3.0 — Orders
 
-- order validation/payment hooks
-- order Data Extension contract
-- cart-to-order conversion tracking
-- suppression of abandoned-cart candidates after conversion
-- order adapter contract shared by supported PrestaShop families
+- [x] `actionValidateOrder` capture across supported PrestaShop families
+- [x] `actionOrderStatusPostUpdate` capture across supported PrestaShop families
+- [x] normalized order contract and stable `OrderKey`
+- [x] `ORDER_CREATED`, `ORDER_UPDATED`, `ORDER_PAID`, `ORDER_CANCELLED`
+- [x] order Data Extension upsert by External Key
+- [x] local order ledger with cart-to-order conversion tracking
+- [x] cart conversion lookup prepared for abandoned-cart suppression
+- [x] queue locking/retry through the shared queue infrastructure
+- [x] upgrade path from 0.2.2
+- [ ] order historical backfill (only if required by first production deployment)
 
 ## 0.4.0 — Abandoned carts
 
@@ -65,6 +67,7 @@
 - configurable inactivity threshold (default 60 minutes)
 - cart + cart item snapshot
 - eligibility checks
+- fail-closed order conversion check through `sfmc_order_sync`
 - deduplication
 - cart adapter contract shared by supported PrestaShop families
 

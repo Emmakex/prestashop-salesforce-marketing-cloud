@@ -6,19 +6,26 @@ if (!defined('_PS_VERSION_')) {
 
 require_once __DIR__ . '/src/Compatibility/Platform.php';
 require_once __DIR__ . '/src/Compatibility/CustomerHookAdapter.php';
+require_once __DIR__ . '/src/Compatibility/OrderHookAdapter.php';
 require_once __DIR__ . '/src/Compatibility/ShopResolver.php';
 require_once __DIR__ . '/src/Salesforce/AuthClient.php';
 require_once __DIR__ . '/src/Salesforce/RestClient.php';
 require_once __DIR__ . '/src/Queue/QueueRepository.php';
 require_once __DIR__ . '/src/Queue/CustomerQueueProcessor.php';
+require_once __DIR__ . '/src/Queue/OrderQueueProcessor.php';
 require_once __DIR__ . '/src/Customer/CustomerNormalizer.php';
 require_once __DIR__ . '/src/Customer/CustomerSyncLedger.php';
 require_once __DIR__ . '/src/Customer/CustomerEventService.php';
 require_once __DIR__ . '/src/Customer/CustomerDataExtensionWriter.php';
 require_once __DIR__ . '/src/Customer/CustomerBackfillRepository.php';
 require_once __DIR__ . '/src/Customer/CustomerBackfillService.php';
+require_once __DIR__ . '/src/Order/OrderNormalizer.php';
+require_once __DIR__ . '/src/Order/OrderSyncLedger.php';
+require_once __DIR__ . '/src/Order/OrderEventService.php';
+require_once __DIR__ . '/src/Order/OrderDataExtensionWriter.php';
 
 use Emmakex\PrestaShopSalesforceMarketingCloud\Compatibility\CustomerHookAdapter;
+use Emmakex\PrestaShopSalesforceMarketingCloud\Compatibility\OrderHookAdapter;
 use Emmakex\PrestaShopSalesforceMarketingCloud\Compatibility\Platform;
 use Emmakex\PrestaShopSalesforceMarketingCloud\Compatibility\ShopResolver;
 use Emmakex\PrestaShopSalesforceMarketingCloud\Customer\CustomerBackfillRepository;
@@ -26,7 +33,11 @@ use Emmakex\PrestaShopSalesforceMarketingCloud\Customer\CustomerBackfillService;
 use Emmakex\PrestaShopSalesforceMarketingCloud\Customer\CustomerDataExtensionWriter;
 use Emmakex\PrestaShopSalesforceMarketingCloud\Customer\CustomerEventService;
 use Emmakex\PrestaShopSalesforceMarketingCloud\Customer\CustomerSyncLedger;
+use Emmakex\PrestaShopSalesforceMarketingCloud\Order\OrderDataExtensionWriter;
+use Emmakex\PrestaShopSalesforceMarketingCloud\Order\OrderEventService;
+use Emmakex\PrestaShopSalesforceMarketingCloud\Order\OrderSyncLedger;
 use Emmakex\PrestaShopSalesforceMarketingCloud\Queue\CustomerQueueProcessor;
+use Emmakex\PrestaShopSalesforceMarketingCloud\Queue\OrderQueueProcessor;
 use Emmakex\PrestaShopSalesforceMarketingCloud\Queue\QueueRepository;
 use Emmakex\PrestaShopSalesforceMarketingCloud\Salesforce\AuthClient;
 use Emmakex\PrestaShopSalesforceMarketingCloud\Salesforce\RestClient;
@@ -41,6 +52,7 @@ class PsSalesforceBridge extends Module
     const CONFIG_MODE = 'PS_SFMC_MODE';
     const CONFIG_CART_ABANDON_MINUTES = 'PS_SFMC_CART_ABANDON_MINUTES';
     const CONFIG_CUSTOMER_DE_KEY = 'PS_SFMC_CUSTOMER_DE_KEY';
+    const CONFIG_ORDER_DE_KEY = 'PS_SFMC_ORDER_DE_KEY';
     const CONFIG_CRON_TOKEN = 'PS_SFMC_CRON_TOKEN';
     const CONFIG_CUSTOMER_BACKFILL_BATCH = 'PS_SFMC_CUSTOMER_BACKFILL_BATCH';
 
@@ -48,7 +60,7 @@ class PsSalesforceBridge extends Module
     {
         $this->name = 'pssalesforcebridge';
         $this->tab = 'advertising_marketing';
-        $this->version = '0.2.2';
+        $this->version = '0.3.0';
         $this->author = 'Emmakex';
         $this->need_instance = 0;
         $this->bootstrap = true;
@@ -74,7 +86,9 @@ class PsSalesforceBridge extends Module
             && $this->installConfiguration()
             && $this->installDatabase()
             && $this->registerHook('actionCustomerAccountAdd')
-            && $this->registerHook('actionCustomerAccountUpdate');
+            && $this->registerHook('actionCustomerAccountUpdate')
+            && $this->registerHook('actionValidateOrder')
+            && $this->registerHook('actionOrderStatusPostUpdate');
     }
 
     public function uninstall()
@@ -92,6 +106,50 @@ class PsSalesforceBridge extends Module
     public function hookActionCustomerAccountUpdate($params)
     {
         return $this->captureCustomerEvent('CUSTOMER_UPDATED', is_array($params) ? $params : []);
+    }
+
+    public function hookActionValidateOrder($params)
+    {
+        $params = is_array($params) ? $params : [];
+        $order = OrderHookAdapter::orderFromParams($params);
+        if (!$order) {
+            return false;
+        }
+
+        $service = new OrderEventService(new QueueRepository(), new OrderSyncLedger());
+
+        return $service->enqueue(
+            'ORDER_CREATED',
+            $order,
+            OrderHookAdapter::customerFromParams($params),
+            OrderHookAdapter::cartFromParams($params),
+            OrderHookAdapter::currencyIso($params, $order),
+            OrderHookAdapter::shopId($order, isset($this->context) ? $this->context : null)
+        );
+    }
+
+    public function hookActionOrderStatusPostUpdate($params)
+    {
+        $params = is_array($params) ? $params : [];
+        $context = OrderHookAdapter::statusContext($params);
+        if (!is_array($context) || empty($context['order'])) {
+            return false;
+        }
+
+        $order = $context['order'];
+        $status = isset($context['status']) ? $context['status'] : null;
+        $service = new OrderEventService(new QueueRepository(), new OrderSyncLedger());
+
+        return $service->enqueue(
+            OrderHookAdapter::eventTypeForStatus($status),
+            $order,
+            isset($context['customer']) ? $context['customer'] : null,
+            isset($context['cart']) ? $context['cart'] : null,
+            OrderHookAdapter::currencyIso([], $order),
+            OrderHookAdapter::shopId($order, isset($this->context) ? $this->context : null),
+            is_object($status) && isset($status->id) ? (int) $status->id : null,
+            is_object($status) && isset($status->paid) ? (bool) $status->paid : null
+        );
     }
 
     public function processCustomerBackfill($batchSize = null)
@@ -114,6 +172,39 @@ class PsSalesforceBridge extends Module
             throw new RuntimeException('Customer Data Extension external key is not configured.');
         }
 
+        $rest = $this->salesforceRestClient();
+        $processor = new CustomerQueueProcessor(
+            new QueueRepository(),
+            new CustomerDataExtensionWriter($rest, $externalKey),
+            new CustomerSyncLedger()
+        );
+
+        return $processor->process($limit);
+    }
+
+    public function processOrderQueue($limit = 50)
+    {
+        if ((string) Configuration::get(self::CONFIG_MODE) !== 'production') {
+            return ['skipped' => 'test_mode', 'claimed' => 0, 'processed' => 0, 'retry' => 0, 'failed' => 0];
+        }
+
+        $externalKey = trim((string) Configuration::get(self::CONFIG_ORDER_DE_KEY));
+        if ($externalKey === '') {
+            throw new RuntimeException('Order Data Extension external key is not configured.');
+        }
+
+        $rest = $this->salesforceRestClient();
+        $processor = new OrderQueueProcessor(
+            new QueueRepository(),
+            new OrderDataExtensionWriter($rest, $externalKey),
+            new OrderSyncLedger()
+        );
+
+        return $processor->process($limit);
+    }
+
+    private function salesforceRestClient()
+    {
         $auth = new AuthClient(
             (string) Configuration::get(self::CONFIG_AUTH_BASE_URI),
             (string) Configuration::get(self::CONFIG_CLIENT_ID),
@@ -122,18 +213,10 @@ class PsSalesforceBridge extends Module
         );
         $token = $auth->requestAccessToken();
 
-        $rest = new RestClient(
+        return new RestClient(
             (string) Configuration::get(self::CONFIG_REST_BASE_URI),
             isset($token['access_token']) ? (string) $token['access_token'] : ''
         );
-
-        $processor = new CustomerQueueProcessor(
-            new QueueRepository(),
-            new CustomerDataExtensionWriter($rest, $externalKey),
-            new CustomerSyncLedger()
-        );
-
-        return $processor->process($limit);
     }
 
     private function captureCustomerEvent($eventType, array $params)
@@ -162,6 +245,7 @@ class PsSalesforceBridge extends Module
         return Configuration::updateValue(self::CONFIG_MODE, 'test')
             && Configuration::updateValue(self::CONFIG_CART_ABANDON_MINUTES, 60)
             && Configuration::updateValue(self::CONFIG_CUSTOMER_DE_KEY, 'PS_CUSTOMERS')
+            && Configuration::updateValue(self::CONFIG_ORDER_DE_KEY, 'PS_ORDERS')
             && Configuration::updateValue(self::CONFIG_CUSTOMER_BACKFILL_BATCH, 50)
             && Configuration::updateValue(self::CONFIG_CRON_TOKEN, bin2hex(random_bytes(24)));
     }
@@ -177,6 +261,7 @@ class PsSalesforceBridge extends Module
             self::CONFIG_MODE,
             self::CONFIG_CART_ABANDON_MINUTES,
             self::CONFIG_CUSTOMER_DE_KEY,
+            self::CONFIG_ORDER_DE_KEY,
             self::CONFIG_CRON_TOKEN,
             self::CONFIG_CUSTOMER_BACKFILL_BATCH,
         ];
@@ -236,6 +321,21 @@ class PsSalesforceBridge extends Module
                 UNIQUE KEY `uniq_sfmc_customer_shop` (`id_shop`, `id_customer`),
                 UNIQUE KEY `uniq_sfmc_customer_contact` (`contact_key`)
             ) ENGINE={$engine} DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+            "CREATE TABLE IF NOT EXISTS `{$prefix}sfmc_order_sync` (
+                `id_sfmc_order_sync` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+                `id_shop` INT UNSIGNED NOT NULL,
+                `id_order` INT UNSIGNED NOT NULL,
+                `id_cart` INT UNSIGNED NOT NULL DEFAULT 0,
+                `contact_key` VARCHAR(191) NOT NULL DEFAULT '',
+                `payload_hash` CHAR(40) NOT NULL,
+                `status` VARCHAR(16) NOT NULL DEFAULT 'pending',
+                `created_at` DATETIME NOT NULL,
+                `updated_at` DATETIME NOT NULL,
+                PRIMARY KEY (`id_sfmc_order_sync`),
+                UNIQUE KEY `uniq_sfmc_order_shop` (`id_shop`, `id_order`),
+                KEY `idx_sfmc_order_cart` (`id_shop`, `id_cart`),
+                KEY `idx_sfmc_order_contact` (`contact_key`)
+            ) ENGINE={$engine} DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
             "CREATE TABLE IF NOT EXISTS `{$prefix}sfmc_customer_backfill` (
                 `id_sfmc_customer_backfill` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
                 `id_shop` INT UNSIGNED NOT NULL,
@@ -266,6 +366,7 @@ class PsSalesforceBridge extends Module
         $prefix = _DB_PREFIX_;
 
         return Db::getInstance()->execute("DROP TABLE IF EXISTS `{$prefix}sfmc_customer_backfill`")
+            && Db::getInstance()->execute("DROP TABLE IF EXISTS `{$prefix}sfmc_order_sync`")
             && Db::getInstance()->execute("DROP TABLE IF EXISTS `{$prefix}sfmc_customer_sync`")
             && Db::getInstance()->execute("DROP TABLE IF EXISTS `{$prefix}sfmc_queue`")
             && Db::getInstance()->execute("DROP TABLE IF EXISTS `{$prefix}sfmc_log`");
@@ -336,6 +437,7 @@ class PsSalesforceBridge extends Module
         $mode = Tools::getValue(self::CONFIG_MODE) === 'production' ? 'production' : 'test';
         $abandonMinutes = max(15, (int) Tools::getValue(self::CONFIG_CART_ABANDON_MINUTES));
         $customerDeKey = trim((string) Tools::getValue(self::CONFIG_CUSTOMER_DE_KEY));
+        $orderDeKey = trim((string) Tools::getValue(self::CONFIG_ORDER_DE_KEY));
         $backfillBatch = max(10, min(500, (int) Tools::getValue(self::CONFIG_CUSTOMER_BACKFILL_BATCH)));
 
         if (!$this->isHttpsUri($authBaseUri) || !$this->isHttpsUri($restBaseUri)) {
@@ -350,6 +452,10 @@ class PsSalesforceBridge extends Module
             return $this->displayError($this->l('Customer Data Extension External Key is required.'));
         }
 
+        if ($orderDeKey === '') {
+            return $this->displayError($this->l('Order Data Extension External Key is required.'));
+        }
+
         Configuration::updateValue(self::CONFIG_AUTH_BASE_URI, $authBaseUri);
         Configuration::updateValue(self::CONFIG_REST_BASE_URI, $restBaseUri);
         Configuration::updateValue(self::CONFIG_CLIENT_ID, $clientId);
@@ -357,6 +463,7 @@ class PsSalesforceBridge extends Module
         Configuration::updateValue(self::CONFIG_MODE, $mode);
         Configuration::updateValue(self::CONFIG_CART_ABANDON_MINUTES, $abandonMinutes);
         Configuration::updateValue(self::CONFIG_CUSTOMER_DE_KEY, $customerDeKey);
+        Configuration::updateValue(self::CONFIG_ORDER_DE_KEY, $orderDeKey);
         Configuration::updateValue(self::CONFIG_CUSTOMER_BACKFILL_BATCH, $backfillBatch);
 
         if ($clientSecret !== '') {
@@ -414,6 +521,7 @@ class PsSalesforceBridge extends Module
             self::CONFIG_MODE => (string) Configuration::get(self::CONFIG_MODE),
             self::CONFIG_CART_ABANDON_MINUTES => (int) Configuration::get(self::CONFIG_CART_ABANDON_MINUTES),
             self::CONFIG_CUSTOMER_DE_KEY => (string) Configuration::get(self::CONFIG_CUSTOMER_DE_KEY),
+            self::CONFIG_ORDER_DE_KEY => (string) Configuration::get(self::CONFIG_ORDER_DE_KEY),
             self::CONFIG_CRON_TOKEN => $cronToken,
             self::CONFIG_CUSTOMER_BACKFILL_BATCH => (int) Configuration::get(self::CONFIG_CUSTOMER_BACKFILL_BATCH),
             'PS_SFMC_CRON_URL' => $cronUrl,
@@ -432,13 +540,14 @@ class PsSalesforceBridge extends Module
                     ['type' => 'password', 'label' => $this->l('Client Secret'), 'name' => self::CONFIG_CLIENT_SECRET, 'desc' => $this->l('Leave blank to keep the existing secret.')],
                     ['type' => 'text', 'label' => $this->l('Business Unit MID / Account ID'), 'name' => self::CONFIG_ACCOUNT_ID],
                     ['type' => 'text', 'label' => $this->l('Customer Data Extension External Key'), 'name' => self::CONFIG_CUSTOMER_DE_KEY, 'required' => true],
+                    ['type' => 'text', 'label' => $this->l('Order Data Extension External Key'), 'name' => self::CONFIG_ORDER_DE_KEY, 'required' => true],
                     [
                         'type' => 'select',
                         'label' => $this->l('Mode'),
                         'name' => self::CONFIG_MODE,
                         'options' => [
                             'query' => [
-                                ['id' => 'test', 'name' => $this->l('Test (no outbound customer writes)')],
+                                ['id' => 'test', 'name' => $this->l('Test (no outbound Salesforce writes)')],
                                 ['id' => 'production', 'name' => $this->l('Production')],
                             ],
                             'id' => 'id',
