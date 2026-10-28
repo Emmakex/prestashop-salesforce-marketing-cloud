@@ -156,8 +156,23 @@
 - [x] dashboard rendering remains local and performs no Salesforce network call
 - [x] PHP 7.1 and PHP 8.5 dashboard contract coverage in CI
 
+### 0.7.0-C — Privacy & retention
+
+- [x] configurable retention windows from 1–3650 days
+- [x] processed queue cleanup never deletes pending / processing / retry / failed work
+- [x] local log retention
+- [x] Journey audit cleanup restricted to sent / suppressed rows
+- [x] terminal cart snapshot + item cleanup for empty / ineligible / converted / recovered states
+- [x] active and abandoned cart snapshots retained for operational/recovery safety
+- [x] expired or unusable recovery token cleanup
+- [x] recovered-token anonymization preserves order/revenue attribution without customer identity
+- [x] automatic retention at most once per day from the protected cron
+- [x] manual retention action and last-run status in Back Office
+- [x] retention failure isolated from commerce-event delivery
+- [x] cron error responses sanitized; raw exception messages are no longer exposed
+- [x] PHP 7.1 and PHP 8.5 retention contract coverage in CI
+
 ### Remaining hardening
 
-- [ ] privacy/log retention controls
 - [ ] release ZIP and upgrade policy for the production release
 - [ ] runtime certification matrix for PrestaShop 1.7.8.x, 8.x and 9.x
