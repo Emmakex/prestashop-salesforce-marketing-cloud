@@ -36,18 +36,18 @@ final class RetentionRepository
     public function purgeTerminalCartSnapshots($cutoff)
     {
         $cutoff = pSQL((string) $cutoff);
+        $now = pSQL(date('Y-m-d H:i:s'));
         $prefix = _DB_PREFIX_;
-        $terminal = "('empty', 'ineligible', 'converted', 'recovered')";
+        $condition = $this->cartRetentionCondition('c', $cutoff, $now, $prefix);
 
         $items = $this->executeAffected(
             "DELETE ci FROM `{$prefix}sfmc_cart_item` ci "
             . "INNER JOIN `{$prefix}sfmc_cart` c ON c.`id_shop` = ci.`id_shop` AND c.`id_cart` = ci.`id_cart` "
-            . "WHERE c.`status` IN {$terminal} AND c.`updated_at` < '{$cutoff}'"
+            . "WHERE {$condition}"
         );
 
         $carts = $this->executeAffected(
-            "DELETE FROM `{$prefix}sfmc_cart` "
-            . "WHERE `status` IN {$terminal} AND `updated_at` < '{$cutoff}'"
+            "DELETE c FROM `{$prefix}sfmc_cart` c WHERE {$condition}"
         );
 
         return [
@@ -86,6 +86,25 @@ final class RetentionRepository
             'used_tokens_deleted' => $usedWithoutRecovery,
             'expired_tokens_deleted' => $expiredUnused,
         ];
+    }
+
+    private function cartRetentionCondition($alias, $cutoff, $now, $prefix)
+    {
+        $alias = (string) $alias;
+        $terminal = "('empty', 'ineligible', 'converted', 'recovered')";
+        $outstanding = "('pending', 'processing', 'retry', 'failed')";
+
+        return "{$alias}.`updated_at` < '{$cutoff}' AND ("
+            . "{$alias}.`status` IN {$terminal} OR ("
+            . "{$alias}.`status` = 'abandoned' "
+            . "AND NOT EXISTS (SELECT 1 FROM `{$prefix}sfmc_recovery_token` rt "
+            . "WHERE rt.`id_shop` = {$alias}.`id_shop` AND rt.`id_cart` = {$alias}.`id_cart` "
+            . "AND rt.`used_at` IS NULL AND rt.`expires_at` >= '{$now}') "
+            . "AND NOT EXISTS (SELECT 1 FROM `{$prefix}sfmc_queue` q "
+            . "WHERE q.`event_type` = 'CART_ABANDONED' "
+            . "AND q.`entity_id` = CONCAT({$alias}.`id_shop`, ':', {$alias}.`id_cart`) "
+            . "AND q.`status` IN {$outstanding})"
+            . '))';
     }
 
     private function executeAffected($sql)
