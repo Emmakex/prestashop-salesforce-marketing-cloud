@@ -93,7 +93,9 @@ jobs:
           php-version: ${{ matrix.php }}
           coverage: none
       - name: Validate release and upgrade contract
-        run: php tests/release-contract.php
+        run: |
+          php tests/release-contract.php
+          php tests/db-single-row-contract.php
 
   package:
     name: Build release package
