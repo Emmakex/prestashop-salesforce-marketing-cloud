@@ -17,7 +17,7 @@ final class CartRepository
         }
 
         $sql = 'INSERT INTO `' . _DB_PREFIX_ . 'sfmc_cart` '
-            . '(`id_shop`, `id_cart`, `id_customer`, `contact_key`, `email`, `currency`, `total`, `product_count`, `item_count`, `consent_mode`, `eligible`, `eligibility_reason`, `status`, `last_activity`, `abandon_after`, `abandoned_at`, `snapshot_hash`, `payload`, `created_at`, `updated_at`) VALUES ('
+            . '(`id_shop`, `id_cart`, `id_customer`, `contact_key`, `email`, `currency`, `total`, `product_count`, `item_count`, `consent_mode`, `eligible`, `eligibility_reason`, `status`, `last_activity`, `abandon_after`, `abandoned_at`, `recovered_at`, `snapshot_hash`, `payload`, `created_at`, `updated_at`) VALUES ('
             . (int) $cart['shop_id'] . ', '
             . (int) $cart['cart_id'] . ', '
             . (int) $cart['customer_id'] . ", '"
@@ -32,7 +32,7 @@ final class CartRepository
             . pSQL((string) $eligibilityReason) . "', '"
             . pSQL((string) $status) . "', '"
             . pSQL((string) $cart['last_activity']) . "', '"
-            . pSQL((string) $abandonAfter) . "', NULL, '"
+            . pSQL((string) $abandonAfter) . "', NULL, NULL, '"
             . pSQL((string) $snapshotHash) . "', '"
             . pSQL($payload, true) . "', '"
             . pSQL($now) . "', '"
@@ -52,6 +52,7 @@ final class CartRepository
             . '`last_activity` = VALUES(`last_activity`), '
             . '`abandon_after` = VALUES(`abandon_after`), '
             . '`abandoned_at` = NULL, '
+            . '`recovered_at` = NULL, '
             . '`snapshot_hash` = VALUES(`snapshot_hash`), '
             . '`payload` = VALUES(`payload`), '
             . '`updated_at` = VALUES(`updated_at`)';
@@ -150,6 +151,23 @@ final class CartRepository
                 'status' => 'abandoned',
                 'abandoned_at' => date('Y-m-d H:i:s'),
                 'updated_at' => date('Y-m-d H:i:s'),
+            ],
+            '`id_shop` = ' . (int) $shopId . ' AND `id_cart` = ' . (int) $cartId
+        );
+    }
+
+    public function markRecovered($shopId, $cartId)
+    {
+        $now = date('Y-m-d H:i:s');
+
+        return (bool) Db::getInstance()->update(
+            'sfmc_cart',
+            [
+                'status' => 'recovered',
+                'eligible' => 0,
+                'eligibility_reason' => 'recovery_link_used',
+                'recovered_at' => $now,
+                'updated_at' => $now,
             ],
             '`id_shop` = ' . (int) $shopId . ' AND `id_cart` = ' . (int) $cartId
         );
