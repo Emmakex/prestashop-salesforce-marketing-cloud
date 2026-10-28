@@ -124,6 +124,14 @@
 
 ## 0.7.0 — Production hardening
 
+### 0.7.0-C0 — Sync correctness invariants
+
+- [x] customer worker claims all `entity_type=customer` events, including `CUSTOMER_BACKFILL`
+- [x] customer sync completion is conditional on the exact payload hash that was delivered
+- [x] order sync completion is conditional on the exact payload hash that was delivered
+- [x] stale events can no longer overwrite a newer pending ledger state
+- [x] PHP 7.1 and PHP 8.5 sync correctness contract coverage in CI
+
 ### 0.7.0-A — Health & queue observability
 
 - [x] local health service with `healthy` / `warning` / `critical` severity
