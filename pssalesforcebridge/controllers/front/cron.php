@@ -4,7 +4,9 @@ class PsSalesforceBridgeCronModuleFrontController extends ModuleFrontController
 {
     public function initContent()
     {
-        parent::initContent();
+        // Machine-to-machine endpoint: do not initialize/render theme content.
+        // Cron execution must not depend on front-office presentation state.
+        $this->setNoCacheHeaders();
 
         $provided = (string) Tools::getValue('token');
         $expected = (string) Configuration::get(PsSalesforceBridge::CONFIG_CRON_TOKEN);
@@ -36,6 +38,13 @@ class PsSalesforceBridgeCronModuleFrontController extends ModuleFrontController
             $this->logOperationalFailure('cron_failed', $e);
             $this->respond(['ok' => false, 'error' => 'cron_failed'], 500);
         }
+    }
+
+    private function setNoCacheHeaders()
+    {
+        header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+        header('Pragma: no-cache');
+        header('X-Robots-Tag: noindex, nofollow', true);
     }
 
     private function processRetentionSafely()

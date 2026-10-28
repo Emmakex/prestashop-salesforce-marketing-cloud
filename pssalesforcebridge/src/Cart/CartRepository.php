@@ -120,10 +120,10 @@ final class CartRepository
             return null;
         }
 
+        // Db::getRow() appends LIMIT 1 itself.
         $sql = 'SELECT * FROM `' . _DB_PREFIX_ . 'sfmc_cart`'
             . ' WHERE `id_shop` = ' . (int) $shopId
-            . ' AND `id_cart` = ' . (int) $cartId
-            . ' LIMIT 1';
+            . ' AND `id_cart` = ' . (int) $cartId;
         $row = Db::getInstance()->getRow($sql);
 
         return is_array($row) ? $row : null;

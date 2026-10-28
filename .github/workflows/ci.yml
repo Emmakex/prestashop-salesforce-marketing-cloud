@@ -22,6 +22,8 @@ jobs:
         php: ['7.1', '7.4', '8.0', '8.1', '8.4', '8.5']
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
       - uses: shivammathur/setup-php@v2
         with:
           php-version: ${{ matrix.php }}
@@ -38,6 +40,8 @@ jobs:
         php: ['7.1', '8.5']
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
       - uses: shivammathur/setup-php@v2
         with:
           php-version: ${{ matrix.php }}
@@ -56,6 +60,8 @@ jobs:
         php: ['7.1', '8.5']
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
       - uses: shivammathur/setup-php@v2
         with:
           php-version: ${{ matrix.php }}
@@ -72,6 +78,8 @@ jobs:
         php: ['7.1', '8.5']
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
       - uses: shivammathur/setup-php@v2
         with:
           php-version: ${{ matrix.php }}
@@ -88,12 +96,17 @@ jobs:
         php: ['7.1', '8.5']
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
       - uses: shivammathur/setup-php@v2
         with:
           php-version: ${{ matrix.php }}
           coverage: none
       - name: Validate release and upgrade contract
-        run: php tests/release-contract.php
+        run: |
+          php tests/release-contract.php
+          php tests/db-single-row-contract.php
+          php tests/db-namespace-contract.php
 
   package:
     name: Build release package
@@ -101,6 +114,8 @@ jobs:
     needs: [php-syntax, health-contract, sync-contract, retention-contract, release-contract]
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
       - name: Build and validate versioned ZIP
         shell: bash
         run: |

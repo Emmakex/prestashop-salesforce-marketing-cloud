@@ -84,7 +84,7 @@ final class RecoveryTokenRepository
 
         $row = $db->getRow(
             'SELECT * FROM `' . _DB_PREFIX_ . 'sfmc_recovery_token`'
-            . " WHERE `token_hash` = '" . pSQL($hash) . "' LIMIT 1"
+            . " WHERE `token_hash` = '" . pSQL($hash) . "'"
         );
 
         return is_array($row) ? $row : null;
@@ -118,7 +118,7 @@ final class RecoveryTokenRepository
             . ' WHERE `id_shop` = ' . $shopId
             . ' AND `recovered_cart_id` = ' . $recoveredCartId
             . ' AND `used_at` IS NOT NULL'
-            . ' ORDER BY `id_sfmc_recovery_token` DESC LIMIT 1'
+            . ' ORDER BY `id_sfmc_recovery_token` DESC'
         );
 
         if (!is_array($token) || empty($token['id_sfmc_recovery_token'])) {

@@ -183,12 +183,14 @@ final class QueueRepository
 
     public function oldestOutstanding()
     {
+        // Db::getRow() appends its own LIMIT 1 across supported PrestaShop
+        // families. Supplying LIMIT here would become invalid `LIMIT 1 LIMIT 1`.
         $row = Db::getInstance()->getRow(
             'SELECT `id_sfmc_queue`, `event_type`, `entity_type`, `entity_id`, `status`, `attempts`, '
             . '`available_at`, `created_at`, `locked_at` '
             . 'FROM `' . _DB_PREFIX_ . 'sfmc_queue` '
             . "WHERE `status` IN ('pending', 'retry', 'processing') "
-            . 'ORDER BY `created_at` ASC, `id_sfmc_queue` ASC LIMIT 1'
+            . 'ORDER BY `created_at` ASC, `id_sfmc_queue` ASC'
         );
 
         return is_array($row) ? $row : [];
