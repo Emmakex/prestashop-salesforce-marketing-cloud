@@ -6,6 +6,7 @@ use Emmakex\PrestaShopSalesforceMarketingCloud\Cart\CartEligibilityPolicy;
 use Emmakex\PrestaShopSalesforceMarketingCloud\Cart\CartRepository;
 use Emmakex\PrestaShopSalesforceMarketingCloud\Journey\JourneyEventAuditRepository;
 use Emmakex\PrestaShopSalesforceMarketingCloud\Order\OrderSyncLedger;
+use Emmakex\PrestaShopSalesforceMarketingCloud\Recovery\RecoveryLinkService;
 use Emmakex\PrestaShopSalesforceMarketingCloud\Salesforce\JourneyClient;
 use Exception;
 use RuntimeException;
@@ -20,6 +21,7 @@ final class AbandonedCartJourneyProcessor
     private $eligibility;
     private $journey;
     private $audit;
+    private $recoveryLinks;
     private $consentMode;
     private $eventDefinitionKey;
 
@@ -30,6 +32,7 @@ final class AbandonedCartJourneyProcessor
         CartEligibilityPolicy $eligibility,
         JourneyClient $journey,
         JourneyEventAuditRepository $audit,
+        RecoveryLinkService $recoveryLinks,
         $consentMode,
         $eventDefinitionKey
     ) {
@@ -39,6 +42,7 @@ final class AbandonedCartJourneyProcessor
         $this->eligibility = $eligibility;
         $this->journey = $journey;
         $this->audit = $audit;
+        $this->recoveryLinks = $recoveryLinks;
         $this->consentMode = (string) $consentMode;
         $this->eventDefinitionKey = (string) $eventDefinitionKey;
     }
@@ -145,7 +149,18 @@ final class AbandonedCartJourneyProcessor
                     continue;
                 }
 
-                $event = $this->journey->fire($contactKey, $this->eventData($currentPayload, $payload, $bridgeEventKey, $snapshotHash));
+                $recoveryUrl = $this->recoveryLinks->issueUrl(
+                    $shopId,
+                    $cartId,
+                    isset($currentPayload['customer_id']) ? (int) $currentPayload['customer_id'] : 0,
+                    $contactKey,
+                    $snapshotHash
+                );
+
+                $event = $this->journey->fire(
+                    $contactKey,
+                    $this->eventData($currentPayload, $payload, $bridgeEventKey, $snapshotHash, $recoveryUrl)
+                );
                 $eventInstanceId = isset($event['event_instance_id']) ? (string) $event['event_instance_id'] : '';
 
                 if (!$this->audit->markSent($queueId, $eventInstanceId)) {
@@ -182,7 +197,7 @@ final class AbandonedCartJourneyProcessor
         ++$result['suppressed'];
     }
 
-    private function eventData(array $current, array $queued, $bridgeEventKey, $snapshotHash)
+    private function eventData(array $current, array $queued, $bridgeEventKey, $snapshotHash, $recoveryUrl)
     {
         return [
             'BridgeEventKey' => (string) $bridgeEventKey,
@@ -201,7 +216,7 @@ final class AbandonedCartJourneyProcessor
             'LastActivity' => isset($current['last_activity']) ? (string) $current['last_activity'] : '',
             'AbandonedAt' => isset($queued['abandoned_at']) ? (string) $queued['abandoned_at'] : '',
             'SnapshotHash' => (string) $snapshotHash,
-            'RecoveryUrl' => '',
+            'RecoveryUrl' => (string) $recoveryUrl,
         ];
     }
 }
