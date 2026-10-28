@@ -137,9 +137,19 @@
 - [x] HTTP 503 for critical health so external monitors can alert
 - [x] PHP 7.1 and PHP 8.5 runtime contract tests in CI
 
+### 0.7.0-B — Back Office health dashboard
+
+- [x] Back Office dashboard consumes the same `HealthService` report as the JSON endpoint
+- [x] queue counts, outstanding age, stale locks and active event breakdown
+- [x] operational issue list and production configuration readiness
+- [x] customer backfill, cart snapshot and Journey delivery summaries
+- [x] recovery attribution and paid recovered revenue by currency
+- [x] output escaping for dynamic event/status values
+- [x] dashboard rendering remains local and performs no Salesforce network call
+- [x] PHP 7.1 and PHP 8.5 dashboard contract coverage in CI
+
 ### Remaining hardening
 
-- [ ] Back Office health/status presentation using the same health service
 - [ ] privacy/log retention controls
 - [ ] release ZIP and upgrade policy for the production release
 - [ ] runtime certification matrix for PrestaShop 1.7.8.x, 8.x and 9.x
