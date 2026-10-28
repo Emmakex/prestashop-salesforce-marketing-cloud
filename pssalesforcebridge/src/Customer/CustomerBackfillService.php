@@ -2,6 +2,8 @@
 
 namespace Emmakex\PrestaShopSalesforceMarketingCloud\Customer;
 
+use Db;
+
 final class CustomerBackfillService
 {
     private $repository;
