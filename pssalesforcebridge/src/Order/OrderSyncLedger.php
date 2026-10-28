@@ -48,11 +48,20 @@ final class OrderSyncLedger
             return false;
         }
 
-        $sql = 'SELECT `id_order` FROM `' . _DB_PREFIX_ . 'sfmc_order_sync`'
+        $localSql = 'SELECT `id_order` FROM `' . _DB_PREFIX_ . 'sfmc_order_sync`'
             . ' WHERE `id_shop` = ' . (int) $shopId
             . ' AND `id_cart` = ' . (int) $cartId
             . ' LIMIT 1';
 
-        return (int) Db::getInstance()->getValue($sql) > 0;
+        if ((int) Db::getInstance()->getValue($localSql) > 0) {
+            return true;
+        }
+
+        $coreSql = 'SELECT `id_order` FROM `' . _DB_PREFIX_ . 'orders`'
+            . ' WHERE `id_shop` = ' . (int) $shopId
+            . ' AND `id_cart` = ' . (int) $cartId
+            . ' LIMIT 1';
+
+        return (int) Db::getInstance()->getValue($coreSql) > 0;
     }
 }
