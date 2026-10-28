@@ -49,10 +49,10 @@ final class OrderSyncLedger
             return false;
         }
 
+        // Db::getValue() delegates to Db::getRow(), which appends LIMIT 1.
         $localSql = 'SELECT `id_order` FROM `' . _DB_PREFIX_ . 'sfmc_order_sync`'
             . ' WHERE `id_shop` = ' . (int) $shopId
-            . ' AND `id_cart` = ' . (int) $cartId
-            . ' LIMIT 1';
+            . ' AND `id_cart` = ' . (int) $cartId;
 
         if ((int) Db::getInstance()->getValue($localSql) > 0) {
             return true;
@@ -60,8 +60,7 @@ final class OrderSyncLedger
 
         $coreSql = 'SELECT `id_order` FROM `' . _DB_PREFIX_ . 'orders`'
             . ' WHERE `id_shop` = ' . (int) $shopId
-            . ' AND `id_cart` = ' . (int) $cartId
-            . ' LIMIT 1';
+            . ' AND `id_cart` = ' . (int) $cartId;
 
         return (int) Db::getInstance()->getValue($coreSql) > 0;
     }
