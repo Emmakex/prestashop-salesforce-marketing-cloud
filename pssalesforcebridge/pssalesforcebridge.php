@@ -32,6 +32,8 @@ require_once __DIR__ . '/src/Cart/CartRepository.php';
 require_once __DIR__ . '/src/Cart/CartCaptureService.php';
 require_once __DIR__ . '/src/Cart/CartAbandonmentDetector.php';
 require_once __DIR__ . '/src/Journey/JourneyEventAuditRepository.php';
+require_once __DIR__ . '/src/Recovery/RecoveryTokenRepository.php';
+require_once __DIR__ . '/src/Recovery/RecoveryLinkService.php';
 
 use Emmakex\PrestaShopSalesforceMarketingCloud\Cart\CartAbandonmentDetector;
 use Emmakex\PrestaShopSalesforceMarketingCloud\Cart\CartCaptureService;
@@ -55,6 +57,8 @@ use Emmakex\PrestaShopSalesforceMarketingCloud\Queue\AbandonedCartJourneyProcess
 use Emmakex\PrestaShopSalesforceMarketingCloud\Queue\CustomerQueueProcessor;
 use Emmakex\PrestaShopSalesforceMarketingCloud\Queue\OrderQueueProcessor;
 use Emmakex\PrestaShopSalesforceMarketingCloud\Queue\QueueRepository;
+use Emmakex\PrestaShopSalesforceMarketingCloud\Recovery\RecoveryLinkService;
+use Emmakex\PrestaShopSalesforceMarketingCloud\Recovery\RecoveryTokenRepository;
 use Emmakex\PrestaShopSalesforceMarketingCloud\Salesforce\AuthClient;
 use Emmakex\PrestaShopSalesforceMarketingCloud\Salesforce\JourneyClient;
 use Emmakex\PrestaShopSalesforceMarketingCloud\Salesforce\RestClient;
@@ -72,6 +76,7 @@ class PsSalesforceBridge extends Module
     const CONFIG_CUSTOMER_DE_KEY = 'PS_SFMC_CUSTOMER_DE_KEY';
     const CONFIG_ORDER_DE_KEY = 'PS_SFMC_ORDER_DE_KEY';
     const CONFIG_JOURNEY_EVENT_DEFINITION_KEY = 'PS_SFMC_JOURNEY_EVENT_DEFINITION_KEY';
+    const CONFIG_RECOVERY_TOKEN_TTL_HOURS = 'PS_SFMC_RECOVERY_TOKEN_TTL_HOURS';
     const CONFIG_CRON_TOKEN = 'PS_SFMC_CRON_TOKEN';
     const CONFIG_CUSTOMER_BACKFILL_BATCH = 'PS_SFMC_CUSTOMER_BACKFILL_BATCH';
 
@@ -81,7 +86,7 @@ class PsSalesforceBridge extends Module
     {
         $this->name = 'pssalesforcebridge';
         $this->tab = 'advertising_marketing';
-        $this->version = '0.5.0';
+        $this->version = '0.6.0';
         $this->author = 'Emmakex';
         $this->need_instance = 0;
         $this->bootstrap = true;
@@ -260,6 +265,7 @@ class PsSalesforceBridge extends Module
             throw new RuntimeException('Journey Event Definition Key is not configured.');
         }
 
+        $ttlHours = max(1, min(720, (int) Configuration::get(self::CONFIG_RECOVERY_TOKEN_TTL_HOURS)));
         $processor = new AbandonedCartJourneyProcessor(
             new QueueRepository(),
             new CartRepository(),
@@ -267,6 +273,12 @@ class PsSalesforceBridge extends Module
             new CartEligibilityPolicy(),
             new JourneyClient($this->salesforceRestClient(), $eventDefinitionKey),
             new JourneyEventAuditRepository(),
+            new RecoveryLinkService(
+                new RecoveryTokenRepository(),
+                isset($this->context->link) ? $this->context->link : null,
+                $ttlHours > 0 ? $ttlHours : 168,
+                $this->name
+            ),
             (string) Configuration::get(self::CONFIG_CART_CONSENT_MODE),
             $eventDefinitionKey
         );
@@ -334,6 +346,7 @@ class PsSalesforceBridge extends Module
             && Configuration::updateValue(self::CONFIG_CUSTOMER_DE_KEY, 'PS_CUSTOMERS')
             && Configuration::updateValue(self::CONFIG_ORDER_DE_KEY, 'PS_ORDERS')
             && Configuration::updateValue(self::CONFIG_JOURNEY_EVENT_DEFINITION_KEY, 'PRESTASHOP_ABANDONED_CART')
+            && Configuration::updateValue(self::CONFIG_RECOVERY_TOKEN_TTL_HOURS, 168)
             && Configuration::updateValue(self::CONFIG_CUSTOMER_BACKFILL_BATCH, 50)
             && Configuration::updateValue(self::CONFIG_CRON_TOKEN, bin2hex(random_bytes(24)));
     }
@@ -352,6 +365,7 @@ class PsSalesforceBridge extends Module
             self::CONFIG_CUSTOMER_DE_KEY,
             self::CONFIG_ORDER_DE_KEY,
             self::CONFIG_JOURNEY_EVENT_DEFINITION_KEY,
+            self::CONFIG_RECOVERY_TOKEN_TTL_HOURS,
             self::CONFIG_CRON_TOKEN,
             self::CONFIG_CUSTOMER_BACKFILL_BATCH,
         ];
@@ -444,6 +458,7 @@ class PsSalesforceBridge extends Module
                 `last_activity` DATETIME NOT NULL,
                 `abandon_after` DATETIME NOT NULL,
                 `abandoned_at` DATETIME NULL,
+                `recovered_at` DATETIME NULL,
                 `snapshot_hash` CHAR(40) NOT NULL,
                 `payload` LONGTEXT NOT NULL,
                 `created_at` DATETIME NOT NULL,
@@ -494,6 +509,25 @@ class PsSalesforceBridge extends Module
                 KEY `idx_sfmc_journey_status` (`status`),
                 KEY `idx_sfmc_journey_contact` (`contact_key`)
             ) ENGINE={$engine} DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+            "CREATE TABLE IF NOT EXISTS `{$prefix}sfmc_recovery_token` (
+                `id_sfmc_recovery_token` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+                `token_hash` CHAR(64) NOT NULL,
+                `id_shop` INT UNSIGNED NOT NULL,
+                `id_cart` INT UNSIGNED NOT NULL,
+                `id_customer` INT UNSIGNED NOT NULL DEFAULT 0,
+                `contact_key` VARCHAR(191) NOT NULL DEFAULT '',
+                `snapshot_hash` CHAR(40) NOT NULL,
+                `expires_at` DATETIME NOT NULL,
+                `used_at` DATETIME NULL,
+                `recovered_cart_id` INT UNSIGNED NOT NULL DEFAULT 0,
+                `created_at` DATETIME NOT NULL,
+                `updated_at` DATETIME NOT NULL,
+                PRIMARY KEY (`id_sfmc_recovery_token`),
+                UNIQUE KEY `uniq_sfmc_recovery_token_hash` (`token_hash`),
+                KEY `idx_sfmc_recovery_source` (`id_shop`, `id_cart`),
+                KEY `idx_sfmc_recovery_expiry` (`expires_at`, `used_at`),
+                KEY `idx_sfmc_recovery_cart` (`recovered_cart_id`)
+            ) ENGINE={$engine} DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
             "CREATE TABLE IF NOT EXISTS `{$prefix}sfmc_customer_backfill` (
                 `id_sfmc_customer_backfill` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
                 `id_shop` INT UNSIGNED NOT NULL,
@@ -523,7 +557,8 @@ class PsSalesforceBridge extends Module
     {
         $prefix = _DB_PREFIX_;
 
-        return Db::getInstance()->execute("DROP TABLE IF EXISTS `{$prefix}sfmc_journey_event`")
+        return Db::getInstance()->execute("DROP TABLE IF EXISTS `{$prefix}sfmc_recovery_token`")
+            && Db::getInstance()->execute("DROP TABLE IF EXISTS `{$prefix}sfmc_journey_event`")
             && Db::getInstance()->execute("DROP TABLE IF EXISTS `{$prefix}sfmc_cart_item`")
             && Db::getInstance()->execute("DROP TABLE IF EXISTS `{$prefix}sfmc_cart`")
             && Db::getInstance()->execute("DROP TABLE IF EXISTS `{$prefix}sfmc_customer_backfill`")
@@ -553,6 +588,7 @@ class PsSalesforceBridge extends Module
             . $this->renderBackfillStatus()
             . $this->renderCartStatus()
             . $this->renderJourneyStatus()
+            . $this->renderRecoveryStatus()
             . $this->renderForm();
     }
 
@@ -622,6 +658,21 @@ class PsSalesforceBridge extends Module
         return $this->displayInformation($this->l('Journey delivery status: ') . implode(' | ', $parts));
     }
 
+    private function renderRecoveryStatus()
+    {
+        $row = (new RecoveryTokenRepository())->summary();
+        if (empty($row)) {
+            return $this->displayInformation($this->l('No cart recovery links have been generated yet.'));
+        }
+
+        return $this->displayInformation(sprintf(
+            $this->l('Recovery links: active %d, used %d, expired %d.'),
+            isset($row['active_tokens']) ? (int) $row['active_tokens'] : 0,
+            isset($row['used_tokens']) ? (int) $row['used_tokens'] : 0,
+            isset($row['expired_tokens']) ? (int) $row['expired_tokens'] : 0
+        ));
+    }
+
     private function saveConfiguration()
     {
         $authBaseUri = rtrim(trim((string) Tools::getValue(self::CONFIG_AUTH_BASE_URI)), '/');
@@ -637,6 +688,7 @@ class PsSalesforceBridge extends Module
         $customerDeKey = trim((string) Tools::getValue(self::CONFIG_CUSTOMER_DE_KEY));
         $orderDeKey = trim((string) Tools::getValue(self::CONFIG_ORDER_DE_KEY));
         $journeyEventDefinitionKey = trim((string) Tools::getValue(self::CONFIG_JOURNEY_EVENT_DEFINITION_KEY));
+        $recoveryTtlHours = max(1, min(720, (int) Tools::getValue(self::CONFIG_RECOVERY_TOKEN_TTL_HOURS)));
         $backfillBatch = max(10, min(500, (int) Tools::getValue(self::CONFIG_CUSTOMER_BACKFILL_BATCH)));
 
         if (!$this->isHttpsUri($authBaseUri) || !$this->isHttpsUri($restBaseUri)) {
@@ -669,6 +721,7 @@ class PsSalesforceBridge extends Module
         Configuration::updateValue(self::CONFIG_CUSTOMER_DE_KEY, $customerDeKey);
         Configuration::updateValue(self::CONFIG_ORDER_DE_KEY, $orderDeKey);
         Configuration::updateValue(self::CONFIG_JOURNEY_EVENT_DEFINITION_KEY, $journeyEventDefinitionKey);
+        Configuration::updateValue(self::CONFIG_RECOVERY_TOKEN_TTL_HOURS, $recoveryTtlHours);
         Configuration::updateValue(self::CONFIG_CUSTOMER_BACKFILL_BATCH, $backfillBatch);
 
         if ($clientSecret !== '') {
@@ -731,6 +784,7 @@ class PsSalesforceBridge extends Module
             self::CONFIG_CUSTOMER_DE_KEY => (string) Configuration::get(self::CONFIG_CUSTOMER_DE_KEY),
             self::CONFIG_ORDER_DE_KEY => (string) Configuration::get(self::CONFIG_ORDER_DE_KEY),
             self::CONFIG_JOURNEY_EVENT_DEFINITION_KEY => (string) Configuration::get(self::CONFIG_JOURNEY_EVENT_DEFINITION_KEY),
+            self::CONFIG_RECOVERY_TOKEN_TTL_HOURS => (int) Configuration::get(self::CONFIG_RECOVERY_TOKEN_TTL_HOURS),
             self::CONFIG_CRON_TOKEN => $cronToken,
             self::CONFIG_CUSTOMER_BACKFILL_BATCH => (int) Configuration::get(self::CONFIG_CUSTOMER_BACKFILL_BATCH),
             'PS_SFMC_CRON_URL' => $cronUrl,
@@ -751,6 +805,7 @@ class PsSalesforceBridge extends Module
                     ['type' => 'text', 'label' => $this->l('Customer Data Extension External Key'), 'name' => self::CONFIG_CUSTOMER_DE_KEY, 'required' => true],
                     ['type' => 'text', 'label' => $this->l('Order Data Extension External Key'), 'name' => self::CONFIG_ORDER_DE_KEY, 'required' => true],
                     ['type' => 'text', 'label' => $this->l('Journey Event Definition Key'), 'name' => self::CONFIG_JOURNEY_EVENT_DEFINITION_KEY, 'required' => true, 'desc' => $this->l('Default: PRESTASHOP_ABANDONED_CART. Create and activate the matching API Entry Event in Journey Builder before enabling Production.')],
+                    ['type' => 'text', 'label' => $this->l('Recovery link lifetime'), 'name' => self::CONFIG_RECOVERY_TOKEN_TTL_HOURS, 'suffix' => $this->l('hours'), 'desc' => $this->l('Allowed range: 1–720 hours. Default: 168 hours (7 days).')],
                     [
                         'type' => 'select',
                         'label' => $this->l('Mode'),
