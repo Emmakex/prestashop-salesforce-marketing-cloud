@@ -173,7 +173,20 @@
 - [x] cron error responses sanitized; raw exception messages are no longer exposed
 - [x] PHP 7.1 and PHP 8.5 retention contract coverage in CI
 
+### 0.7.0-D — Release hardening
+
+- [x] public module version bumped to `0.7.0`
+- [x] Composer PHP floor aligned with the declared PHP 7.1 source-compatibility contract
+- [x] `0.6.1 -> 0.7.0` upgrade script materializes missing retention defaults without DDL
+- [x] existing merchant retention values are preserved during upgrade
+- [x] fresh install and upgrade defaults are checked for contract parity
+- [x] versioned `pssalesforcebridge-0.7.0.zip` release artifact
+- [x] package validates embedded module version, Composer floor and required upgrade script
+- [x] package excludes `vendor/` and local development files
+- [x] SHA-256 checksum generated alongside the exact ZIP
+- [x] PHP 7.1 and PHP 8.5 release/upgrade contract coverage in CI
+- [x] exact-head and post-merge release gate policy documented
+
 ### Remaining hardening
 
-- [ ] release ZIP and upgrade policy for the production release
-- [ ] runtime certification matrix for PrestaShop 1.7.8.x, 8.x and 9.x
+- [ ] 0.7.0-E runtime certification matrix for PrestaShop 1.7.8.x, 8.x and 9.x
