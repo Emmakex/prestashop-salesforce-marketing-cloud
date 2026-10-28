@@ -42,8 +42,9 @@ Version `0.6.1` provides:
 - recovery without implicit customer authentication;
 - duplicated/sanitized recovery carts with source → recovered-cart linkage;
 - local `CART_RECOVERED` events;
-- recovered-cart → order attribution on the same order event pipeline;
-- authoritative recovered order totals, currency, state, paid and valid state persisted locally;
+- recovered-cart → one-or-more-orders attribution on the same order event pipeline;
+- authoritative recovered order totals, currencies, states and paid/valid states persisted locally;
+- multi-package/multi-order-safe attribution: one recovered cart never overwrites another order from the same cart;
 - paid recovered revenue reported separately per currency;
 - queue locking, stale-lock recovery, retry/backoff and terminal failure handling;
 - safe `test` mode that captures locally but performs no outbound Salesforce writes;
@@ -71,9 +72,9 @@ Clicking `RecoveryUrl` atomically consumes the token, confirms that the original
 
 If the browser is already authenticated as the same customer, the recovered cart can remain associated with that authenticated customer. Otherwise it is detached from the original customer before being exposed to the browser.
 
-The connector persists `source cart → recovered cart`. If that recovered cart later becomes an order, the normal order event pipeline also records the resulting PrestaShop order id, authoritative order total, currency, state and paid/valid state. This means recovery conversion and revenue do not depend on email-open or click analytics.
+The connector persists `source cart → recovered cart`. If that recovered cart later becomes one or more PrestaShop orders, the normal order event pipeline records each resulting order independently in `sfmc_recovery_order`, including authoritative total, currency, state and paid/valid state. This accommodates PrestaShop flows where one cart is split into multiple orders and prevents later orders from overwriting earlier attribution.
 
-Back Office recovery metrics distinguish used links, recovered carts, attributed orders and paid recovered orders. Revenue is grouped by currency; values from different currencies are never added together into a misleading global total.
+Back Office recovery metrics distinguish used links, recovered carts, attributed orders and paid recovered orders. Revenue is grouped by currency; values from different currencies are never added together into a misleading global total. The metrics are based on PrestaShop order state and totals, not email-open tracking.
 
 ## Engineering rules
 
@@ -87,10 +88,12 @@ Back Office recovery metrics distinguish used links, recovered carts, attributed
 8. Abandoned-cart events must be revalidated immediately before Journey delivery.
 9. Recovery tokens must be single-use, expiring and bound to the exact cart snapshot.
 10. A recovery link must never become an implicit customer login.
-11. Recovered revenue must come from authoritative PrestaShop order totals and must not mix currencies.
-12. Production sending is opt-in; configuration defaults to `test` mode.
-13. Version-specific PrestaShop behavior belongs behind compatibility adapters, never in Salesforce services.
-14. Runtime compatibility is certified by real integration tests, not inferred from PHP lint alone.
-15. Historical backfills must reuse the same normalized event pipeline as live storefront hooks.
+11. Recovery attribution must support one recovered cart producing multiple PrestaShop orders.
+12. Recovered revenue must come from authoritative PrestaShop order totals and must not mix currencies.
+13. Attribution failures must never block the authoritative order synchronization path.
+14. Production sending is opt-in; configuration defaults to `test` mode.
+15. Version-specific PrestaShop behavior belongs behind compatibility adapters, never in Salesforce services.
+16. Runtime compatibility is certified by real integration tests, not inferred from PHP lint alone.
+17. Historical backfills must reuse the same normalized event pipeline as live storefront hooks.
 
 See `ROADMAP.md`, `CUSTOMER_CONTRACT.md`, `DATA_EXTENSION_CUSTOMERS.md`, `DATA_EXTENSION_ORDERS.md`, `JOURNEY_BUILDER.md` and `RECOVERY.md` for details.
