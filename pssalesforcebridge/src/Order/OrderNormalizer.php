@@ -25,9 +25,7 @@ final class OrderNormalizer
         $resolvedStateId = $stateId !== null
             ? (int) $stateId
             : (is_object($order) && isset($order->current_state) ? (int) $order->current_state : 0);
-        $resolvedPaid = $paid !== null
-            ? (bool) $paid
-            : (is_object($order) && isset($order->valid) ? (bool) $order->valid : false);
+        $resolvedPaid = self::resolvePaid($resolvedStateId, $paid);
 
         return [
             'order_key' => $shopId > 0 && $orderId > 0 ? 'ps_' . $shopId . '_' . $orderId : '',
@@ -51,6 +49,22 @@ final class OrderNormalizer
             'date_add' => is_object($order) && isset($order->date_add) ? (string) $order->date_add : '',
             'date_upd' => is_object($order) && isset($order->date_upd) ? (string) $order->date_upd : '',
         ];
+    }
+
+    private static function resolvePaid($stateId, $paid)
+    {
+        if ($paid !== null) {
+            return (bool) $paid;
+        }
+
+        if ((int) $stateId > 0 && class_exists('OrderState')) {
+            $state = new \OrderState((int) $stateId);
+            if (is_object($state) && isset($state->id) && (int) $state->id > 0 && isset($state->paid)) {
+                return (bool) $state->paid;
+            }
+        }
+
+        return false;
     }
 
     private static function number($object, $preferred, $fallback)
