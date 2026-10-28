@@ -37,7 +37,7 @@ copy_module() {
 }
 
 console() {
-  docker exec -w /var/www/html "$PS_CONTAINER" php bin/console "$@"
+  docker exec -u www-data -w /var/www/html "$PS_CONTAINER" php bin/console "$@"
 }
 
 wait_for_shop() {
@@ -157,7 +157,7 @@ copy_module /tmp/pssfmc-runtime-070/pssalesforcebridge
 console prestashop:module install pssalesforcebridge --no-interaction
 
 docker cp "$ROOT/tests/runtime/prestashop-smoke.php" "$PS_CONTAINER:/tmp/prestashop-smoke.php"
-docker exec -e EXPECTED_PS_VERSION="$PS_VERSION" -e PS_ROOT=/var/www/html -w /var/www/html "$PS_CONTAINER" php /tmp/prestashop-smoke.php
+docker exec -u www-data -e EXPECTED_PS_VERSION="$PS_VERSION" -e PS_ROOT=/var/www/html -w /var/www/html "$PS_CONTAINER" php /tmp/prestashop-smoke.php
 
 echo "==> Verifying protected health and cron endpoints"
 TOKEN="$(sql "SELECT value FROM ps_configuration WHERE name='PS_SFMC_CRON_TOKEN' ORDER BY id_configuration DESC LIMIT 1")"
