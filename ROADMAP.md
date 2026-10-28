@@ -89,11 +89,30 @@
 
 ## 0.6.0 — Cart recovery
 
-- signed opaque recovery tokens
-- expiration / one-time-use controls
-- restore cart flow
-- `RecoveryUrl` population in Journey events
-- recovered cart / recovered revenue attribution
+- [x] cryptographically random opaque recovery tokens
+- [x] SHA-256-only token persistence; raw tokens are not stored
+- [x] configurable expiration, default 168 hours and range 1–720 hours
+- [x] atomic one-time-use token claim
+- [x] snapshot/shop/cart binding and stale-link rejection
+- [x] fail-closed conversion check before recovery
+- [x] multishop-aware `RecoveryUrl` population in Journey events
+- [x] recovery endpoint with no-store / noindex behavior
+- [x] cart duplication and session restoration
+- [x] recovery does not implicitly authenticate a customer
+- [x] customer/address/carrier sanitization before exposing recovered cart
+- [x] source cart → recovered cart relation persisted
+- [x] local `CART_RECOVERED` event
+- [x] upgrade path from 0.5.0
+- [ ] recovered cart → order → revenue attribution (`0.6.1`)
+- [ ] live end-to-end recovery certification on supported PrestaShop families
+
+## 0.6.1 — Recovery attribution
+
+- map `recovered_cart_id` to the resulting PrestaShop order
+- persist recovery conversion timestamp and order id
+- calculate recovered revenue from authoritative PrestaShop order totals
+- expose recovery conversion metrics without relying on email-open tracking
+- optionally synchronize recovery/conversion state back to Marketing Cloud
 
 ## 0.7.0 — Production hardening
 
