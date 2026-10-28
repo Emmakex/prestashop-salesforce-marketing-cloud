@@ -12,9 +12,11 @@ The connector is intentionally asynchronous: storefront hooks only persist local
 
 One module targets PrestaShop **1.7.8.x, 8.x and 9.x**. Version-specific behavior must stay behind the compatibility/adaptor boundary; Salesforce-facing contracts remain identical across PrestaShop generations.
 
-The source and Composer compatibility floor is PHP **7.1**. Runtime certification against real PrestaShop installations is tracked separately from syntax/contract CI.
+The source and Composer compatibility floor is PHP **7.1**. Version `0.7.0` is runtime-certified on representative releases **PrestaShop 1.7.8.11, 8.2.8 and 9.1.5** using real containerized PrestaShop installations. This is representative certification for the supported families, not a claim that every patch release has been individually exercised.
 
-See `COMPATIBILITY.md` for certification policy.
+The runtime matrix covers real `0.6.1 -> 0.7.0` upgrades, clean ZIP installs, connector tables/configuration/hooks, customer/cart/order smoke paths, local cron components, protected health/cron endpoints, Front Office reachability and fail-closed `test` mode. Live Salesforce Marketing Cloud Journey/recovery certification remains a separate production-integration gate.
+
+See `COMPATIBILITY.md` for the certification matrix and evidence policy.
 
 ## Current scope
 
