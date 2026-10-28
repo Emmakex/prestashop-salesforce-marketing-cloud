@@ -17,6 +17,7 @@ class Db
     public static $eventRows = [];
     public static $oldestRow = [];
     public static $staleCount = 0;
+    public static $lastGetRowSql = '';
     private static $instance;
 
     public static function getInstance()
@@ -43,6 +44,8 @@ class Db
 
     public function getRow($sql)
     {
+        self::$lastGetRowSql = (string) $sql;
+
         if (strpos($sql, 'ORDER BY `created_at` ASC') !== false) {
             return self::$oldestRow;
         }
@@ -108,6 +111,7 @@ $testReport = $service->report(['mode' => 'test', 'cron_token' => true]);
 assertSameValue('healthy', $testReport['status'], 'Test mode backlog must not be reported as unhealthy.');
 assertSameValue(5, $testReport['queue']['outstanding_total'], 'Outstanding queue count is incorrect.');
 assertTrueValue(in_array('outbound_delivery_disabled_in_test_mode', $testReport['notes'], true), 'Test-mode note is missing.');
+assertTrueValue(stripos(Db::$lastGetRowSql, ' limit ') === false, 'Queries passed to PrestaShop Db::getRow() must not include a manual LIMIT.');
 
 // In production, 15+ minutes of outstanding work is a warning.
 Db::$statusRows = [['status' => 'pending', 'total' => 2, 'max_attempts' => 0]];
