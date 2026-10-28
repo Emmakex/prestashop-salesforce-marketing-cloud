@@ -1,0 +1,86 @@
+name: SFMC Live Certification
+
+on:
+  workflow_dispatch:
+    inputs:
+      stage:
+        description: Certification depth
+        required: true
+        default: auth
+        type: choice
+        options:
+          - auth
+          - data_extensions
+          - journey
+      confirm_live_write:
+        description: Required for Data Extension or Journey writes
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sfmc-live-certification
+  cancel-in-progress: false
+
+jobs:
+  certify:
+    name: SFMC live certification · ${{ inputs.stage }}
+    runs-on: ubuntu-latest
+    environment: sfmc-live-certification
+
+    steps:
+      - name: Check out exact dispatched SHA
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+
+      - name: Verify exact checkout
+        shell: bash
+        run: |
+          test "$(git rev-parse HEAD)" = "${GITHUB_SHA}"
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: curl
+          coverage: none
+
+      - name: Enforce explicit live-write confirmation
+        if: ${{ inputs.stage != 'auth' && inputs.confirm_live_write != true }}
+        shell: bash
+        run: |
+          echo 'Data Extension and Journey certification perform live tenant writes.' >&2
+          echo 'Re-run with confirm_live_write enabled.' >&2
+          exit 1
+
+      - name: Run SFMC live certification
+        env:
+          SFMC_CERT_STAGE: ${{ inputs.stage }}
+          SFMC_CERT_CONFIRM_LIVE_WRITE: ${{ inputs.confirm_live_write }}
+          SFMC_CERT_EVIDENCE_PATH: sfmc-live-certification.json
+          SFMC_CERT_RUN_KEY: ${{ github.run_id }}-${{ github.run_attempt }}-${{ github.sha }}
+          SFMC_AUTH_BASE_URI: ${{ secrets.SFMC_AUTH_BASE_URI }}
+          SFMC_REST_BASE_URI: ${{ secrets.SFMC_REST_BASE_URI }}
+          SFMC_CLIENT_ID: ${{ secrets.SFMC_CLIENT_ID }}
+          SFMC_CLIENT_SECRET: ${{ secrets.SFMC_CLIENT_SECRET }}
+          SFMC_ACCOUNT_ID: ${{ secrets.SFMC_ACCOUNT_ID }}
+          SFMC_CUSTOMER_DE_KEY: ${{ secrets.SFMC_CUSTOMER_DE_KEY }}
+          SFMC_ORDER_DE_KEY: ${{ secrets.SFMC_ORDER_DE_KEY }}
+          SFMC_JOURNEY_EVENT_DEFINITION_KEY: ${{ secrets.SFMC_JOURNEY_EVENT_DEFINITION_KEY }}
+          SFMC_CERT_EMAIL: ${{ secrets.SFMC_CERT_EMAIL }}
+          SFMC_CERT_CONTACT_KEY: ${{ secrets.SFMC_CERT_CONTACT_KEY }}
+          SFMC_CERT_RECOVERY_URL: ${{ secrets.SFMC_CERT_RECOVERY_URL }}
+        run: php tests/live/sfmc-live-certification.php
+
+      - name: Upload sanitized certification evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: sfmc-live-certification-${{ github.run_id }}-${{ github.run_attempt }}
+          path: sfmc-live-certification.json
+          if-no-files-found: ignore
+          retention-days: 30

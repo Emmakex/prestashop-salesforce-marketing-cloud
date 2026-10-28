@@ -107,6 +107,7 @@ jobs:
           php tests/release-contract.php
           php tests/db-single-row-contract.php
           php tests/db-namespace-contract.php
+          php tests/sfmc-live-certification-contract.php
 
   package:
     name: Build release package
