@@ -79,13 +79,35 @@ docker run -d --name "$DB_CONTAINER" --network "$NETWORK" \
   -e MYSQL_DATABASE=prestashop \
   mysql:5.7 --default-authentication-plugin=mysql_native_password >/dev/null
 
-for _ in $(seq 1 60); do
-  if docker exec "$DB_CONTAINER" mysqladmin ping -uroot -padmin --silent >/dev/null 2>&1; then
+# The official MySQL 5.7 image starts a temporary server while initializing
+# the data directory, then shuts it down and launches the final server. A raw
+# mysqladmin ping can therefore succeed too early. Wait for the entrypoint's
+# completion marker first, then require the final server to answer a real query.
+db_init_done=0
+for _ in $(seq 1 90); do
+  if docker logs "$DB_CONTAINER" 2>&1 | grep -q 'MySQL init process done. Ready for start up.'; then
+    db_init_done=1
     break
   fi
-  sleep 2
+  sleep 1
 done
-docker exec "$DB_CONTAINER" mysqladmin ping -uroot -padmin --silent >/dev/null
+if [ "$db_init_done" -ne 1 ]; then
+  echo "MySQL initialization did not complete" >&2
+  exit 1
+fi
+
+db_ready=0
+for _ in $(seq 1 60); do
+  if docker exec "$DB_CONTAINER" mysql -uroot -padmin --batch --skip-column-names -e 'SELECT 1' 2>/dev/null | grep -qx '1'; then
+    db_ready=1
+    break
+  fi
+  sleep 1
+done
+if [ "$db_ready" -ne 1 ]; then
+  echo "MySQL final server did not become ready" >&2
+  exit 1
+fi
 
 echo "==> Starting PrestaShop ${PS_VERSION}"
 docker run -d --name "$PS_CONTAINER" --network "$NETWORK" -p "${PORT}:80" \
