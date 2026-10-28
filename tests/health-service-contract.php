@@ -4,6 +4,11 @@ if (!defined('_DB_PREFIX_')) {
     define('_DB_PREFIX_', 'ps_');
 }
 
+function pSQL($value)
+{
+    return (string) $value;
+}
+
 class Db
 {
     const INSERT_IGNORE = 1;
