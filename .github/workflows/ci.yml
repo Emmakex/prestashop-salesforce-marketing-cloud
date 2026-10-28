@@ -79,19 +79,50 @@ jobs:
       - name: Run privacy retention contract
         run: php tests/retention-contract.php
 
-  package:
-    name: Build installable module
+  release-contract:
+    name: Release contract (${{ matrix.php }})
     runs-on: ubuntu-latest
-    needs: [php-syntax, health-contract, sync-contract, retention-contract]
+    strategy:
+      fail-fast: false
+      matrix:
+        php: ['7.1', '8.5']
     steps:
       - uses: actions/checkout@v4
-      - name: Build ZIP
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          coverage: none
+      - name: Validate release and upgrade contract
+        run: php tests/release-contract.php
+
+  package:
+    name: Build release package
+    runs-on: ubuntu-latest
+    needs: [php-syntax, health-contract, sync-contract, retention-contract, release-contract]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build and validate versioned ZIP
+        shell: bash
         run: |
+          set -euo pipefail
+          VERSION=0.7.0
           mkdir -p build
-          zip -r build/pssalesforcebridge.zip pssalesforcebridge \
+          ZIP="build/pssalesforcebridge-${VERSION}.zip"
+          zip -r "$ZIP" pssalesforcebridge \
             -x '*/vendor/*' '*.DS_Store'
+          unzip -Z1 "$ZIP" | grep -qx 'pssalesforcebridge/pssalesforcebridge.php'
+          unzip -Z1 "$ZIP" | grep -qx 'pssalesforcebridge/upgrade/upgrade-0.7.0.php'
+          if unzip -Z1 "$ZIP" | grep -q '^pssalesforcebridge/vendor/'; then
+            echo 'vendor directory must not be packaged'
+            exit 1
+          fi
+          unzip -p "$ZIP" pssalesforcebridge/pssalesforcebridge.php | grep -Fq "\$this->version = '0.7.0';"
+          unzip -p "$ZIP" pssalesforcebridge/composer.json | grep -Fq '"php": ">=7.1"'
+          sha256sum "$ZIP" > "${ZIP}.sha256"
       - uses: actions/upload-artifact@v4
         with:
-          name: pssalesforcebridge
-          path: build/pssalesforcebridge.zip
+          name: pssalesforcebridge-0.7.0
+          path: |
+            build/pssalesforcebridge-0.7.0.zip
+            build/pssalesforcebridge-0.7.0.zip.sha256
           if-no-files-found: error
