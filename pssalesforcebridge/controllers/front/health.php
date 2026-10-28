@@ -4,8 +4,8 @@ class PsSalesforceBridgeHealthModuleFrontController extends ModuleFrontControlle
 {
     public function initContent()
     {
-        parent::initContent();
-
+        // Machine-to-machine endpoint: do not initialize/render theme content.
+        // Front-office theme state must never be a dependency of connector health.
         $this->setNoCacheHeaders();
 
         $provided = (string) Tools::getValue('token');
@@ -19,6 +19,7 @@ class PsSalesforceBridgeHealthModuleFrontController extends ModuleFrontControlle
             $report = $this->module->healthReport();
             $this->respond($report, !empty($report['ok']) ? 200 : 503);
         } catch (\Throwable $e) {
+            $this->logOperationalFailure('health_report_failed', $e);
             $this->respond([
                 'ok' => false,
                 'status' => 'critical',
@@ -32,6 +33,20 @@ class PsSalesforceBridgeHealthModuleFrontController extends ModuleFrontControlle
         header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
         header('Pragma: no-cache');
         header('X-Robots-Tag: noindex, nofollow', true);
+    }
+
+    private function logOperationalFailure($event, \Throwable $error)
+    {
+        if (!class_exists('PrestaShopLogger')) {
+            return;
+        }
+
+        PrestaShopLogger::addLog(
+            'Salesforce bridge ' . (string) $event . ' [' . get_class($error) . ']',
+            3,
+            null,
+            'PsSalesforceBridge'
+        );
     }
 
     private function respond(array $payload, $status)
