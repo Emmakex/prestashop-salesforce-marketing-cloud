@@ -6,6 +6,7 @@ if (!defined('_PS_VERSION_')) {
 
 require_once __DIR__ . '/src/Compatibility/Platform.php';
 require_once __DIR__ . '/src/Compatibility/CustomerHookAdapter.php';
+require_once __DIR__ . '/src/Compatibility/ShopResolver.php';
 require_once __DIR__ . '/src/Salesforce/AuthClient.php';
 require_once __DIR__ . '/src/Salesforce/RestClient.php';
 require_once __DIR__ . '/src/Queue/QueueRepository.php';
@@ -14,9 +15,14 @@ require_once __DIR__ . '/src/Customer/CustomerNormalizer.php';
 require_once __DIR__ . '/src/Customer/CustomerSyncLedger.php';
 require_once __DIR__ . '/src/Customer/CustomerEventService.php';
 require_once __DIR__ . '/src/Customer/CustomerDataExtensionWriter.php';
+require_once __DIR__ . '/src/Customer/CustomerBackfillRepository.php';
+require_once __DIR__ . '/src/Customer/CustomerBackfillService.php';
 
 use Emmakex\PrestaShopSalesforceMarketingCloud\Compatibility\CustomerHookAdapter;
 use Emmakex\PrestaShopSalesforceMarketingCloud\Compatibility\Platform;
+use Emmakex\PrestaShopSalesforceMarketingCloud\Compatibility\ShopResolver;
+use Emmakex\PrestaShopSalesforceMarketingCloud\Customer\CustomerBackfillRepository;
+use Emmakex\PrestaShopSalesforceMarketingCloud\Customer\CustomerBackfillService;
 use Emmakex\PrestaShopSalesforceMarketingCloud\Customer\CustomerDataExtensionWriter;
 use Emmakex\PrestaShopSalesforceMarketingCloud\Customer\CustomerEventService;
 use Emmakex\PrestaShopSalesforceMarketingCloud\Customer\CustomerSyncLedger;
@@ -36,12 +42,13 @@ class PsSalesforceBridge extends Module
     const CONFIG_CART_ABANDON_MINUTES = 'PS_SFMC_CART_ABANDON_MINUTES';
     const CONFIG_CUSTOMER_DE_KEY = 'PS_SFMC_CUSTOMER_DE_KEY';
     const CONFIG_CRON_TOKEN = 'PS_SFMC_CRON_TOKEN';
+    const CONFIG_CUSTOMER_BACKFILL_BATCH = 'PS_SFMC_CUSTOMER_BACKFILL_BATCH';
 
     public function __construct()
     {
         $this->name = 'pssalesforcebridge';
         $this->tab = 'advertising_marketing';
-        $this->version = '0.2.1';
+        $this->version = '0.2.2';
         $this->author = 'Emmakex';
         $this->need_instance = 0;
         $this->bootstrap = true;
@@ -87,7 +94,16 @@ class PsSalesforceBridge extends Module
         return $this->captureCustomerEvent('CUSTOMER_UPDATED', is_array($params) ? $params : []);
     }
 
-    public function processCustomerQueue($limit = 20)
+    public function processCustomerBackfill($batchSize = null)
+    {
+        if ($batchSize === null) {
+            $batchSize = (int) Configuration::get(self::CONFIG_CUSTOMER_BACKFILL_BATCH);
+        }
+
+        return $this->customerBackfillService()->process($batchSize > 0 ? $batchSize : 50);
+    }
+
+    public function processCustomerQueue($limit = 50)
     {
         if ((string) Configuration::get(self::CONFIG_MODE) !== 'production') {
             return ['skipped' => 'test_mode', 'claimed' => 0, 'processed' => 0, 'retry' => 0, 'failed' => 0];
@@ -133,11 +149,20 @@ class PsSalesforceBridge extends Module
         return $service->enqueue($eventType, $customer, $shopId);
     }
 
+    private function customerBackfillService()
+    {
+        return new CustomerBackfillService(
+            new CustomerBackfillRepository(),
+            new CustomerEventService(new QueueRepository(), new CustomerSyncLedger())
+        );
+    }
+
     private function installConfiguration()
     {
         return Configuration::updateValue(self::CONFIG_MODE, 'test')
             && Configuration::updateValue(self::CONFIG_CART_ABANDON_MINUTES, 60)
             && Configuration::updateValue(self::CONFIG_CUSTOMER_DE_KEY, 'PS_CUSTOMERS')
+            && Configuration::updateValue(self::CONFIG_CUSTOMER_BACKFILL_BATCH, 50)
             && Configuration::updateValue(self::CONFIG_CRON_TOKEN, bin2hex(random_bytes(24)));
     }
 
@@ -153,6 +178,7 @@ class PsSalesforceBridge extends Module
             self::CONFIG_CART_ABANDON_MINUTES,
             self::CONFIG_CUSTOMER_DE_KEY,
             self::CONFIG_CRON_TOKEN,
+            self::CONFIG_CUSTOMER_BACKFILL_BATCH,
         ];
 
         foreach ($keys as $key) {
@@ -210,6 +236,20 @@ class PsSalesforceBridge extends Module
                 UNIQUE KEY `uniq_sfmc_customer_shop` (`id_shop`, `id_customer`),
                 UNIQUE KEY `uniq_sfmc_customer_contact` (`contact_key`)
             ) ENGINE={$engine} DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+            "CREATE TABLE IF NOT EXISTS `{$prefix}sfmc_customer_backfill` (
+                `id_sfmc_customer_backfill` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+                `id_shop` INT UNSIGNED NOT NULL,
+                `cursor_customer_id` INT UNSIGNED NOT NULL DEFAULT 0,
+                `status` VARCHAR(16) NOT NULL DEFAULT 'pending',
+                `scanned_count` BIGINT UNSIGNED NOT NULL DEFAULT 0,
+                `queued_count` BIGINT UNSIGNED NOT NULL DEFAULT 0,
+                `started_at` DATETIME NULL,
+                `updated_at` DATETIME NOT NULL,
+                `completed_at` DATETIME NULL,
+                PRIMARY KEY (`id_sfmc_customer_backfill`),
+                UNIQUE KEY `uniq_sfmc_customer_backfill_shop` (`id_shop`),
+                KEY `idx_sfmc_customer_backfill_status` (`status`)
+            ) ENGINE={$engine} DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
         ];
 
         foreach ($queries as $query) {
@@ -225,7 +265,8 @@ class PsSalesforceBridge extends Module
     {
         $prefix = _DB_PREFIX_;
 
-        return Db::getInstance()->execute("DROP TABLE IF EXISTS `{$prefix}sfmc_customer_sync`")
+        return Db::getInstance()->execute("DROP TABLE IF EXISTS `{$prefix}sfmc_customer_backfill`")
+            && Db::getInstance()->execute("DROP TABLE IF EXISTS `{$prefix}sfmc_customer_sync`")
             && Db::getInstance()->execute("DROP TABLE IF EXISTS `{$prefix}sfmc_queue`")
             && Db::getInstance()->execute("DROP TABLE IF EXISTS `{$prefix}sfmc_log`");
     }
@@ -242,7 +283,47 @@ class PsSalesforceBridge extends Module
             $output .= $this->testConnection();
         }
 
-        return $output . $this->renderForm();
+        if (Tools::isSubmit('startPsSalesforceBridgeCustomerBackfill')) {
+            $output .= $this->startCustomerBackfill();
+        }
+
+        return $output . $this->renderBackfillStatus() . $this->renderForm();
+    }
+
+    private function startCustomerBackfill()
+    {
+        $shopIds = ShopResolver::activeShopIds(isset($this->context) ? $this->context : null);
+        if (empty($shopIds)) {
+            return $this->displayError($this->l('No active shops were found for customer backfill.'));
+        }
+
+        if (!$this->customerBackfillService()->start($shopIds)) {
+            return $this->displayError($this->l('Unable to start or resume customer backfill.'));
+        }
+
+        return $this->displayConfirmation($this->l('Customer backfill started or resumed. The cron will process it incrementally.'));
+    }
+
+    private function renderBackfillStatus()
+    {
+        $rows = (new CustomerBackfillRepository())->summary();
+        if (empty($rows)) {
+            return $this->displayInformation($this->l('Customer backfill has not been started.'));
+        }
+
+        $parts = [];
+        foreach ($rows as $row) {
+            $parts[] = sprintf(
+                'Shop %d: %s, scanned %d, queued %d, cursor %d',
+                isset($row['id_shop']) ? (int) $row['id_shop'] : 0,
+                isset($row['status']) ? (string) $row['status'] : 'unknown',
+                isset($row['scanned_count']) ? (int) $row['scanned_count'] : 0,
+                isset($row['queued_count']) ? (int) $row['queued_count'] : 0,
+                isset($row['cursor_customer_id']) ? (int) $row['cursor_customer_id'] : 0
+            );
+        }
+
+        return $this->displayInformation($this->l('Customer backfill status: ') . implode(' | ', $parts));
     }
 
     private function saveConfiguration()
@@ -255,6 +336,7 @@ class PsSalesforceBridge extends Module
         $mode = Tools::getValue(self::CONFIG_MODE) === 'production' ? 'production' : 'test';
         $abandonMinutes = max(15, (int) Tools::getValue(self::CONFIG_CART_ABANDON_MINUTES));
         $customerDeKey = trim((string) Tools::getValue(self::CONFIG_CUSTOMER_DE_KEY));
+        $backfillBatch = max(10, min(500, (int) Tools::getValue(self::CONFIG_CUSTOMER_BACKFILL_BATCH)));
 
         if (!$this->isHttpsUri($authBaseUri) || !$this->isHttpsUri($restBaseUri)) {
             return $this->displayError($this->l('Authentication and REST Base URIs must be valid HTTPS URLs.'));
@@ -275,6 +357,7 @@ class PsSalesforceBridge extends Module
         Configuration::updateValue(self::CONFIG_MODE, $mode);
         Configuration::updateValue(self::CONFIG_CART_ABANDON_MINUTES, $abandonMinutes);
         Configuration::updateValue(self::CONFIG_CUSTOMER_DE_KEY, $customerDeKey);
+        Configuration::updateValue(self::CONFIG_CUSTOMER_BACKFILL_BATCH, $backfillBatch);
 
         if ($clientSecret !== '') {
             Configuration::updateValue(self::CONFIG_CLIENT_SECRET, $clientSecret);
@@ -332,6 +415,7 @@ class PsSalesforceBridge extends Module
             self::CONFIG_CART_ABANDON_MINUTES => (int) Configuration::get(self::CONFIG_CART_ABANDON_MINUTES),
             self::CONFIG_CUSTOMER_DE_KEY => (string) Configuration::get(self::CONFIG_CUSTOMER_DE_KEY),
             self::CONFIG_CRON_TOKEN => $cronToken,
+            self::CONFIG_CUSTOMER_BACKFILL_BATCH => (int) Configuration::get(self::CONFIG_CUSTOMER_BACKFILL_BATCH),
             'PS_SFMC_CRON_URL' => $cronUrl,
         ];
 
@@ -361,6 +445,7 @@ class PsSalesforceBridge extends Module
                             'name' => 'name',
                         ],
                     ],
+                    ['type' => 'text', 'label' => $this->l('Customer backfill batch size'), 'name' => self::CONFIG_CUSTOMER_BACKFILL_BATCH, 'desc' => $this->l('Customers scanned per active shop and cron run. Allowed range: 10–500.')],
                     ['type' => 'text', 'label' => $this->l('Cron URL'), 'name' => 'PS_SFMC_CRON_URL', 'readonly' => true, 'desc' => $this->l('Call this protected URL from the server cron every 5 minutes.')],
                     ['type' => 'text', 'label' => $this->l('Cron token'), 'name' => self::CONFIG_CRON_TOKEN, 'readonly' => true],
                     ['type' => 'text', 'label' => $this->l('Abandoned cart threshold (minutes)'), 'name' => self::CONFIG_CART_ABANDON_MINUTES, 'suffix' => $this->l('minutes')],
@@ -373,6 +458,13 @@ class PsSalesforceBridge extends Module
                         'type' => 'submit',
                         'class' => 'btn btn-default pull-right',
                         'icon' => 'process-icon-refresh',
+                    ],
+                    [
+                        'title' => $this->l('Start / resume customer backfill'),
+                        'name' => 'startPsSalesforceBridgeCustomerBackfill',
+                        'type' => 'submit',
+                        'class' => 'btn btn-default pull-right',
+                        'icon' => 'process-icon-database',
                     ],
                 ],
             ],
