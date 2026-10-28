@@ -32,11 +32,12 @@ final class CustomerSyncLedger
         return (bool) Db::getInstance()->update(
             'sfmc_customer_sync',
             [
-                'payload_hash' => (string) $payloadHash,
                 'status' => 'synced',
                 'updated_at' => date('Y-m-d H:i:s'),
             ],
-            '`id_shop` = ' . (int) $shopId . ' AND `id_customer` = ' . (int) $customerId
+            '`id_shop` = ' . (int) $shopId
+            . ' AND `id_customer` = ' . (int) $customerId
+            . " AND `payload_hash` = '" . pSQL((string) $payloadHash) . "'"
         );
     }
 }

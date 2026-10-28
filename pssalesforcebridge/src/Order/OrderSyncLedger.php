@@ -34,11 +34,12 @@ final class OrderSyncLedger
         return (bool) Db::getInstance()->update(
             'sfmc_order_sync',
             [
-                'payload_hash' => (string) $payloadHash,
                 'status' => 'synced',
                 'updated_at' => date('Y-m-d H:i:s'),
             ],
-            '`id_shop` = ' . (int) $shopId . ' AND `id_order` = ' . (int) $orderId
+            '`id_shop` = ' . (int) $shopId
+            . ' AND `id_order` = ' . (int) $orderId
+            . " AND `payload_hash` = '" . pSQL((string) $payloadHash) . "'"
         );
     }
 
