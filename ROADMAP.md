@@ -205,7 +205,23 @@
 - [x] runtime-discovered global `Db` namespace imports protected by CI contract
 - [x] runtime certification scope and non-goals documented in `RUNTIME_CERTIFICATION.md`
 
+### 0.7.0-F — Salesforce live certification harness
+
+- [x] manual-only `workflow_dispatch` live certification workflow
+- [x] dedicated GitHub environment boundary for tenant credentials and approval controls
+- [x] default auth-only stage performs no Data Extension or Journey writes
+- [x] Data Extension and Journey stages require explicit live-write confirmation
+- [x] harness reuses production `AuthClient`, `RestClient`, Data Extension writers and `JourneyClient`
+- [x] OAuth certification verifies configured REST Base URI against Salesforce `rest_instance_url`
+- [x] Data Extension stage writes recognizable synthetic customer/order rows using the production field contracts
+- [x] Journey stage requires a dedicated active test ContactKey and persists only sanitized evidence
+- [x] exact dispatched SHA is verified before certification
+- [x] live gate scope and final end-to-end recovery procedure documented in `SFMC_LIVE_CERTIFICATION.md`
+
 ### Remaining release/deployment gates
 
-- [ ] live Salesforce Marketing Cloud / Journey Builder certification with production-like tenant configuration
+- [ ] run `auth` certification against the target Marketing Cloud tenant
+- [ ] run `data_extensions` certification against the target customer/order Data Extensions
+- [ ] run `journey` certification against the active `PRESTASHOP_ABANDONED_CART` API Entry Event and dedicated test contact
+- [ ] complete live end-to-end abandoned-cart recovery on controlled PrestaShop staging, including one-time link use and recovered-order attribution
 - [ ] publish the final `v0.7.0` Git tag and GitHub Release only after exact-main CI + runtime certification is green
