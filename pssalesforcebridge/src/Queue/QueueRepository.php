@@ -140,4 +140,54 @@ final class QueueRepository
             true
         );
     }
+
+    public function statusSummary()
+    {
+        $rows = Db::getInstance()->executeS(
+            'SELECT `status`, COUNT(*) AS `total`, MAX(`attempts`) AS `max_attempts` '
+            . 'FROM `' . _DB_PREFIX_ . 'sfmc_queue` '
+            . 'GROUP BY `status` ORDER BY `status` ASC'
+        );
+
+        return is_array($rows) ? $rows : [];
+    }
+
+    public function eventTypeSummary()
+    {
+        $rows = Db::getInstance()->executeS(
+            'SELECT `event_type`, `status`, COUNT(*) AS `total` '
+            . 'FROM `' . _DB_PREFIX_ . 'sfmc_queue` '
+            . "WHERE `status` IN ('pending', 'processing', 'retry', 'failed') "
+            . 'GROUP BY `event_type`, `status` '
+            . 'ORDER BY `event_type` ASC, `status` ASC'
+        );
+
+        return is_array($rows) ? $rows : [];
+    }
+
+    public function oldestOutstanding()
+    {
+        $row = Db::getInstance()->getRow(
+            'SELECT `id_sfmc_queue`, `event_type`, `entity_type`, `entity_id`, `status`, `attempts`, '
+            . '`available_at`, `created_at`, `locked_at` '
+            . 'FROM `' . _DB_PREFIX_ . 'sfmc_queue` '
+            . "WHERE `status` IN ('pending', 'retry', 'processing') "
+            . 'ORDER BY `created_at` ASC, `id_sfmc_queue` ASC LIMIT 1'
+        );
+
+        return is_array($row) ? $row : [];
+    }
+
+    public function staleProcessingCount($staleSeconds)
+    {
+        $staleSeconds = max(60, (int) $staleSeconds);
+        $staleBefore = pSQL(date('Y-m-d H:i:s', time() - $staleSeconds));
+        $value = Db::getInstance()->getValue(
+            'SELECT COUNT(*) FROM `' . _DB_PREFIX_ . 'sfmc_queue` '
+            . "WHERE `status` = 'processing' "
+            . "AND `locked_at` IS NOT NULL AND `locked_at` < '{$staleBefore}'"
+        );
+
+        return (int) $value;
+    }
 }

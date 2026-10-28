@@ -124,8 +124,22 @@
 
 ## 0.7.0 — Production hardening
 
-- health/status dashboard
-- queue metrics
-- privacy/log retention controls
-- release ZIP and upgrade scripts
-- runtime certification matrix for PrestaShop 1.7.8.x, 8.x and 9.x
+### 0.7.0-A — Health & queue observability
+
+- [x] local health service with `healthy` / `warning` / `critical` severity
+- [x] protected no-cache JSON health endpoint
+- [x] queue counts for pending / processing / retry / failed / processed
+- [x] queue breakdown by event type and status
+- [x] oldest outstanding event age
+- [x] stale processing-lock detection
+- [x] production configuration completeness checks without exposing secret values
+- [x] test mode treats intentionally unsent backlog as informational
+- [x] HTTP 503 for critical health so external monitors can alert
+- [x] PHP 7.1 and PHP 8.5 runtime contract tests in CI
+
+### Remaining hardening
+
+- [ ] Back Office health/status presentation using the same health service
+- [ ] privacy/log retention controls
+- [ ] release ZIP and upgrade policy for the production release
+- [ ] runtime certification matrix for PrestaShop 1.7.8.x, 8.x and 9.x
