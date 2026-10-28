@@ -36,7 +36,7 @@ final class QueueRepository
 
     public function claimCustomerBatch($limit, $lockToken)
     {
-        return $this->claimBatchByEventTypes(['CUSTOMER_CREATED', 'CUSTOMER_UPDATED'], $limit, $lockToken);
+        return $this->claimBatchByEntityType('customer', $limit, $lockToken);
     }
 
     public function claimOrderBatch($limit, $lockToken)
@@ -53,15 +53,19 @@ final class QueueRepository
         return $this->claimBatchByEventTypes(['CART_ABANDONED'], $limit, $lockToken);
     }
 
+    private function claimBatchByEntityType($entityType, $limit, $lockToken)
+    {
+        $entityType = trim((string) $entityType);
+        if ($entityType === '') {
+            return [];
+        }
+
+        return $this->claimBatch("`entity_type` = '" . pSQL($entityType) . "'", $limit, $lockToken);
+    }
+
     private function claimBatchByEventTypes(array $eventTypes, $limit, $lockToken)
     {
-        $limit = max(1, min(100, (int) $limit));
-        $lockToken = pSQL((string) $lockToken);
-        $prefix = _DB_PREFIX_;
-        $staleBefore = pSQL(date('Y-m-d H:i:s', time() - 600));
-        $now = pSQL(date('Y-m-d H:i:s'));
         $quotedEvents = [];
-
         foreach ($eventTypes as $eventType) {
             $quotedEvents[] = "'" . pSQL((string) $eventType) . "'";
         }
@@ -69,6 +73,18 @@ final class QueueRepository
         if (empty($quotedEvents)) {
             return [];
         }
+
+        return $this->claimBatch('`event_type` IN (' . implode(',', $quotedEvents) . ')', $limit, $lockToken);
+    }
+
+    private function claimBatch($selectorSql, $limit, $lockToken)
+    {
+        $limit = max(1, min(100, (int) $limit));
+        $lockToken = pSQL((string) $lockToken);
+        $prefix = _DB_PREFIX_;
+        $staleBefore = pSQL(date('Y-m-d H:i:s', time() - 600));
+        $now = pSQL(date('Y-m-d H:i:s'));
+        $selectorSql = (string) $selectorSql;
 
         Db::getInstance()->execute(
             "UPDATE `{$prefix}sfmc_queue`
@@ -84,7 +100,7 @@ final class QueueRepository
                     FROM `{$prefix}sfmc_queue`
                     WHERE `status` IN ('pending', 'retry')
                       AND `available_at` <= '{$now}'
-                      AND `event_type` IN (" . implode(',', $quotedEvents) . ")
+                      AND {$selectorSql}
                     ORDER BY `id_sfmc_queue` ASC
                     LIMIT {$limit}
                 ) AS `claimable`
