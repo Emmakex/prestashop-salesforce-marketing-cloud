@@ -89,11 +89,24 @@ retentionAssert(
 );
 retentionAssert(
     strpos($sql, "('empty', 'ineligible', 'converted', 'recovered')") !== false,
-    'Cart retention must target only explicit terminal snapshot states.'
+    'Cart retention must include the explicit terminal snapshot states.'
 );
 retentionAssert(
-    strpos($sql, "('active'") === false && strpos($sql, "('abandoned'") === false,
-    'Active and abandoned cart snapshots must not be auto-purged.'
+    strpos($sql, "`status` = 'abandoned'") !== false,
+    'Old abandoned snapshots should become eligible for guarded privacy cleanup.'
+);
+retentionAssert(
+    strpos($sql, "rt.`used_at` IS NULL AND rt.`expires_at` >=") !== false,
+    'Abandoned snapshot cleanup must preserve carts with an active recovery token.'
+);
+retentionAssert(
+    strpos($sql, "q.`event_type` = 'CART_ABANDONED'") !== false
+    && strpos($sql, "q.`status` IN ('pending', 'processing', 'retry', 'failed')") !== false,
+    'Abandoned snapshot cleanup must preserve carts with outstanding or failed Journey work.'
+);
+retentionAssert(
+    strpos($sql, "`status` = 'active'") === false,
+    'Active cart snapshots must never be auto-purged.'
 );
 retentionAssert(
     strpos($sql, "`recovered_cart_id` > 0") !== false
