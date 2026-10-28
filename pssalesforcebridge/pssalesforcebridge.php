@@ -520,21 +520,34 @@ class PsSalesforceBridge extends Module
                 `expires_at` DATETIME NOT NULL,
                 `used_at` DATETIME NULL,
                 `recovered_cart_id` INT UNSIGNED NOT NULL DEFAULT 0,
-                `recovered_order_id` INT UNSIGNED NOT NULL DEFAULT 0,
-                `recovered_order_total` DECIMAL(20,6) NOT NULL DEFAULT 0,
-                `recovered_currency` VARCHAR(8) NOT NULL DEFAULT '',
-                `recovered_order_state_id` INT UNSIGNED NOT NULL DEFAULT 0,
-                `recovered_order_paid` TINYINT(1) NOT NULL DEFAULT 0,
-                `recovered_order_valid` TINYINT(1) NOT NULL DEFAULT 0,
-                `converted_at` DATETIME NULL,
                 `created_at` DATETIME NOT NULL,
                 `updated_at` DATETIME NOT NULL,
                 PRIMARY KEY (`id_sfmc_recovery_token`),
                 UNIQUE KEY `uniq_sfmc_recovery_token_hash` (`token_hash`),
                 KEY `idx_sfmc_recovery_source` (`id_shop`, `id_cart`),
                 KEY `idx_sfmc_recovery_expiry` (`expires_at`, `used_at`),
-                KEY `idx_sfmc_recovery_cart` (`recovered_cart_id`),
-                KEY `idx_sfmc_recovery_order` (`recovered_order_id`)
+                KEY `idx_sfmc_recovery_cart` (`recovered_cart_id`)
+            ) ENGINE={$engine} DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+            "CREATE TABLE IF NOT EXISTS `{$prefix}sfmc_recovery_order` (
+                `id_sfmc_recovery_order` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+                `id_sfmc_recovery_token` BIGINT UNSIGNED NOT NULL,
+                `id_shop` INT UNSIGNED NOT NULL,
+                `source_cart_id` INT UNSIGNED NOT NULL,
+                `recovered_cart_id` INT UNSIGNED NOT NULL,
+                `id_order` INT UNSIGNED NOT NULL,
+                `order_total` DECIMAL(20,6) NOT NULL DEFAULT 0,
+                `currency` VARCHAR(8) NOT NULL DEFAULT '',
+                `state_id` INT UNSIGNED NOT NULL DEFAULT 0,
+                `paid` TINYINT(1) NOT NULL DEFAULT 0,
+                `valid` TINYINT(1) NOT NULL DEFAULT 0,
+                `converted_at` DATETIME NOT NULL,
+                `created_at` DATETIME NOT NULL,
+                `updated_at` DATETIME NOT NULL,
+                PRIMARY KEY (`id_sfmc_recovery_order`),
+                UNIQUE KEY `uniq_sfmc_recovery_order` (`id_shop`, `id_order`),
+                KEY `idx_sfmc_recovery_order_token` (`id_sfmc_recovery_token`),
+                KEY `idx_sfmc_recovery_order_cart` (`id_shop`, `recovered_cart_id`),
+                KEY `idx_sfmc_recovery_order_paid` (`paid`, `currency`)
             ) ENGINE={$engine} DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
             "CREATE TABLE IF NOT EXISTS `{$prefix}sfmc_customer_backfill` (
                 `id_sfmc_customer_backfill` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -565,7 +578,8 @@ class PsSalesforceBridge extends Module
     {
         $prefix = _DB_PREFIX_;
 
-        return Db::getInstance()->execute("DROP TABLE IF EXISTS `{$prefix}sfmc_recovery_token`")
+        return Db::getInstance()->execute("DROP TABLE IF EXISTS `{$prefix}sfmc_recovery_order`")
+            && Db::getInstance()->execute("DROP TABLE IF EXISTS `{$prefix}sfmc_recovery_token`")
             && Db::getInstance()->execute("DROP TABLE IF EXISTS `{$prefix}sfmc_journey_event`")
             && Db::getInstance()->execute("DROP TABLE IF EXISTS `{$prefix}sfmc_cart_item`")
             && Db::getInstance()->execute("DROP TABLE IF EXISTS `{$prefix}sfmc_cart`")
