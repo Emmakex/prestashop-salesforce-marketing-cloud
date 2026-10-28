@@ -103,16 +103,21 @@
 - [x] source cart → recovered cart relation persisted
 - [x] local `CART_RECOVERED` event
 - [x] upgrade path from 0.5.0
-- [ ] recovered cart → order → revenue attribution (`0.6.1`)
+- [x] recovered cart → order → revenue attribution (`0.6.1`)
 - [ ] live end-to-end recovery certification on supported PrestaShop families
 
 ## 0.6.1 — Recovery attribution
 
-- map `recovered_cart_id` to the resulting PrestaShop order
-- persist recovery conversion timestamp and order id
-- calculate recovered revenue from authoritative PrestaShop order totals
-- expose recovery conversion metrics without relying on email-open tracking
-- optionally synchronize recovery/conversion state back to Marketing Cloud
+- [x] map `recovered_cart_id` to the resulting PrestaShop order
+- [x] persist recovery conversion timestamp and order id
+- [x] persist authoritative order total, currency, state and paid/valid state
+- [x] update attribution again on later order-status events
+- [x] calculate paid recovered revenue from authoritative PrestaShop order totals
+- [x] keep revenue separated by currency
+- [x] expose recovered carts / attributed orders / paid orders / revenue metrics in Back Office
+- [x] reuse the normal order event pipeline; no parallel attribution hook path
+- [x] upgrade path from 0.6.0
+- [ ] optionally synchronize recovery/conversion attribution fields back to Marketing Cloud
 
 ## 0.7.0 — Production hardening
 
