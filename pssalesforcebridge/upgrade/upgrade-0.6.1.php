@@ -27,5 +27,10 @@ function upgrade_module_0_6_1($module)
         }
     }
 
+    $index = $db->getRow("SHOW INDEX FROM `{$table}` WHERE `Key_name` = 'idx_sfmc_recovery_order'");
+    if (!$index && !$db->execute("ALTER TABLE `{$table}` ADD KEY `idx_sfmc_recovery_order` (`recovered_order_id`)")) {
+        return false;
+    }
+
     return true;
 }
