@@ -84,7 +84,9 @@ final class CartHookAdapter
 
         try {
             return (float) $cart->getOrderTotal(true, Cart::BOTH);
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
+            // Cart total enrichment is non-authoritative. A partial CLI/context state,
+            // extension error or cross-version TypeError must never break cart save.
             return 0.0;
         }
     }
