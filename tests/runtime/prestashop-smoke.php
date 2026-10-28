@@ -208,6 +208,13 @@ runtimeAssert(isset($customerQueue['skipped']) && $customerQueue['skipped'] === 
 runtimeAssert(isset($orderQueue['skipped']) && $orderQueue['skipped'] === 'test_mode', 'order delivery must remain blocked in test mode');
 runtimeAssert(isset($journeyQueue['skipped']) && $journeyQueue['skipped'] === 'test_mode', 'Journey delivery must remain blocked in test mode');
 
+$backfill = $module->processCustomerBackfill();
+runtimeAssert(is_array($backfill), 'customer backfill cron component did not return an array');
+$cartDetection = $module->processCartAbandonmentCandidates(100);
+runtimeAssert(is_array($cartDetection), 'cart abandonment cron component did not return an array');
+$retention = $module->processRetention(false);
+runtimeAssert(is_array($retention), 'retention cron component did not return an array');
+
 $health = $module->healthReport();
 runtimeAssert(is_array($health), 'health report did not return an array');
 runtimeAssert(isset($health['mode']) && $health['mode'] === 'test', 'health report mode mismatch');
