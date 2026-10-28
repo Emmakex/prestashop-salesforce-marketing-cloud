@@ -8,6 +8,8 @@ NETWORK="pssfmc-${PS_VERSION//./-}-${GITHUB_RUN_ID:-local}-${RANDOM}"
 DB_CONTAINER="${NETWORK}-db"
 PS_CONTAINER="${NETWORK}-ps"
 PORT="8080"
+MYSQL_IMAGE="mysql:5.7"
+PRESTASHOP_IMAGE="prestashop/prestashop:${PS_VERSION}"
 
 cleanup() {
   set +e
@@ -24,6 +26,23 @@ cleanup() {
   docker network rm "$NETWORK" >/dev/null 2>&1 || true
 }
 trap cleanup EXIT
+
+pull_image() {
+  local image="$1"
+  local attempt
+
+  for attempt in 1 2 3 4 5; do
+    if docker pull "$image"; then
+      return 0
+    fi
+
+    echo "Docker pull failed for ${image} (attempt ${attempt}/5)" >&2
+    sleep $((attempt * 5))
+  done
+
+  echo "Unable to pull ${image} after 5 attempts" >&2
+  return 1
+}
 
 sql() {
   docker exec "$DB_CONTAINER" mysql -uroot -padmin --batch --skip-column-names prestashop -e "$1"
@@ -89,12 +108,16 @@ test -f /tmp/pssfmc-runtime-070/pssalesforcebridge/pssalesforcebridge.php
 grep -Fq "\$this->version = '0.6.1';" /tmp/pssfmc-runtime-061/pssalesforcebridge/pssalesforcebridge.php
 grep -Fq "\$this->version = '0.7.0';" /tmp/pssfmc-runtime-070/pssalesforcebridge/pssalesforcebridge.php
 
+echo "==> Pulling pinned runtime images"
+pull_image "$MYSQL_IMAGE"
+pull_image "$PRESTASHOP_IMAGE"
+
 echo "==> Starting MySQL"
 docker network create "$NETWORK" >/dev/null
-docker run -d --name "$DB_CONTAINER" --network "$NETWORK" \
+docker run --pull=never -d --name "$DB_CONTAINER" --network "$NETWORK" \
   -e MYSQL_ROOT_PASSWORD=admin \
   -e MYSQL_DATABASE=prestashop \
-  mysql:5.7 --default-authentication-plugin=mysql_native_password >/dev/null
+  "$MYSQL_IMAGE" --default-authentication-plugin=mysql_native_password >/dev/null
 
 # The official MySQL 5.7 image starts a temporary server while initializing
 # the data directory, then shuts it down and launches the final server. A raw
@@ -127,7 +150,7 @@ if [ "$db_ready" -ne 1 ]; then
 fi
 
 echo "==> Starting PrestaShop ${PS_VERSION}"
-docker run -d --name "$PS_CONTAINER" --network "$NETWORK" -p "${PORT}:80" \
+docker run --pull=never -d --name "$PS_CONTAINER" --network "$NETWORK" -p "${PORT}:80" \
   -e DB_SERVER="$DB_CONTAINER" \
   -e DB_NAME=prestashop \
   -e DB_USER=root \
@@ -143,7 +166,7 @@ docker run -d --name "$PS_CONTAINER" --network "$NETWORK" -p "${PORT}:80" \
   -e PS_DEV_MODE=1 \
   -e ADMIN_MAIL=runtime@example.com \
   -e ADMIN_PASSWD='Runtime123!' \
-  "prestashop/prestashop:${PS_VERSION}" >/dev/null
+  "$PRESTASHOP_IMAGE" >/dev/null
 
 wait_for_shop
 ACTUAL_VERSION="$(sql "SELECT value FROM ps_configuration WHERE name='PS_VERSION_DB' ORDER BY id_configuration DESC LIMIT 1")"
