@@ -62,7 +62,7 @@ final class OrderEventService
                 !empty($payload['paid']),
                 !empty($payload['valid'])
             );
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             // The order synchronization path remains authoritative and continues.
         }
 
