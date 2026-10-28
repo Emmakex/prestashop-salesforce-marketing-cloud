@@ -95,15 +95,18 @@ function runtimeCart($customer)
         $cart->secure_key = (string) $customer->secure_key;
     }
 
+    // Cart::add() itself fires actionCartSave on supported PrestaShop families,
+    // which exercises the connector against a real core Cart object. Keep this
+    // fixture empty: Cart::updateQty() fans out to unrelated stock modules such
+    // as ps_googleanalytics that require a browser/employee context in CLI and
+    // are outside this connector's certification boundary.
     runtimeAssert($cart->add(), 'unable to create runtime cart');
 
-    $productId = (int) Db::getInstance()->getValue(
-        'SELECT id_product FROM `' . _DB_PREFIX_ . 'product` WHERE active = 1 ORDER BY id_product ASC'
-    );
-    if ($productId > 0) {
-        $result = $cart->updateQty(1, $productId);
-        runtimeAssert($result !== false, 'unable to add a product to runtime cart');
+    if ($cart->id_currency > 0) {
+        $context->currency = new Currency((int) $cart->id_currency);
     }
+    $context->customer = $customer;
+    $context->cart = $cart;
 
     Hook::exec('actionCartSave', ['cart' => $cart]);
 
