@@ -42,8 +42,10 @@ jobs:
         with:
           php-version: ${{ matrix.php }}
           coverage: none
-      - name: Run health service contract
-        run: php tests/health-service-contract.php
+      - name: Run health contracts
+        run: |
+          php tests/health-service-contract.php
+          php tests/health-dashboard-contract.php
 
   package:
     name: Build installable module

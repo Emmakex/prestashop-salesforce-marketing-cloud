@@ -1,22 +1,48 @@
 # Health and queue observability
 
-The connector exposes a local, read-only health report intended for production monitoring without introducing a dependency on Salesforce availability.
+The connector exposes one local, read-only health report that is consumed by both external monitoring and the Back Office dashboard. Generating the report never calls Salesforce.
 
-## Endpoint
+## Protected JSON endpoint
 
 ```text
 /module/pssalesforcebridge/health?token=<cron-token>
 ```
 
-The endpoint uses the same protected token already generated for the cron controller. It is intentionally not public and returns `403` when the token is absent or invalid.
+The endpoint uses the same protected token already generated for the cron controller. It returns `403` when the token is absent or invalid.
 
-The response is JSON, `Cache-Control: no-store`, and `X-Robots-Tag: noindex, nofollow`.
+The response is JSON with `Cache-Control: no-store` and `X-Robots-Tag: noindex, nofollow`.
+
+## Back Office dashboard
+
+The module configuration screen renders a health dashboard from the exact same `healthReport()` used by the JSON endpoint. There is no second severity calculation or queue-health implementation in the UI.
+
+The dashboard includes:
+
+- overall `healthy`, `warning` or `critical` state;
+- current connector mode and PrestaShop/module versions;
+- queue counts for `pending`, `processing`, `retry`, `failed` and `processed`;
+- total outstanding work and oldest outstanding age;
+- stale processing-lock count;
+- active queue breakdown by event type/status;
+- current operational issues;
+- configuration readiness and missing configuration keys;
+- customer backfill progress by shop;
+- cart snapshot status totals;
+- Journey delivery status totals;
+- recovery-link / recovered-cart / attributed-order metrics;
+- paid recovered revenue separated by currency.
+
+Dynamic values rendered into the dashboard are escaped. The dashboard receives configuration-presence booleans only; it never receives or renders the Client Secret, Salesforce access token, recovery token, queue payload or customer email address.
+
+The renderer uses basic server-rendered HTML/Bootstrap classes only. It does not depend on a JavaScript framework or a PrestaShop-generation-specific admin component.
+
+If dashboard construction itself fails, the module configuration page remains usable and shows a generic local error instead of exposing an exception or secret value.
 
 ## Important rule
 
-Generating a health report never calls Salesforce.
+Generating either the JSON health endpoint or the Back Office dashboard never calls Salesforce.
 
-Health reflects the state of the local connector: configuration readiness, queue pressure, terminal failures and stale worker locks. A Salesforce outage may later surface as retries/failures through the normal asynchronous worker, but opening the health endpoint itself never waits for Salesforce.
+Health reflects the local connector state: configuration readiness, queue pressure, terminal failures and stale worker locks. A Salesforce outage may later surface as retries/failures through the normal asynchronous worker, but opening health surfaces never waits for Salesforce.
 
 ## Status levels
 
@@ -81,7 +107,9 @@ The health report includes:
 - total outstanding work (`pending + processing + retry`);
 - oldest outstanding event timestamp and age in seconds;
 - number of stale processing locks;
-- grouped counts by event type and status.
+- grouped active counts by event type and status.
+
+The event-type breakdown is intentionally restricted to active/problem work (`pending`, `processing`, `retry`, `failed`) so health rendering does not become slower as the historical processed queue grows.
 
 It does not expose payloads, customer email addresses, recovery tokens, Client Secrets or Salesforce access tokens.
 
@@ -124,7 +152,7 @@ It does not expose payloads, customer email addresses, recovery tokens, Client S
 }
 ```
 
-The module version in this example is illustrative. `0.7.0-A` is an internal hardening microcut; the public module version is not bumped until the production-hardening release boundary is closed.
+The module version in this example is illustrative. `0.7.0-A` and `0.7.0-B` are internal hardening microcuts; the public module version is not bumped until the production-hardening release boundary is closed.
 
 ## Monitoring
 
