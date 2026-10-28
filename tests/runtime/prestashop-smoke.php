@@ -95,11 +95,9 @@ function runtimeCart($customer)
         $cart->secure_key = (string) $customer->secure_key;
     }
 
-    // Cart::add() itself fires actionCartSave on supported PrestaShop families,
-    // which exercises the connector against a real core Cart object. Keep this
-    // fixture empty: Cart::updateQty() fans out to unrelated stock modules such
-    // as ps_googleanalytics that require a browser/employee context in CLI and
-    // are outside this connector's certification boundary.
+    // Cart::add() exercises the real core object lifecycle. Keep this fixture
+    // empty because updateQty fans out to unrelated stock/analytics modules
+    // whose CLI dependencies are outside this connector's certification scope.
     runtimeAssert($cart->add(), 'unable to create runtime cart');
 
     if ($cart->id_currency > 0) {
@@ -107,8 +105,6 @@ function runtimeCart($customer)
     }
     $context->customer = $customer;
     $context->cart = $cart;
-
-    Hook::exec('actionCartSave', ['cart' => $cart]);
 
     return $cart;
 }
@@ -157,13 +153,14 @@ foreach ($hooks as $hook) {
 }
 
 $customer = runtimeCustomer();
-Hook::exec('actionCustomerAccountUpdate', ['customer' => $customer]);
+runtimeAssert($module->hookActionCustomerAccountUpdate(['customer' => $customer]) !== false, 'customer hook returned failure');
 $customerEvents = (int) Db::getInstance()->getValue(
     'SELECT COUNT(*) FROM `' . _DB_PREFIX_ . "sfmc_queue` WHERE entity_type = 'customer' AND entity_id = '" . (int) $customer->id . "'"
 );
 runtimeAssert($customerEvents > 0, 'customer hook did not enqueue an event');
 
 $cart = runtimeCart($customer);
+runtimeAssert($module->hookActionCartSave(['cart' => $cart]) !== false, 'cart hook returned failure');
 $cartRows = (int) Db::getInstance()->getValue(
     'SELECT COUNT(*) FROM `' . _DB_PREFIX_ . 'sfmc_cart` WHERE id_shop = ' . (int) $cart->id_shop . ' AND id_cart = ' . (int) $cart->id
 );
@@ -192,12 +189,12 @@ $order->date_add = date('Y-m-d H:i:s');
 $order->date_upd = $order->date_add;
 $currency = new Currency((int) $cart->id_currency);
 
-Hook::exec('actionValidateOrder', [
+runtimeAssert($module->hookActionValidateOrder([
     'order' => $order,
     'customer' => $customer,
     'cart' => $cart,
     'currency' => $currency,
-]);
+]) !== false, 'order hook returned failure');
 
 $orderEvents = (int) Db::getInstance()->getValue(
     'SELECT COUNT(*) FROM `' . _DB_PREFIX_ . "sfmc_queue` WHERE event_type = 'ORDER_CREATED' AND entity_type = 'order' AND entity_id = '" . (int) $order->id . "'"
@@ -210,5 +207,11 @@ $journeyQueue = $module->processAbandonedCartJourneyQueue(10);
 runtimeAssert(isset($customerQueue['skipped']) && $customerQueue['skipped'] === 'test_mode', 'customer delivery must remain blocked in test mode');
 runtimeAssert(isset($orderQueue['skipped']) && $orderQueue['skipped'] === 'test_mode', 'order delivery must remain blocked in test mode');
 runtimeAssert(isset($journeyQueue['skipped']) && $journeyQueue['skipped'] === 'test_mode', 'Journey delivery must remain blocked in test mode');
+
+$health = $module->healthReport();
+runtimeAssert(is_array($health), 'health report did not return an array');
+runtimeAssert(isset($health['mode']) && $health['mode'] === 'test', 'health report mode mismatch');
+runtimeAssert(isset($health['module_version']) && $health['module_version'] === '0.7.0', 'health report module version mismatch');
+runtimeAssert(!empty($health['ok']), 'health report should be healthy in test mode');
 
 fwrite(STDOUT, 'runtime smoke: ok on PrestaShop ' . _PS_VERSION_ . PHP_EOL);
