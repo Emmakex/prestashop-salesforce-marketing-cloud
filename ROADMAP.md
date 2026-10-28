@@ -17,7 +17,7 @@
 - [x] module installation range widened to 1.7.8.0–9.x
 - [x] compatibility/adaptor architecture rule documented
 - [x] PHP syntax CI expanded across representative legacy/current runtimes
-- [ ] runtime certification against real PrestaShop fixtures/containers per supported family
+- [x] runtime certification against real PrestaShop fixtures/containers on pinned representatives: 1.7.8.11, 8.2.8 and 9.1.5
 
 ## 0.2.0 — Customer event foundation
 
@@ -104,7 +104,7 @@
 - [x] local `CART_RECOVERED` event
 - [x] upgrade path from 0.5.0
 - [x] recovered cart → order(s) → revenue attribution (`0.6.1`)
-- [ ] live end-to-end recovery certification on supported PrestaShop families
+- [ ] live end-to-end recovery certification with a real Marketing Cloud Journey
 
 ## 0.6.1 — Recovery attribution
 
@@ -187,6 +187,25 @@
 - [x] PHP 7.1 and PHP 8.5 release/upgrade contract coverage in CI
 - [x] exact-head and post-merge release gate policy documented
 
-### Remaining hardening
+### 0.7.0-E — Runtime certification
 
-- [ ] 0.7.0-E runtime certification matrix for PrestaShop 1.7.8.x, 8.x and 9.x
+- [x] reproducible Docker runtime workflow added as a release gate
+- [x] pull requests explicitly check out the exact head SHA, not GitHub's synthetic merge ref
+- [x] real `0.6.1 -> 0.7.0` module upgrade exercised on each pinned PrestaShop version
+- [x] clean 0.7.0 install exercised on each pinned PrestaShop version
+- [x] connector tables, defaults and hook registrations verified in real PrestaShop runtimes
+- [x] local customer, cart and order hook paths verified with real PrestaShop core objects
+- [x] test mode verified to block customer/order/Journey Salesforce writes
+- [x] backfill, abandoned-cart detection, retention, health and protected cron exercised
+- [x] Front Office remains reachable after connector smoke
+- [x] PrestaShop 1.7.8.11 runtime certified
+- [x] PrestaShop 8.2.8 runtime certified
+- [x] PrestaShop 9.1.5 runtime certified
+- [x] runtime-discovered `Db::getRow()` / `Db::getValue()` limit semantics protected by CI contract
+- [x] runtime-discovered global `Db` namespace imports protected by CI contract
+- [x] runtime certification scope and non-goals documented in `RUNTIME_CERTIFICATION.md`
+
+### Remaining release/deployment gates
+
+- [ ] live Salesforce Marketing Cloud / Journey Builder certification with production-like tenant configuration
+- [ ] publish the final `v0.7.0` Git tag and GitHub Release only after exact-main CI + runtime certification is green
