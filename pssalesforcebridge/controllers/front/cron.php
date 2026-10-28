@@ -15,6 +15,7 @@ class PsSalesforceBridgeCronModuleFrontController extends ModuleFrontController
 
         try {
             $backfill = $this->module->processCustomerBackfill();
+            $cartDetection = $this->module->processCartAbandonmentCandidates(100);
             $customerDelivery = $this->module->processCustomerQueue(50);
             $orderDelivery = $this->module->processOrderQueue(50);
 
@@ -22,6 +23,7 @@ class PsSalesforceBridgeCronModuleFrontController extends ModuleFrontController
                 'ok' => true,
                 'result' => [
                     'customer_backfill' => $backfill,
+                    'cart_detection' => $cartDetection,
                     'customer_delivery' => $customerDelivery,
                     'order_delivery' => $orderDelivery,
                 ],
