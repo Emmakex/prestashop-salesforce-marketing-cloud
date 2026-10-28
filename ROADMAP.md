@@ -19,15 +19,16 @@
 - [x] PHP syntax CI expanded across representative legacy/current runtimes
 - [ ] runtime certification against real PrestaShop fixtures/containers per supported family
 
-## 0.2.0 — Customer synchronization
+## 0.2.0 — Customer synchronization foundation
 
-- customer create/update hooks
-- canonical ContactKey: `ps_{shop_id}_{customer_id}`
-- local idempotency ledger
-- Marketing Cloud customer Data Extension contract
-- consent/newsletter mapping
-- initial backfill command
-- customer adapter contract shared by PrestaShop 1.7.8, 8 and 9
+- [x] customer create/update hooks
+- [x] canonical ContactKey: `ps_{shop_id}_{customer_id}`
+- [x] local idempotency ledger
+- [x] normalized customer Data Extension contract
+- [x] newsletter/opt-in source mapping
+- [x] customer hook compatibility adapter for PrestaShop 1.7.8, 8 and 9
+- [ ] Salesforce Data Extension writer / worker
+- [ ] initial customer backfill command
 
 ## 0.3.0 — Orders
 

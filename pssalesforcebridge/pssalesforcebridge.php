@@ -5,9 +5,19 @@ if (!defined('_PS_VERSION_')) {
 }
 
 require_once __DIR__ . '/src/Compatibility/Platform.php';
+require_once __DIR__ . '/src/Compatibility/CustomerHookAdapter.php';
 require_once __DIR__ . '/src/Salesforce/AuthClient.php';
+require_once __DIR__ . '/src/Queue/QueueRepository.php';
+require_once __DIR__ . '/src/Customer/CustomerNormalizer.php';
+require_once __DIR__ . '/src/Customer/CustomerSyncLedger.php';
+require_once __DIR__ . '/src/Customer/CustomerEventService.php';
 
+use Emmakex\PrestaShopSalesforceMarketingCloud\Compatibility\CustomerHookAdapter;
 use Emmakex\PrestaShopSalesforceMarketingCloud\Compatibility\Platform;
+use Emmakex\PrestaShopSalesforceMarketingCloud\Customer\CustomerEventService;
+use Emmakex\PrestaShopSalesforceMarketingCloud\Customer\CustomerNormalizer;
+use Emmakex\PrestaShopSalesforceMarketingCloud\Customer\CustomerSyncLedger;
+use Emmakex\PrestaShopSalesforceMarketingCloud\Queue\QueueRepository;
 use Emmakex\PrestaShopSalesforceMarketingCloud\Salesforce\AuthClient;
 
 class PsSalesforceBridge extends Module
@@ -24,7 +34,7 @@ class PsSalesforceBridge extends Module
     {
         $this->name = 'pssalesforcebridge';
         $this->tab = 'advertising_marketing';
-        $this->version = '0.1.1';
+        $this->version = '0.2.0';
         $this->author = 'Emmakex';
         $this->need_instance = 0;
         $this->bootstrap = true;
@@ -48,7 +58,9 @@ class PsSalesforceBridge extends Module
 
         return parent::install()
             && $this->installConfiguration()
-            && $this->installDatabase();
+            && $this->installDatabase()
+            && $this->registerHook('actionCustomerAccountAdd')
+            && $this->registerHook('actionCustomerAccountUpdate');
     }
 
     public function uninstall()
@@ -56,6 +68,29 @@ class PsSalesforceBridge extends Module
         return $this->uninstallDatabase()
             && $this->uninstallConfiguration()
             && parent::uninstall();
+    }
+
+    public function hookActionCustomerAccountAdd($params)
+    {
+        return $this->captureCustomerEvent('CUSTOMER_CREATED', is_array($params) ? $params : []);
+    }
+
+    public function hookActionCustomerAccountUpdate($params)
+    {
+        return $this->captureCustomerEvent('CUSTOMER_UPDATED', is_array($params) ? $params : []);
+    }
+
+    private function captureCustomerEvent($eventType, array $params)
+    {
+        $customer = CustomerHookAdapter::customerFromParams($params);
+        if (!$customer) {
+            return false;
+        }
+
+        $shopId = CustomerHookAdapter::shopId($customer, isset($this->context) ? $this->context : null);
+        $service = new CustomerEventService(new QueueRepository(), new CustomerSyncLedger());
+
+        return $service->enqueue($eventType, $customer, $shopId);
     }
 
     private function installConfiguration()
@@ -115,6 +150,19 @@ class PsSalesforceBridge extends Module
                 PRIMARY KEY (`id_sfmc_log`),
                 KEY `idx_sfmc_log_created` (`created_at`)
             ) ENGINE={$engine} DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+            "CREATE TABLE IF NOT EXISTS `{$prefix}sfmc_customer_sync` (
+                `id_sfmc_customer_sync` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+                `id_shop` INT UNSIGNED NOT NULL,
+                `id_customer` INT UNSIGNED NOT NULL,
+                `contact_key` VARCHAR(191) NOT NULL,
+                `payload_hash` CHAR(40) NOT NULL,
+                `status` VARCHAR(16) NOT NULL DEFAULT 'pending',
+                `created_at` DATETIME NOT NULL,
+                `updated_at` DATETIME NOT NULL,
+                PRIMARY KEY (`id_sfmc_customer_sync`),
+                UNIQUE KEY `uniq_sfmc_customer_shop` (`id_shop`, `id_customer`),
+                UNIQUE KEY `uniq_sfmc_customer_contact` (`contact_key`)
+            ) ENGINE={$engine} DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
         ];
 
         foreach ($queries as $query) {
@@ -130,7 +178,8 @@ class PsSalesforceBridge extends Module
     {
         $prefix = _DB_PREFIX_;
 
-        return Db::getInstance()->execute("DROP TABLE IF EXISTS `{$prefix}sfmc_queue`")
+        return Db::getInstance()->execute("DROP TABLE IF EXISTS `{$prefix}sfmc_customer_sync`")
+            && Db::getInstance()->execute("DROP TABLE IF EXISTS `{$prefix}sfmc_queue`")
             && Db::getInstance()->execute("DROP TABLE IF EXISTS `{$prefix}sfmc_log`");
     }
 
@@ -174,7 +223,6 @@ class PsSalesforceBridge extends Module
         Configuration::updateValue(self::CONFIG_MODE, $mode);
         Configuration::updateValue(self::CONFIG_CART_ABANDON_MINUTES, $abandonMinutes);
 
-        // Empty secret means "keep the existing value" so masked forms never erase it accidentally.
         if ($clientSecret !== '') {
             Configuration::updateValue(self::CONFIG_CLIENT_SECRET, $clientSecret);
         }
