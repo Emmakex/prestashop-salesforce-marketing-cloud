@@ -47,10 +47,26 @@ jobs:
           php tests/health-service-contract.php
           php tests/health-dashboard-contract.php
 
+  sync-contract:
+    name: Sync correctness (${{ matrix.php }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        php: ['7.1', '8.5']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          coverage: none
+      - name: Run sync correctness contract
+        run: php tests/sync-correctness-contract.php
+
   package:
     name: Build installable module
     runs-on: ubuntu-latest
-    needs: [php-syntax, health-contract]
+    needs: [php-syntax, health-contract, sync-contract]
     steps:
       - uses: actions/checkout@v4
       - name: Build ZIP
