@@ -19,6 +19,7 @@ class PsSalesforceBridgeCronModuleFrontController extends ModuleFrontController
             $customerDelivery = $this->module->processCustomerQueue(50);
             $orderDelivery = $this->module->processOrderQueue(50);
             $journeyDelivery = $this->module->processAbandonedCartJourneyQueue(20);
+            $retention = $this->processRetentionSafely();
 
             $this->respond([
                 'ok' => true,
@@ -28,11 +29,41 @@ class PsSalesforceBridgeCronModuleFrontController extends ModuleFrontController
                     'customer_delivery' => $customerDelivery,
                     'order_delivery' => $orderDelivery,
                     'journey_delivery' => $journeyDelivery,
+                    'retention' => $retention,
                 ],
             ], 200);
-        } catch (Exception $e) {
-            $this->respond(['ok' => false, 'error' => $e->getMessage()], 500);
+        } catch (\Throwable $e) {
+            $this->logOperationalFailure('cron_failed', $e);
+            $this->respond(['ok' => false, 'error' => 'cron_failed'], 500);
         }
+    }
+
+    private function processRetentionSafely()
+    {
+        try {
+            return $this->module->processRetention(false);
+        } catch (\Throwable $e) {
+            $this->logOperationalFailure('retention_failed', $e);
+
+            return [
+                'ok' => false,
+                'error' => 'retention_failed',
+            ];
+        }
+    }
+
+    private function logOperationalFailure($event, \Throwable $error)
+    {
+        if (!class_exists('PrestaShopLogger')) {
+            return;
+        }
+
+        PrestaShopLogger::addLog(
+            'Salesforce bridge ' . (string) $event . ' [' . get_class($error) . ']',
+            3,
+            null,
+            'PsSalesforceBridge'
+        );
     }
 
     private function respond(array $payload, $status)

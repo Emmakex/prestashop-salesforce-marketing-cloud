@@ -37,6 +37,9 @@ require_once __DIR__ . '/src/Recovery/RecoveryLinkService.php';
 require_once __DIR__ . '/src/Operations/HealthService.php';
 require_once __DIR__ . '/src/Operations/BackOfficeHealthDashboard.php';
 require_once __DIR__ . '/src/Operations/ModuleHealthTrait.php';
+require_once __DIR__ . '/src/Operations/RetentionRepository.php';
+require_once __DIR__ . '/src/Operations/RetentionService.php';
+require_once __DIR__ . '/src/Operations/ModuleRetentionTrait.php';
 
 use Emmakex\PrestaShopSalesforceMarketingCloud\Cart\CartAbandonmentDetector;
 use Emmakex\PrestaShopSalesforceMarketingCloud\Cart\CartCaptureService;
@@ -69,6 +72,7 @@ use Emmakex\PrestaShopSalesforceMarketingCloud\Salesforce\RestClient;
 class PsSalesforceBridge extends Module
 {
     use \Emmakex\PrestaShopSalesforceMarketingCloud\Operations\ModuleHealthTrait;
+    use \Emmakex\PrestaShopSalesforceMarketingCloud\Operations\ModuleRetentionTrait;
 
     const CONFIG_AUTH_BASE_URI = 'PS_SFMC_AUTH_BASE_URI';
     const CONFIG_REST_BASE_URI = 'PS_SFMC_REST_BASE_URI';
@@ -84,6 +88,12 @@ class PsSalesforceBridge extends Module
     const CONFIG_RECOVERY_TOKEN_TTL_HOURS = 'PS_SFMC_RECOVERY_TOKEN_TTL_HOURS';
     const CONFIG_CRON_TOKEN = 'PS_SFMC_CRON_TOKEN';
     const CONFIG_CUSTOMER_BACKFILL_BATCH = 'PS_SFMC_CUSTOMER_BACKFILL_BATCH';
+    const CONFIG_RETENTION_QUEUE_DAYS = 'PS_SFMC_RETENTION_QUEUE_DAYS';
+    const CONFIG_RETENTION_LOG_DAYS = 'PS_SFMC_RETENTION_LOG_DAYS';
+    const CONFIG_RETENTION_JOURNEY_DAYS = 'PS_SFMC_RETENTION_JOURNEY_DAYS';
+    const CONFIG_RETENTION_CART_DAYS = 'PS_SFMC_RETENTION_CART_DAYS';
+    const CONFIG_RETENTION_RECOVERY_DAYS = 'PS_SFMC_RETENTION_RECOVERY_DAYS';
+    const CONFIG_RETENTION_LAST_RUN_AT = 'PS_SFMC_RETENTION_LAST_RUN_AT';
 
     private $salesforceRestClientCache;
 
@@ -353,6 +363,12 @@ class PsSalesforceBridge extends Module
             && Configuration::updateValue(self::CONFIG_JOURNEY_EVENT_DEFINITION_KEY, 'PRESTASHOP_ABANDONED_CART')
             && Configuration::updateValue(self::CONFIG_RECOVERY_TOKEN_TTL_HOURS, 168)
             && Configuration::updateValue(self::CONFIG_CUSTOMER_BACKFILL_BATCH, 50)
+            && Configuration::updateValue(self::CONFIG_RETENTION_QUEUE_DAYS, 30)
+            && Configuration::updateValue(self::CONFIG_RETENTION_LOG_DAYS, 30)
+            && Configuration::updateValue(self::CONFIG_RETENTION_JOURNEY_DAYS, 90)
+            && Configuration::updateValue(self::CONFIG_RETENTION_CART_DAYS, 30)
+            && Configuration::updateValue(self::CONFIG_RETENTION_RECOVERY_DAYS, 30)
+            && Configuration::updateValue(self::CONFIG_RETENTION_LAST_RUN_AT, '')
             && Configuration::updateValue(self::CONFIG_CRON_TOKEN, bin2hex(random_bytes(24)));
     }
 
@@ -373,6 +389,12 @@ class PsSalesforceBridge extends Module
             self::CONFIG_RECOVERY_TOKEN_TTL_HOURS,
             self::CONFIG_CRON_TOKEN,
             self::CONFIG_CUSTOMER_BACKFILL_BATCH,
+            self::CONFIG_RETENTION_QUEUE_DAYS,
+            self::CONFIG_RETENTION_LOG_DAYS,
+            self::CONFIG_RETENTION_JOURNEY_DAYS,
+            self::CONFIG_RETENTION_CART_DAYS,
+            self::CONFIG_RETENTION_RECOVERY_DAYS,
+            self::CONFIG_RETENTION_LAST_RUN_AT,
         ];
 
         foreach ($keys as $key) {
@@ -611,8 +633,13 @@ class PsSalesforceBridge extends Module
             $output .= $this->startCustomerBackfill();
         }
 
+        if (Tools::isSubmit('runPsSalesforceBridgeRetention')) {
+            $output .= $this->runRetentionNowAction();
+        }
+
         return $output
             . $this->renderHealthDashboard()
+            . $this->renderRetentionStatus()
             . $this->renderForm();
     }
 
@@ -737,6 +764,11 @@ class PsSalesforceBridge extends Module
         $journeyEventDefinitionKey = trim((string) Tools::getValue(self::CONFIG_JOURNEY_EVENT_DEFINITION_KEY));
         $recoveryTtlHours = max(1, min(720, (int) Tools::getValue(self::CONFIG_RECOVERY_TOKEN_TTL_HOURS)));
         $backfillBatch = max(10, min(500, (int) Tools::getValue(self::CONFIG_CUSTOMER_BACKFILL_BATCH)));
+        $retentionQueueDays = max(1, min(3650, (int) Tools::getValue(self::CONFIG_RETENTION_QUEUE_DAYS)));
+        $retentionLogDays = max(1, min(3650, (int) Tools::getValue(self::CONFIG_RETENTION_LOG_DAYS)));
+        $retentionJourneyDays = max(1, min(3650, (int) Tools::getValue(self::CONFIG_RETENTION_JOURNEY_DAYS)));
+        $retentionCartDays = max(1, min(3650, (int) Tools::getValue(self::CONFIG_RETENTION_CART_DAYS)));
+        $retentionRecoveryDays = max(1, min(3650, (int) Tools::getValue(self::CONFIG_RETENTION_RECOVERY_DAYS)));
 
         if (!$this->isHttpsUri($authBaseUri) || !$this->isHttpsUri($restBaseUri)) {
             return $this->displayError($this->l('Authentication and REST Base URIs must be valid HTTPS URLs.'));
@@ -770,6 +802,11 @@ class PsSalesforceBridge extends Module
         Configuration::updateValue(self::CONFIG_JOURNEY_EVENT_DEFINITION_KEY, $journeyEventDefinitionKey);
         Configuration::updateValue(self::CONFIG_RECOVERY_TOKEN_TTL_HOURS, $recoveryTtlHours);
         Configuration::updateValue(self::CONFIG_CUSTOMER_BACKFILL_BATCH, $backfillBatch);
+        Configuration::updateValue(self::CONFIG_RETENTION_QUEUE_DAYS, $retentionQueueDays);
+        Configuration::updateValue(self::CONFIG_RETENTION_LOG_DAYS, $retentionLogDays);
+        Configuration::updateValue(self::CONFIG_RETENTION_JOURNEY_DAYS, $retentionJourneyDays);
+        Configuration::updateValue(self::CONFIG_RETENTION_CART_DAYS, $retentionCartDays);
+        Configuration::updateValue(self::CONFIG_RETENTION_RECOVERY_DAYS, $retentionRecoveryDays);
 
         if ($clientSecret !== '') {
             Configuration::updateValue(self::CONFIG_CLIENT_SECRET, $clientSecret);
@@ -818,6 +855,7 @@ class PsSalesforceBridge extends Module
         if (isset($this->context->link)) {
             $cronUrl = $this->context->link->getModuleLink($this->name, 'cron', ['token' => $cronToken], true);
         }
+        $retention = $this->retentionConfiguration();
 
         $helper->fields_value = [
             self::CONFIG_AUTH_BASE_URI => (string) Configuration::get(self::CONFIG_AUTH_BASE_URI),
@@ -834,6 +872,11 @@ class PsSalesforceBridge extends Module
             self::CONFIG_RECOVERY_TOKEN_TTL_HOURS => (int) Configuration::get(self::CONFIG_RECOVERY_TOKEN_TTL_HOURS),
             self::CONFIG_CRON_TOKEN => $cronToken,
             self::CONFIG_CUSTOMER_BACKFILL_BATCH => (int) Configuration::get(self::CONFIG_CUSTOMER_BACKFILL_BATCH),
+            self::CONFIG_RETENTION_QUEUE_DAYS => $retention['queue_days'],
+            self::CONFIG_RETENTION_LOG_DAYS => $retention['log_days'],
+            self::CONFIG_RETENTION_JOURNEY_DAYS => $retention['journey_days'],
+            self::CONFIG_RETENTION_CART_DAYS => $retention['cart_days'],
+            self::CONFIG_RETENTION_RECOVERY_DAYS => $retention['recovery_days'],
             'PS_SFMC_CRON_URL' => $cronUrl,
         ];
 
@@ -884,6 +927,11 @@ class PsSalesforceBridge extends Module
                             'name' => 'name',
                         ],
                     ],
+                    ['type' => 'text', 'label' => $this->l('Processed queue retention'), 'name' => self::CONFIG_RETENTION_QUEUE_DAYS, 'suffix' => $this->l('days'), 'desc' => $this->l('Only processed queue rows are deleted. Pending, processing, retry and failed rows are never auto-purged.')],
+                    ['type' => 'text', 'label' => $this->l('Local log retention'), 'name' => self::CONFIG_RETENTION_LOG_DAYS, 'suffix' => $this->l('days')],
+                    ['type' => 'text', 'label' => $this->l('Journey audit retention'), 'name' => self::CONFIG_RETENTION_JOURNEY_DAYS, 'suffix' => $this->l('days'), 'desc' => $this->l('Only sent and suppressed Journey audit rows are deleted automatically.')],
+                    ['type' => 'text', 'label' => $this->l('Terminal cart snapshot retention'), 'name' => self::CONFIG_RETENTION_CART_DAYS, 'suffix' => $this->l('days'), 'desc' => $this->l('Only empty, ineligible, converted and recovered snapshots are deleted. Active and abandoned snapshots are retained.')],
+                    ['type' => 'text', 'label' => $this->l('Recovery token retention'), 'name' => self::CONFIG_RETENTION_RECOVERY_DAYS, 'suffix' => $this->l('days'), 'desc' => $this->l('Recovered tokens are anonymized to preserve attribution. Expired or unusable tokens without recovery are deleted.')],
                 ],
                 'submit' => ['title' => $this->l('Save')],
                 'buttons' => [
@@ -900,6 +948,13 @@ class PsSalesforceBridge extends Module
                         'type' => 'submit',
                         'class' => 'btn btn-default pull-right',
                         'icon' => 'process-icon-database',
+                    ],
+                    [
+                        'title' => $this->l('Run privacy retention now'),
+                        'name' => 'runPsSalesforceBridgeRetention',
+                        'type' => 'submit',
+                        'class' => 'btn btn-default pull-right',
+                        'icon' => 'process-icon-eraser',
                     ],
                 ],
             ],
