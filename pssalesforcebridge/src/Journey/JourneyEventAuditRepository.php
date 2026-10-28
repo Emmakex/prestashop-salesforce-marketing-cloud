@@ -8,7 +8,7 @@ final class JourneyEventAuditRepository
 {
     public function findByQueueId($queueId)
     {
-        $sql = 'SELECT * FROM `' . _DB_PREFIX_ . 'sfmc_journey_event` WHERE `id_sfmc_queue` = ' . (int) $queueId . ' LIMIT 1';
+        $sql = 'SELECT * FROM `' . _DB_PREFIX_ . 'sfmc_journey_event` WHERE `id_sfmc_queue` = ' . (int) $queueId;
         $row = Db::getInstance()->getRow($sql);
 
         return is_array($row) ? $row : null;
