@@ -35,19 +35,23 @@ final class RecoveryTokenRepository
             . ' AND `used_at` IS NULL'
         );
 
-        $ok = $db->insert('sfmc_recovery_token', [
-            'token_hash' => $tokenHash,
-            'id_shop' => $shopId,
-            'id_cart' => $cartId,
-            'id_customer' => $customerId,
-            'contact_key' => $contactKey,
-            'snapshot_hash' => $snapshotHash,
-            'expires_at' => $expiresAt,
-            'used_at' => null,
-            'recovered_cart_id' => 0,
-            'created_at' => $now,
-            'updated_at' => $now,
-        ]);
+        $ok = $db->insert(
+            'sfmc_recovery_token',
+            [
+                'token_hash' => $tokenHash,
+                'id_shop' => $shopId,
+                'id_cart' => $cartId,
+                'id_customer' => $customerId,
+                'contact_key' => $contactKey,
+                'snapshot_hash' => $snapshotHash,
+                'expires_at' => $expiresAt,
+                'used_at' => null,
+                'recovered_cart_id' => 0,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ],
+            true
+        );
 
         if (!$ok) {
             throw new RuntimeException('Unable to persist recovery token.');
