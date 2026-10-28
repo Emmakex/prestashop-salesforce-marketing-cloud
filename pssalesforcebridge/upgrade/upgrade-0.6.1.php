@@ -6,31 +6,30 @@ if (!defined('_PS_VERSION_')) {
 
 function upgrade_module_0_6_1($module)
 {
+    $engine = _MYSQL_ENGINE_;
     $prefix = _DB_PREFIX_;
-    $db = Db::getInstance();
-    $table = "{$prefix}sfmc_recovery_token";
 
-    $columns = [
-        'recovered_order_id' => 'INT UNSIGNED NOT NULL DEFAULT 0 AFTER `recovered_cart_id`',
-        'recovered_order_total' => 'DECIMAL(20,6) NOT NULL DEFAULT 0 AFTER `recovered_order_id`',
-        'recovered_currency' => "VARCHAR(8) NOT NULL DEFAULT '' AFTER `recovered_order_total`",
-        'recovered_order_state_id' => 'INT UNSIGNED NOT NULL DEFAULT 0 AFTER `recovered_currency`',
-        'recovered_order_paid' => 'TINYINT(1) NOT NULL DEFAULT 0 AFTER `recovered_order_state_id`',
-        'recovered_order_valid' => 'TINYINT(1) NOT NULL DEFAULT 0 AFTER `recovered_order_paid`',
-        'converted_at' => 'DATETIME NULL AFTER `recovered_order_valid`',
-    ];
+    $query = "CREATE TABLE IF NOT EXISTS `{$prefix}sfmc_recovery_order` (
+        `id_sfmc_recovery_order` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+        `id_sfmc_recovery_token` BIGINT UNSIGNED NOT NULL,
+        `id_shop` INT UNSIGNED NOT NULL,
+        `source_cart_id` INT UNSIGNED NOT NULL,
+        `recovered_cart_id` INT UNSIGNED NOT NULL,
+        `id_order` INT UNSIGNED NOT NULL,
+        `order_total` DECIMAL(20,6) NOT NULL DEFAULT 0,
+        `currency` VARCHAR(8) NOT NULL DEFAULT '',
+        `state_id` INT UNSIGNED NOT NULL DEFAULT 0,
+        `paid` TINYINT(1) NOT NULL DEFAULT 0,
+        `valid` TINYINT(1) NOT NULL DEFAULT 0,
+        `converted_at` DATETIME NOT NULL,
+        `created_at` DATETIME NOT NULL,
+        `updated_at` DATETIME NOT NULL,
+        PRIMARY KEY (`id_sfmc_recovery_order`),
+        UNIQUE KEY `uniq_sfmc_recovery_order` (`id_shop`, `id_order`),
+        KEY `idx_sfmc_recovery_order_token` (`id_sfmc_recovery_token`),
+        KEY `idx_sfmc_recovery_order_cart` (`id_shop`, `recovered_cart_id`),
+        KEY `idx_sfmc_recovery_order_paid` (`paid`, `currency`)
+    ) ENGINE={$engine} DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci";
 
-    foreach ($columns as $name => $definition) {
-        $column = $db->getRow("SHOW COLUMNS FROM `{$table}` LIKE '" . pSQL($name) . "'");
-        if (!$column && !$db->execute("ALTER TABLE `{$table}` ADD `{$name}` {$definition}")) {
-            return false;
-        }
-    }
-
-    $index = $db->getRow("SHOW INDEX FROM `{$table}` WHERE `Key_name` = 'idx_sfmc_recovery_order'");
-    if (!$index && !$db->execute("ALTER TABLE `{$table}` ADD KEY `idx_sfmc_recovery_order` (`recovered_order_id`)")) {
-        return false;
-    }
-
-    return true;
+    return (bool) Db::getInstance()->execute($query);
 }
