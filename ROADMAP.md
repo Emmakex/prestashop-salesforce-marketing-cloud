@@ -38,7 +38,18 @@
 - [x] exponential retry and terminal failure after five attempts
 - [x] test mode blocks outbound customer writes
 - [x] upgrade path from 0.2.0
-- [ ] initial customer backfill command
+
+## 0.2.2 — Customer backfill
+
+- [x] persistent per-shop backfill state
+- [x] cursor-based traversal without large OFFSET queries
+- [x] configurable batch size from 10 to 500 (default 50)
+- [x] multishop discovery through compatibility boundary
+- [x] customer-shop association support with legacy fallback
+- [x] same normalizer, ledger and queue as live customer hooks
+- [x] cron advances backfill incrementally before queue delivery
+- [x] Back Office start/resume action and progress summary
+- [x] upgrade path from 0.2.1
 
 ## 0.3.0 — Orders
 
