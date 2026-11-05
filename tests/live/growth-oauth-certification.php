@@ -33,9 +33,14 @@ try {
     $evidence['instance_url_validated'] = true;
     unset($token);
 } catch (\Throwable $error) {
-    // Never reveal request fields, client secrets, tokens or server responses.
-    $evidence['error_code'] = 'oauth_authentication_failed';
-    fwrite(STDERR, "Growth OAuth failed. Verify External Client App policies and Environment settings.\n");
+    // AuthClient error codes are server-independent or strictly allowlisted OAuth names.
+    // Reject any unexpected message to prevent leakage into logs/artifacts.
+    $code = (string) $error->getMessage();
+    if (!preg_match('/^growth_oauth_[a-z0-9_]{1,80}$/D', $code)) {
+        $code = 'growth_oauth_unknown_failure';
+    }
+    $evidence['error_code'] = $code;
+    fwrite(STDERR, "Growth OAuth failed with sanitized code: " . $code . "\n");
 }
 
 $evidence['finished_at_utc'] = gmdate('c');
