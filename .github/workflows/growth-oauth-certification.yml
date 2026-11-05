@@ -1,0 +1,46 @@
+name: Salesforce Growth OAuth Auth Only
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: salesforce-growth-auth-only
+  cancel-in-progress: false
+
+jobs:
+  auth:
+    name: Growth OAuth · no data writes
+    runs-on: ubuntu-latest
+    environment: salesforce-growth-certification
+    steps:
+      - name: Checkout exact SHA
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - name: Verify exact checkout
+        shell: bash
+        run: test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: curl
+          coverage: none
+      - name: Certify OAuth only
+        env:
+          SF_GROWTH_ORG_URL: ${{ vars.SF_GROWTH_ORG_URL }}
+          SF_GROWTH_CLIENT_ID: ${{ secrets.SF_GROWTH_CLIENT_ID }}
+          SF_GROWTH_CLIENT_SECRET: ${{ secrets.SF_GROWTH_CLIENT_SECRET }}
+          SF_GROWTH_EVIDENCE_PATH: growth-oauth-certification.json
+        run: php tests/live/growth-oauth-certification.php
+      - name: Upload sanitized evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: growth-oauth-auth-${{ github.run_id }}-${{ github.run_attempt }}
+          path: growth-oauth-certification.json
+          if-no-files-found: ignore
+          retention-days: 30
