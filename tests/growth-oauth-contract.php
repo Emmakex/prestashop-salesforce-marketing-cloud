@@ -41,7 +41,25 @@ try {
     });
     growth_assert(false, '401 response accepted.');
 } catch (RuntimeException $expected) {
-    growth_assert(strpos($expected->getMessage(), 'fake-secret') === false, 'Credential leaked in OAuth error.');
+    growth_assert($expected->getMessage() === 'growth_oauth_http_401', '401 must expose status only, not an OAuth description.');
+}
+
+try {
+    $client->requestAccessToken(function () {
+        return ['status' => 400, 'body' => '{"error":"invalid_client","error_description":"private identity fake-secret"}'];
+    });
+    growth_assert(false, 'Invalid client was accepted.');
+} catch (RuntimeException $expected) {
+    growth_assert($expected->getMessage() === 'growth_oauth_http_400_invalid_client', 'Known OAuth error must be safely classified.');
+}
+
+try {
+    $client->requestAccessToken(function () {
+        return ['status' => 403, 'body' => '{"error":"evil-secret-fake-secret","error_description":"private tenant data"}'];
+    });
+    growth_assert(false, 'Unknown OAuth error accepted.');
+} catch (RuntimeException $expected) {
+    growth_assert($expected->getMessage() === 'growth_oauth_http_403', 'Unknown OAuth error must be suppressed.');
 }
 
 try {
@@ -66,4 +84,8 @@ growth_assert(strpos($workflow, 'vars.SF_GROWTH_ORG_URL') !== false, 'Organizati
 growth_assert(strpos($workflow, 'sfmc-live-certification') === false, 'Engagement environment must not be used.');
 growth_assert(strpos($harness, 'new AuthClient(') !== false, 'Harness must reuse Growth AuthClient.');
 growth_assert(strpos($harness, "'auth_only'") !== false && strpos($harness, 'salesforce_data_writes') !== false, 'Harness must remain read-only.');
+growth_assert(strpos($harness, "error_code'] = $code") !== false, 'Evidence must persist the sanitized failure code.');
+growth_assert(strpos($harness, 'preg_match(') !== false, 'Harness must validate diagnostic codes.');
+growth_assert(strpos($harness, "getMessage(),") === false, 'Never forward an exception message directly to the evidence.');
+
 fwrite(STDOUT, "Growth OAuth auth-only contract passed.\n");

@@ -26,7 +26,7 @@ Ejecutar manualmente Actions → **Salesforce Growth OAuth Auth Only** → Run w
 
 El workflow efectúa únicamente una solicitud POST HTTPS de tipo client_credentials al endpoint /services/oauth2/token. No consulta ni modifica objetos, Data 360, contactos, pedidos ni campañas de Salesforce. El artefacto JSON se limita a status, flags, SHA, run ID y fechas; no contiene secretos ni respuestas OAuth.
 
-Si el token falla, la evidencia se limita a una categoría genérica. Verificar el dominio, los secretos, permisos del Run As y la asignación de acceso a la aplicación. No desactivar las restricciones como atajo.
+Si el token falla, la evidencia recoge únicamente un identificador de diagnóstico saneado: estado HTTP y, si Salesforce lo devuelve, un código OAuth de una lista cerrada (`invalid_client`, `invalid_grant`, etc.). Nunca contiene `error_description`, cuerpo de respuesta, credenciales ni tokens. El resultado antiguo #42048133903 falló en autenticación, pero su evidencia genérica no permitió identificar el motivo. Verificar el dominio, los secretos, permisos del Run As y la asignación de acceso a la aplicación. No desactivar las restricciones como atajo.
 
 ## Frontera de certificación
 

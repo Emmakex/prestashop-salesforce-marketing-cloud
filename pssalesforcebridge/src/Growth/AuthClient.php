@@ -43,7 +43,28 @@ class AuthClient
         }
         $status = (int) $result['status'];
         if ($status !== 200) {
-            throw new RuntimeException('growth_oauth_http_' . $status);
+            // Only retain a fixed OAuth error identifier, never the raw response.
+            // The Salesforce response may contain credentials, identities or private tenant details.
+            $diagnostic = 'growth_oauth_http_' . $status;
+            $errorResponse = json_decode((string) $result['body'], true);
+            $knownErrors = [
+                'invalid_client',
+                'invalid_client_id',
+                'invalid_grant',
+                'invalid_request',
+                'invalid_scope',
+                'invalid_app_access',
+                'unauthorized_client',
+                'unsupported_grant_type',
+                'access_denied',
+                'server_error',
+            ];
+            if (is_array($errorResponse) && isset($errorResponse['error'])
+                && is_string($errorResponse['error'])
+                && in_array($errorResponse['error'], $knownErrors, true)) {
+                $diagnostic .= '_' . $errorResponse['error'];
+            }
+            throw new RuntimeException($diagnostic);
         }
         $token = json_decode((string) $result['body'], true);
         if (!is_array($token) || !isset($token['access_token']) || !is_string($token['access_token']) || $token['access_token'] === '') {
