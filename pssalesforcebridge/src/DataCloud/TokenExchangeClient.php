@@ -87,6 +87,17 @@ final class TokenExchangeClient
         if (!is_string($url) || $url === '') {
             throw new RuntimeException('data_cloud_exchange_invalid_' . $kind . '_url');
         }
+        // ABH connector PST displays a bare tenant host. Salesforce may
+        // supply the same host-only shape in the token exchange response.
+        // Normalize ONLY exact Salesforce-owned c360a hostnames. This is
+        // not an arbitrary scheme repair or an SSRF bypass.
+        if ($kind === 'cloud' && strlen($url) <= 253
+            && preg_match(
+                '/^(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+c360a\.salesforce\.com$/Di',
+                $url
+            ) === 1) {
+            $url = 'https://' . strtolower($url);
+        }
         $parts = parse_url($url);
 
         // The response is not logged: categorize only the rejected URL shape
