@@ -131,6 +131,7 @@ jobs:
           php tests/growth-schema-contract.php
           php tests/data-cloud-mapping-contract.php
           php tests/data-cloud-token-exchange-contract.php
+          php tests/data-cloud-token-only-workflow-contract.php
 
   data-cloud-schema-contract:
     name: ABH PST Data Cloud schema review (offline)
