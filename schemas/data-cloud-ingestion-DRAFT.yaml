@@ -1,0 +1,53 @@
+# DESIGN DRAFT: NOT approved for uploading to the ABH Data Cloud tenant.
+openapi: 3.0.3
+info:
+  title: PrestaShop Data Cloud Source - DRAFT
+  version: "0.1.0"
+paths: {}
+components:
+  schemas:
+    PSCustomer:
+      type: object
+      properties:
+        source_key: {type: string}
+        source_namespace: {type: string}
+        shop_id: {type: integer}
+        customer_id: {type: integer}
+        email: {type: string}
+        first_name: {type: string}
+        last_name: {type: string}
+        newsletter_flag: {type: boolean}
+        partner_optin_flag: {type: boolean}
+        active_flag: {type: boolean}
+        source_updated_local: {type: string}
+      required: [source_key, source_namespace, shop_id, customer_id]
+    PSOrder:
+      type: object
+      properties:
+        source_key: {type: string}
+        source_namespace: {type: string}
+        shop_id: {type: integer}
+        order_id: {type: integer}
+        customer_source_key: {type: string}
+        cart_source_key: {type: string}
+        currency: {type: string}
+        total_paid: {type: number}
+        paid_flag: {type: boolean}
+        state_id: {type: integer}
+        source_updated_local: {type: string}
+      required: [source_key, source_namespace, shop_id, order_id]
+    PSCartEvent:
+      type: object
+      properties:
+        event_key: {type: string}
+        source_namespace: {type: string}
+        shop_id: {type: integer}
+        cart_source_key: {type: string}
+        customer_source_key: {type: string}
+        event_type: {type: string}
+        event_time: {type: string, format: date-time}
+        cart_total: {type: number}
+        currency: {type: string}
+        product_count: {type: integer}
+        snapshot_hash: {type: string}
+      required: [event_key, source_namespace, shop_id, cart_source_key, event_time]
