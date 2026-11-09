@@ -5,6 +5,8 @@ on:
     paths:
       - 'pssalesforcebridge/**'
       - 'tests/runtime/**'
+      - 'tests/live/data-cloud-token-only-certification.php'
+      - '.github/workflows/data-cloud-token-only-certification.yml'
       - 'schemas/**'
       - 'tests/data-cloud-schema-fixture.php'
       - 'scripts/ci/validate-pst-ingestion-schema.py'
@@ -16,6 +18,8 @@ on:
     paths:
       - 'pssalesforcebridge/**'
       - 'tests/runtime/**'
+      - 'tests/live/data-cloud-token-only-certification.php'
+      - '.github/workflows/data-cloud-token-only-certification.yml'
       - 'schemas/**'
       - 'tests/data-cloud-schema-fixture.php'
       - 'scripts/ci/validate-pst-ingestion-schema.py'
