@@ -129,6 +129,7 @@ jobs:
           php tests/growth-oauth-contract.php
           php tests/growth-discovery-contract.php
           php tests/growth-schema-contract.php
+          php tests/data-cloud-mapping-contract.php
 
   package:
     name: Build release package
