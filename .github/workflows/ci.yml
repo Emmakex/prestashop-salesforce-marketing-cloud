@@ -124,8 +124,10 @@ jobs:
         with:
           php-version: ${{ matrix.php }}
           coverage: none
-      - name: Run Growth auth-only contract
-        run: php tests/growth-oauth-contract.php
+      - name: Run Growth auth-only and metadata discovery contracts
+        run: |
+          php tests/growth-oauth-contract.php
+          php tests/growth-discovery-contract.php
 
   package:
     name: Build release package
