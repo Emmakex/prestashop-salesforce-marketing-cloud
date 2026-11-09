@@ -54,3 +54,12 @@ documentation before permitting another host family. No Data Cloud writes.
 The second manual token-exchange workflow on SHA `22c7cbc344440e608465d57ee6727257b729a416` returned `data_cloud_exchange_invalid_cloud_url` again. The revised domain-family checks were never reached because the generic code was raised by the initial URL-structure guard (or an empty URL). Do not assume that DNS subdomain matching was the cause.
 
 The new strictly non-identifying URL-shape diagnostics distinguish HTTPS scheme, userinfo, port, path, query, fragment or an unparseable/relative URL. All malformed URLs **remain rejected**. A Data Cloud access token is not saved to disk, and the sanitized artifact contains only a fixed code. Do not permit paths, ports or arbitrary hostnames based solely on a failure; confirm the tenant endpoint in ABH privately against Salesforce documentation before changing validation policy.
+
+
+## ABH hostname-only PST endpoint: strict normalization (2026-11-09)
+
+The operator confirmed that the PST Ingestion API connector displays the tenant endpoint as a **bare hostname** ending in `.c360a.salesforce.com`, without the `https://` prefix. This is a UI observation, not proof of the token response shape. Manual auth-only run #42650619298 produced the fixed `data_cloud_exchange_invalid_cloud_url_structure` code.
+
+The token-exchange client may normalize a **pure, well-formed host** under `.c360a.salesforce.com` to an HTTPS origin, accepting both one- and multi-label tenant hostnames. The safeguard rejects hostnames containing paths, ports, credentials, delimiters, whitespace, an attacker suffix, or untrusted domains. It never sends a record, writes a stream, uploads a schema or logs the hostname/token. Absolute HTTPS Salesforce origins remain supported.
+
+After exact-head checks and post-merge CI/runtime, run the token-only workflow **once** on main. If it still fails, inspect only sanitized errors and do not loosen allowlists by guesswork. Data Cloud token certification does not establish ingestion permission, stream readiness or any campaign send.

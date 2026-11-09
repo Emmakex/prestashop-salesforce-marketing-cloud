@@ -31,6 +31,52 @@ $result = $exchange->exchange('https://alfabh.my.salesforce.com', 'synthetic-cor
         ];
     }
 );
+// Host-only endpoint returned by the tenant must be normalized exclusively
+// when its DNS suffix belongs to the documented Salesforce-owned c360a zone.
+foreach ([
+    'credencial.c360a.salesforce.com' => 'https://credencial.c360a.salesforce.com',
+    'REGION.TENANT-ID.C360A.SALESFORCE.COM' => 'https://region.tenant-id.c360a.salesforce.com',
+] as $hostname => $expectedOrigin) {
+    $normalized = $exchange->exchange('https://alfabh.my.salesforce.com', 'synthetic',
+        function () use ($hostname) {
+            return ['status' => 200, 'body' => json_encode([
+                'access_token' => 'never-log-token',
+                'instance_url' => $hostname,
+                'token_type' => 'Bearer',
+            ])];
+        });
+    dc_exchange_assert($normalized['instance_url'] === $expectedOrigin,
+        'Valid Salesforce Data Cloud bare hostname was not normalized.');
+}
+foreach ([
+    'attacker.example.org',
+    'credencial.c360a.salesforce.com.attacker.org',
+    'user@credencial.c360a.salesforce.com',
+    'credencial.c360a.salesforce.com:8443',
+    'credencial.c360a.salesforce.com/path',
+    'credencial.c360a.salesforce.com?x=y',
+    'credencial.c360a.salesforce.com#fragment',
+    ' credencial.c360a.salesforce.com',
+    '-bad.c360a.salesforce.com',
+    'credencial.c360a.salesforce.com.',
+] as $invalidHostname) {
+    try {
+        $exchange->exchange('https://alfabh.my.salesforce.com', 'synthetic',
+            function () use ($invalidHostname) {
+                return ['status' => 200, 'body' => json_encode([
+                    'access_token' => 'never-log-token',
+                    'instance_url' => $invalidHostname,
+                ])];
+            });
+        dc_exchange_assert(false, 'Untrusted bare hostname was accepted.');
+    } catch (RuntimeException $error) {
+        dc_exchange_assert(strpos($error->getMessage(), 'data_cloud_exchange_invalid_cloud_url_') === 0,
+            'Unsafe hostname must fail closed with a sanitized code.');
+        dc_exchange_assert(strpos($error->getMessage(), 'credencial') === false,
+            'Tenant identity must never appear in an error.');
+    }
+}
+
 // Only fixed non-sensitive shape categories may be emitted for suspicious URL
 // responses; neither raw URL nor tenant identifiers should appear in logs.
 $badShapes = [
