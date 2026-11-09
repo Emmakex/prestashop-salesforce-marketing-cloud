@@ -31,6 +31,39 @@ $result = $exchange->exchange('https://alfabh.my.salesforce.com', 'synthetic-cor
         ];
     }
 );
+// Previously, a nested Salesforce tenant host was incorrectly rejected.
+$nested = $exchange->exchange('https://alfabh.my.salesforce.com', 'synthetic',
+    function () {
+        return [
+            'status' => 200,
+            'body' => '{"access_token":"synthetic",'
+                . '"instance_url":"https://region.tenant-id.c360a.salesforce.com"}',
+        ];
+    });
+dc_exchange_assert($nested['instance_url'] === 'https://region.tenant-id.c360a.salesforce.com',
+    'Multi-label tenant host incorrectly rejected.');
+
+foreach ([
+    'https://tenant.salesforce.com' => 'data_cloud_exchange_invalid_cloud_url_salesforce_other',
+    'https://a360.cdp.test.aws.sfdc.cl' => 'data_cloud_exchange_invalid_cloud_url_sfdc',
+    'https://attacker.example.org' => 'data_cloud_exchange_invalid_cloud_url_external',
+    'https://tenant.c360a.salesforce.com.attacker.org' => 'data_cloud_exchange_invalid_cloud_url_external',
+    'https://-invalid.c360a.salesforce.com' => 'data_cloud_exchange_invalid_cloud_url_label',
+] as $candidate => $expectedError) {
+    try {
+        $exchange->exchange('https://alfabh.my.salesforce.com', 'synthetic',
+            function () use ($candidate) {
+                return ['status' => 200, 'body' => json_encode([
+                    'access_token' => 'never-log-token', 'instance_url' => $candidate,
+                ])];
+            });
+        dc_exchange_assert(false, 'Unsafe domain accepted.');
+    } catch (RuntimeException $error) {
+        dc_exchange_assert($error->getMessage() === $expectedError,
+            'Diagnostic must never expose URL, token, or tenant ID.');
+    }
+}
+
 dc_exchange_assert($called, 'No token exchange performed.');
 dc_exchange_assert($result === [
     'access_token' => 'synthetic-cloud-token',
@@ -75,7 +108,11 @@ foreach ([
             });
         dc_exchange_assert(false, 'Unsafe Cloud URL accepted.');
     } catch (RuntimeException $error) {
-        dc_exchange_assert($error->getMessage() === 'data_cloud_exchange_invalid_cloud_url',
+        $expectedError = strpos($bad, 'https://evil.example.org') === 0
+            || strpos($bad, '.evil.org') !== false
+            ? 'data_cloud_exchange_invalid_cloud_url_external'
+            : 'data_cloud_exchange_invalid_cloud_url';
+        dc_exchange_assert($error->getMessage() === $expectedError,
             'Cloud token/URL leaked in error.');
     }
 }
