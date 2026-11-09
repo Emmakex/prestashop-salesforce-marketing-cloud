@@ -47,3 +47,10 @@ URL, access token, or raw response is retained in evidence.
 Do not broaden allowlist to arbitrary domains. If still blocked, compare
 the official tenant endpoint privately and verify format against Salesforce
 documentation before permitting another host family. No Data Cloud writes.
+
+
+## Live run #42646179309: same generic URL failure
+
+The second manual token-exchange workflow on SHA `22c7cbc344440e608465d57ee6727257b729a416` returned `data_cloud_exchange_invalid_cloud_url` again. The revised domain-family checks were never reached because the generic code was raised by the initial URL-structure guard (or an empty URL). Do not assume that DNS subdomain matching was the cause.
+
+The new strictly non-identifying URL-shape diagnostics distinguish HTTPS scheme, userinfo, port, path, query, fragment or an unparseable/relative URL. All malformed URLs **remain rejected**. A Data Cloud access token is not saved to disk, and the sanitized artifact contains only a fixed code. Do not permit paths, ports or arbitrary hostnames based solely on a failure; confirm the tenant endpoint in ABH privately against Salesforce documentation before changing validation policy.

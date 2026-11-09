@@ -31,6 +31,36 @@ $result = $exchange->exchange('https://alfabh.my.salesforce.com', 'synthetic-cor
         ];
     }
 );
+// Only fixed non-sensitive shape categories may be emitted for suspicious URL
+// responses; neither raw URL nor tenant identifiers should appear in logs.
+$badShapes = [
+    'http://tenant.c360a.salesforce.com' => 'scheme',
+    'https://user@tenant.c360a.salesforce.com' => 'userinfo',
+    'https://tenant.c360a.salesforce.com:8443' => 'port',
+    'https://tenant.c360a.salesforce.com/services/api' => 'path',
+    'https://tenant.c360a.salesforce.com?secret=synthetic' => 'query',
+    'https://tenant.c360a.salesforce.com#fragment' => 'fragment',
+    '/relative/no-origin' => 'structure',
+];
+foreach ($badShapes as $badUrl => $reason) {
+    try {
+        $exchange->exchange('https://alfabh.my.salesforce.com', 'synthetic',
+            function () use ($badUrl) {
+                return ['status' => 200, 'body' => json_encode([
+                    'access_token' => 'never-log-token', 'instance_url' => $badUrl,
+                ])];
+            });
+        dc_exchange_assert(false, 'Bad URL shape accepted.');
+    } catch (RuntimeException $error) {
+        dc_exchange_assert(
+            $error->getMessage() === 'data_cloud_exchange_invalid_cloud_url_' . $reason,
+            'Wrong sanitized URL-shape classification.'
+        );
+        dc_exchange_assert(strpos($error->getMessage(), 'tenant') === false,
+            'Tenant identity leaked.');
+    }
+}
+
 // Previously, a nested Salesforce tenant host was incorrectly rejected.
 $nested = $exchange->exchange('https://alfabh.my.salesforce.com', 'synthetic',
     function () {
@@ -111,7 +141,15 @@ foreach ([
         $expectedError = strpos($bad, 'https://evil.example.org') === 0
             || strpos($bad, '.evil.org') !== false
             ? 'data_cloud_exchange_invalid_cloud_url_external'
-            : 'data_cloud_exchange_invalid_cloud_url';
+            : (strpos($bad, 'http://') === 0
+                ? 'data_cloud_exchange_invalid_cloud_url_scheme'
+                : (strpos($bad, 'https://user@') === 0
+                    ? 'data_cloud_exchange_invalid_cloud_url_userinfo'
+                    : (strpos($bad, '/path') !== false
+                        ? 'data_cloud_exchange_invalid_cloud_url_path'
+                        : (strpos($bad, ':80') !== false
+                            ? 'data_cloud_exchange_invalid_cloud_url_port'
+                            : 'data_cloud_exchange_invalid_cloud_url_query'))));
         dc_exchange_assert($error->getMessage() === $expectedError,
             'Cloud token/URL leaked in error.');
     }

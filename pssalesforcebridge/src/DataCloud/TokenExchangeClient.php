@@ -88,6 +88,33 @@ final class TokenExchangeClient
             throw new RuntimeException('data_cloud_exchange_invalid_' . $kind . '_url');
         }
         $parts = parse_url($url);
+
+        // The response is not logged: categorize only the rejected URL shape
+        // to distinguish a genuine endpoint mismatch from a malformed URI.
+        if ($kind === 'cloud') {
+            if (!is_array($parts) || !isset($parts['scheme'], $parts['host'])) {
+                throw new RuntimeException('data_cloud_exchange_invalid_cloud_url_structure');
+            }
+            if (strtolower($parts['scheme']) !== 'https') {
+                throw new RuntimeException('data_cloud_exchange_invalid_cloud_url_scheme');
+            }
+            if (isset($parts['user']) || isset($parts['pass'])) {
+                throw new RuntimeException('data_cloud_exchange_invalid_cloud_url_userinfo');
+            }
+            if (isset($parts['port'])) {
+                throw new RuntimeException('data_cloud_exchange_invalid_cloud_url_port');
+            }
+            if (isset($parts['query'])) {
+                throw new RuntimeException('data_cloud_exchange_invalid_cloud_url_query');
+            }
+            if (isset($parts['fragment'])) {
+                throw new RuntimeException('data_cloud_exchange_invalid_cloud_url_fragment');
+            }
+            if (isset($parts['path']) && $parts['path'] !== '' && $parts['path'] !== '/') {
+                throw new RuntimeException('data_cloud_exchange_invalid_cloud_url_path');
+            }
+        }
+
         if (!is_array($parts)
             || !isset($parts['scheme'], $parts['host'])
             || strtolower($parts['scheme']) !== 'https'
