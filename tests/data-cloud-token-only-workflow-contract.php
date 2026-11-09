@@ -19,7 +19,7 @@ $tests = [
         && strpos($harness, "'marketing_messages_sent' => false") !== false
         && strpos($harness, '/api/v1/ingest/') === false,
     'sanitized errors' => strpos($harness, 'preg_match(') !== false
-        && strpos($harness, "error_code'] = $code") !== false,
+        && strpos($harness, "error_code'] = " . '$code') !== false,
     'gate in CI' => strpos($ci, 'php tests/data-cloud-token-only-workflow-contract.php') !== false,
 ];
 foreach ($tests as $name => $passed) {
