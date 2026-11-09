@@ -1,0 +1,46 @@
+name: Salesforce Growth Read Only Discovery
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: salesforce-growth-readonly-discovery
+  cancel-in-progress: false
+
+jobs:
+  discover:
+    name: Growth REST metadata only · no record reads or writes
+    runs-on: ubuntu-latest
+    environment: salesforce-growth-certification
+    steps:
+      - name: Checkout exact SHA
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - name: Verify exact checkout
+        shell: bash
+        run: test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: curl
+          coverage: none
+      - name: Discover REST metadata only
+        env:
+          SF_GROWTH_ORG_URL: ${{ vars.SF_GROWTH_ORG_URL }}
+          SF_GROWTH_CLIENT_ID: ${{ secrets.SF_GROWTH_CLIENT_ID }}
+          SF_GROWTH_CLIENT_SECRET: ${{ secrets.SF_GROWTH_CLIENT_SECRET }}
+          SF_GROWTH_EVIDENCE_PATH: growth-readonly-discovery.json
+        run: php tests/live/growth-readonly-discovery.php
+      - name: Upload sanitized evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: growth-readonly-discovery-${{ github.run_id }}-${{ github.run_attempt }}
+          path: growth-readonly-discovery.json
+          if-no-files-found: ignore
+          retention-days: 30
