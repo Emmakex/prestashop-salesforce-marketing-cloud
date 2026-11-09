@@ -128,6 +128,7 @@ jobs:
         run: |
           php tests/growth-oauth-contract.php
           php tests/growth-discovery-contract.php
+          php tests/growth-schema-contract.php
 
   package:
     name: Build release package

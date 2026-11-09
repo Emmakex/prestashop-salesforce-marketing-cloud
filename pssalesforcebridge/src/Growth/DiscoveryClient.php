@@ -91,6 +91,96 @@ final class DiscoveryClient
         ];
     }
 
+
+    /**
+     * Metadata-only sObject Describe for a fixed selection of standard objects/fields.
+     * No /query, record endpoints, Data 360, custom field names or values leave this method.
+     * The booleans describe this integration identity only; they do not approve live writes.
+     */
+    public function inspectSchema($transport = null)
+    {
+        $probe = $this->inspect($transport);
+        $version = $probe['rest_api_version'];
+        if (!preg_match('/^v[0-9]{2,3}\.[0-9]{1,2}$/D', $version)) {
+            throw new RuntimeException('growth_discovery_invalid_api_version');
+        }
+
+        $candidates = [
+            'Contact' => ['Id', 'FirstName', 'LastName', 'Email', 'HasOptedOutOfEmail', 'IndividualId'],
+            'Lead' => ['Id', 'FirstName', 'LastName', 'Email', 'HasOptedOutOfEmail', 'Status', 'IndividualId'],
+            'Campaign' => ['Id', 'Name', 'Status', 'IsActive'],
+            'Individual' => ['Id', 'Name', 'HasOptedOutTracking', 'DoNotTrack', 'ShouldForget'],
+            'ContactPointEmail' => ['Id', 'ParentId', 'EmailAddress', 'IsPrimary', 'ActiveFromDate', 'ActiveToDate'],
+            'ContactPointTypeConsent' => ['Id', 'ContactPointId', 'DataUsePurposeId', 'PrivacyConsentStatus', 'EffectiveFrom', 'EffectiveTo'],
+            'Order' => ['Id', 'OrderNumber', 'Status', 'EffectiveDate', 'AccountId', 'Pricebook2Id', 'TotalAmount'],
+        ];
+
+        $objects = [];
+        foreach ($candidates as $name => $fieldNames) {
+            if (empty($probe['visible_standard_object_types'][$name])) {
+                $objects[$name] = ['visible' => false, 'described' => false];
+                continue;
+            }
+
+            // $name is never caller-controlled: only the static allowlist above.
+            $raw = $this->fetch('/services/data/' . $version . '/sobjects/' . $name . '/describe', $transport);
+            if (!isset($raw['name'], $raw['fields']) || $raw['name'] !== $name
+                || !is_array($raw['fields'])
+                || !isset($raw['createable'], $raw['updateable'], $raw['queryable'])
+                || !is_bool($raw['createable']) || !is_bool($raw['updateable']) || !is_bool($raw['queryable'])) {
+                throw new RuntimeException('growth_discovery_invalid_describe');
+            }
+
+            $lookup = [];
+            $hasExternalId = false;
+            foreach ($raw['fields'] as $field) {
+                if (!is_array($field) || !isset($field['name']) || !is_string($field['name'])) {
+                    continue;
+                }
+                // Only the boolean is persisted; never the identity of an unknown/custom field.
+                if (isset($field['externalId']) && $field['externalId'] === true) {
+                    $hasExternalId = true;
+                }
+                if (in_array($field['name'], $fieldNames, true)) {
+                    $lookup[$field['name']] = $field;
+                }
+            }
+
+            $fields = [];
+            foreach ($fieldNames as $fieldName) {
+                $found = isset($lookup[$fieldName]);
+                $field = $found ? $lookup[$fieldName] : [];
+                $fields[$fieldName] = [
+                    'present' => $found,
+                    'createable' => $found && isset($field['createable']) && $field['createable'] === true,
+                    'updateable' => $found && isset($field['updateable']) && $field['updateable'] === true,
+                    'external_id' => $found && isset($field['externalId']) && $field['externalId'] === true,
+                ];
+            }
+            $objects[$name] = [
+                'visible' => true,
+                'described' => true,
+                'createable' => $raw['createable'],
+                'updateable' => $raw['updateable'],
+                'queryable' => $raw['queryable'],
+                'any_external_id_metadata' => $hasExternalId,
+                'candidate_fields' => $fields,
+            ];
+            unset($lookup, $raw, $fields);
+        }
+
+        return [
+            'rest_api_version' => $version,
+            'objects' => $objects,
+            'data_360_entitlement' => 'not_evaluated',
+            'data_360_ingestion' => 'not_evaluated',
+            'growth_flow_entry' => 'not_evaluated',
+            'field_level_write_certification' => 'metadata_only',
+            'salesforce_record_reads' => false,
+            'salesforce_data_writes' => false,
+        ];
+    }
+
     private function fetch($path, $transport)
     {
         $url = $this->instanceUrl . $path;
