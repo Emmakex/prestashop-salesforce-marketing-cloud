@@ -29,3 +29,21 @@ permissions, WITHOUT changing the already working Core OAuth secrets.
 Documentation:
 https://developer.salesforce.com/docs/data/data-cloud-int/guide/c360-a-create-ingestion-api-connected-app.html
 https://developer.salesforce.com/docs/data/data-cloud-int/references/data-cloud-ingestionapi-ref/c360-a-api-get-started.html
+
+
+## 2026-11-09 live host diagnostic
+
+Manual run #42641648302 reached Salesforce Data Cloud token exchange and
+received HTTP 200 and a valid token response, but rejected the tenant origin
+as data_cloud_exchange_invalid_cloud_url. The original matcher required
+exactly one subdomain label before c360a.salesforce.com.
+
+The revised allowlist accepts one or more valid tenant subdomain labels
+under the Salesforce-controlled c360a.salesforce.com domain only. Unknown
+host families stay blocked, with non-identifying classifications for
+salesforce_other, sfdc, external or malformed label. No tenant ID, full
+URL, access token, or raw response is retained in evidence.
+
+Do not broaden allowlist to arbitrary domains. If still blocked, compare
+the official tenant endpoint privately and verify format against Salesforce
+documentation before permitting another host family. No Data Cloud writes.

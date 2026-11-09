@@ -101,10 +101,27 @@ final class TokenExchangeClient
             // Intentionally restrict to the observed ABH My Domain identity.
             $valid = preg_match('/^[a-z0-9-]+\.my\.salesforce\.com$/D', $host) === 1;
         } else {
-            // Production Ingestion API tenant endpoints are under c360a.salesforce.com.
-            $valid = preg_match('/^[a-z0-9-]+\.c360a\.salesforce\.com$/D', $host) === 1;
+            // Multiple well-formed labels under Salesforce-controlled c360a domain
+            // are allowed; never accept unrelated HTTPS hosts.
+            $valid = preg_match(
+                '/^(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+c360a\.salesforce\.com$/D',
+                $host
+            ) === 1;
         }
         if (!$valid) {
+            if ($kind === 'cloud') {
+                // Non-identifying diagnostics only. Never log raw URL or tenant ID.
+                if (preg_match('/(^|\.)c360a\.salesforce\.com$/D', $host)) {
+                    throw new RuntimeException('data_cloud_exchange_invalid_cloud_url_label');
+                }
+                if (preg_match('/(^|\.)salesforce\.com$/D', $host)) {
+                    throw new RuntimeException('data_cloud_exchange_invalid_cloud_url_salesforce_other');
+                }
+                if (preg_match('/(^|\.)sfdc\.cl$/D', $host)) {
+                    throw new RuntimeException('data_cloud_exchange_invalid_cloud_url_sfdc');
+                }
+                throw new RuntimeException('data_cloud_exchange_invalid_cloud_url_external');
+            }
             throw new RuntimeException('data_cloud_exchange_invalid_' . $kind . '_url');
         }
         return 'https://' . $host;
