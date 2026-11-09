@@ -5,6 +5,9 @@ on:
     paths:
       - 'pssalesforcebridge/**'
       - 'tests/runtime/**'
+      - 'schemas/**'
+      - 'tests/data-cloud-schema-fixture.php'
+      - 'scripts/ci/validate-pst-ingestion-schema.py'
       - '.github/workflows/runtime-certification.yml'
       - 'ROADMAP.md'
       - 'RUNTIME_CERTIFICATION.md'
@@ -13,6 +16,9 @@ on:
     paths:
       - 'pssalesforcebridge/**'
       - 'tests/runtime/**'
+      - 'schemas/**'
+      - 'tests/data-cloud-schema-fixture.php'
+      - 'scripts/ci/validate-pst-ingestion-schema.py'
       - '.github/workflows/runtime-certification.yml'
       - 'ROADMAP.md'
       - 'RUNTIME_CERTIFICATION.md'
