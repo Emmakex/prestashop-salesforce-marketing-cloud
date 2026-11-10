@@ -20,6 +20,22 @@ trait ModuleHealthTrait
         return $report;
     }
 
+    private function renderDataCloudReadiness()
+    {
+        try {
+            $shops = \Emmakex\PrestaShopSalesforceMarketingCloud\Compatibility\ShopResolver::activeShopIds(
+                isset($this->context) ? $this->context : null
+            );
+            $report = \Emmakex\PrestaShopSalesforceMarketingCloud\DataCloud\PrestaShopReadinessProbe::inspect($shops);
+            return (new \Emmakex\PrestaShopSalesforceMarketingCloud\DataCloud\InstallationReadinessDashboard())
+                ->render($report);
+        } catch (\Throwable $e) {
+            // Never leak the DB query, credentials, tenant URL or exception message.
+            return '<div class="panel"><div class="panel-heading">Data Cloud - installation preflight</div>'
+                . '<div class="alert alert-warning">BLOCKED - read-only metadata check unavailable.</div></div>';
+        }
+    }
+
     private function healthConfigurationState()
     {
         return [
