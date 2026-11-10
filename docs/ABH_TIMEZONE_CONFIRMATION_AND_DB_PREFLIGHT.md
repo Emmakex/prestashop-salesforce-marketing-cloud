@@ -57,3 +57,19 @@ DB timezone to reinterpret historical values automatically.
 Next ABH data owner signoff: field dictionary (including consent source flags),
 retention/erasure, source_key uniqueness, Profile/Other categories, Data Space
 default, Record Modified/refresh strategy and DLO-to-DMO relationship mappings.
+
+## Source scope clarification (2026-11-10)
+
+The operator confirmed that the production ABH PrestaShop source is the
+database previously inspected, despite its test-like database identifier.
+The read-only metadata showed date_add and date_upd as DATETIME in the
+customer/orders tables using the bc_ prefix. This removes uncertainty about
+which PrestaShop installation was inspected, not about the historical
+calendar/timezone semantics of its DATETIME contents.
+
+ABH store PS_TIMEZONE is currently Europe/Madrid. This database name,
+table prefix and timezone MUST NOT be hardcoded in the reusable plugin.
+Other websites require independent shop/timezone and DB metadata checks.
+StagedInstallationPipeline now composes source identity, shop timezone,
+candidate v0.3 UTC mapping and batch validation without any network writes.
+Shop timestamps around DST transitions still require trustworthy provenance.
