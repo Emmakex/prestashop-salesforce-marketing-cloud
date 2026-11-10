@@ -200,6 +200,16 @@ def main():
                             staged_fixtures[obj]["source_updated_utc"]):
             raise ValueError("Staged UTC value not valid Zulu timestamp")
 
+    staged_fields = json.loads(subprocess.check_output(
+        ["php", str(ROOT / "tests" / "data-cloud-v03-payload-fields.php")], cwd=str(ROOT)))
+    if set(staged_fields) != OBJECTS:
+        raise ValueError("Staged UTC payload builder object inventory drift")
+    for obj in OBJECTS:
+        expected = {name: definition["type"] for name, definition
+                    in candidate_objects[obj]["properties"].items()}
+        if staged_fields[obj] != expected:
+            raise ValueError("UTC staged payload field names/types differ from v0.3 candidate")
+
     negative_cases(schema, fixtures)
     print("ABH PST schema review gate passed: 2 flat objects, 22 fields; no Data Cloud writes.")
     print("This is offline structural validation only, NOT Salesforce tenant acceptance.")
