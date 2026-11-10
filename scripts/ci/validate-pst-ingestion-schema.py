@@ -157,6 +157,49 @@ def main():
                   for field, spec in definitions[object_name]["properties"].items()}
         if allowed[object_name] != actual:
             raise ValueError("Payload builder field names/types drifted from schema")
+
+    # Compare the optional v0.3 UTC candidate against the unchanged v0.2 review.
+    # Exactly one date-time field is proposed per source object. No uploads.
+    candidate_path = ROOT / "schemas" / "ABH_PST_SCHEMA_UTC_CANDIDATE.yaml"
+    candidate = yaml.load(candidate_path.read_text(encoding="utf-8"), Loader=UniqueKeysLoader)
+    staged_fixtures = json.loads(subprocess.check_output(
+        ["php", str(ROOT / "tests" / "data-cloud-utc-candidate-fixture.php")],
+        cwd=str(ROOT)))
+    if candidate.get("openapi") != schema.get("openapi"):
+        raise ValueError("UTC candidate must retain same OpenAPI major/minor version")
+    candidate_objects = candidate.get("components", {}).get("schemas", {})
+    base_objects = schema["components"]["schemas"]
+    if set(candidate_objects) != OBJECTS or set(staged_fixtures) != OBJECTS:
+        raise ValueError("UTC candidate must have exactly PSCustomer and PSOrder")
+    for obj in OBJECTS:
+        props = candidate_objects[obj].get("properties", {})
+        baseline = base_objects[obj].get("properties", {})
+        if set(props) != set(baseline) | {"source_updated_utc"}:
+            raise ValueError("UTC candidate field inventory drift")
+        if candidate_objects[obj].get("required") != base_objects[obj].get("required") + ["source_updated_utc"]:
+            raise ValueError("UTC candidate must require source modification UTC alongside primary identities")
+        for field, defn in baseline.items():
+            if props.get(field) != defn:
+                raise ValueError("UTC candidate must not alter previous field types")
+        if props["source_updated_utc"] != {"type": "string", "format": "date-time"}:
+            raise ValueError("UTC candidate timestamp field must be ISO 8601 date-time")
+        check(obj)
+        if set(staged_fixtures[obj]) != set(props):
+            raise ValueError("Staged PHP mapper does not match proposed UTC candidate")
+        for field, spec in props.items():
+            check(field, is_field=True)
+            value = staged_fixtures[obj][field]
+            typ = spec["type"]
+            if typ == "string" and not isinstance(value, str):
+                raise ValueError("UTC candidate staged string field mismatch")
+            if typ == "number" and (isinstance(value, bool) or not isinstance(value, (int, float))):
+                raise ValueError("UTC candidate staged number field mismatch")
+            if typ == "boolean" and not isinstance(value, bool):
+                raise ValueError("UTC candidate staged boolean field mismatch")
+        if not re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z",
+                            staged_fixtures[obj]["source_updated_utc"]):
+            raise ValueError("Staged UTC value not valid Zulu timestamp")
+
     negative_cases(schema, fixtures)
     print("ABH PST schema review gate passed: 2 flat objects, 22 fields; no Data Cloud writes.")
     print("This is offline structural validation only, NOT Salesforce tenant acceptance.")

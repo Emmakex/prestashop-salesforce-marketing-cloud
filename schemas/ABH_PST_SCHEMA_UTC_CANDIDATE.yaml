@@ -1,0 +1,70 @@
+# ABH connector PST / ABH_PrestaShop_Data_Cloud
+# V0.3 CANDIDATE ONLY: DO NOT UPLOAD without ABH data-owner sign-off.
+# Stream categories/PKs remain subject to Data Cloud Architect approval.
+# No cart events or messaging/consent inferences in this initial release.
+openapi: 3.0.3
+info:
+  title: ABH PrestaShop Data Cloud PST Schema UTC Candidate
+  version: "0.3.0"
+paths: {}
+components:
+  schemas:
+    PSCustomer:
+      type: object
+      required: [source_key, source_namespace, shop_id, customer_id, source_updated_utc]
+      properties:
+        source_key:
+          type: string
+        source_namespace:
+          type: string
+        shop_id:
+          type: number
+        customer_id:
+          type: number
+        email:
+          type: string
+          format: email
+        first_name:
+          type: string
+        last_name:
+          type: string
+        newsletter_flag:
+          type: boolean
+        partner_optin_flag:
+          type: boolean
+        active_flag:
+          type: boolean
+        source_updated_local:
+          type: string
+        source_updated_utc:
+          type: string
+          format: date-time
+    PSOrder:
+      type: object
+      required: [source_key, source_namespace, shop_id, order_id, source_updated_utc]
+      properties:
+        source_key:
+          type: string
+        source_namespace:
+          type: string
+        shop_id:
+          type: number
+        order_id:
+          type: number
+        customer_source_key:
+          type: string
+        cart_source_key:
+          type: string
+        currency:
+          type: string
+        total_paid:
+          type: number
+        paid_flag:
+          type: boolean
+        state_id:
+          type: number
+        source_updated_local:
+          type: string
+        source_updated_utc:
+          type: string
+          format: date-time
