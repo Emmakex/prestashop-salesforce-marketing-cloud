@@ -176,8 +176,8 @@ def main():
         baseline = base_objects[obj].get("properties", {})
         if set(props) != set(baseline) | {"source_updated_utc"}:
             raise ValueError("UTC candidate field inventory drift")
-        if candidate_objects[obj].get("required") != base_objects[obj].get("required"):
-            raise ValueError("UTC candidate must preserve required primary identities")
+        if candidate_objects[obj].get("required") != base_objects[obj].get("required") + ["source_updated_utc"]:
+            raise ValueError("UTC candidate must require source modification UTC alongside primary identities")
         for field, defn in baseline.items():
             if props.get(field) != defn:
                 raise ValueError("UTC candidate must not alter previous field types")
