@@ -130,6 +130,7 @@ jobs:
           php tests/growth-discovery-contract.php
           php tests/growth-schema-contract.php
           php tests/data-cloud-mapping-contract.php
+          php tests/data-cloud-batch-contract.php
           php tests/data-cloud-token-exchange-contract.php
           php tests/data-cloud-token-only-workflow-contract.php
 
