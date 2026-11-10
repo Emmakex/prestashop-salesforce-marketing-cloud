@@ -11,7 +11,7 @@ components:
   schemas:
     PSCustomer:
       type: object
-      required: [source_key, source_namespace, shop_id, customer_id]
+      required: [source_key, source_namespace, shop_id, customer_id, source_updated_utc]
       properties:
         source_key:
           type: string
@@ -41,7 +41,7 @@ components:
           format: date-time
     PSOrder:
       type: object
-      required: [source_key, source_namespace, shop_id, order_id]
+      required: [source_key, source_namespace, shop_id, order_id, source_updated_utc]
       properties:
         source_key:
           type: string
