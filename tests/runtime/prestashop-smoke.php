@@ -221,4 +221,21 @@ runtimeAssert(isset($health['mode']) && $health['mode'] === 'test', 'health repo
 runtimeAssert(isset($health['module_version']) && $health['module_version'] === '0.7.0', 'health report module version mismatch');
 runtimeAssert(!empty($health['ok']), 'health report should be healthy in test mode');
 
+$preflight = \Emmakex\PrestaShopSalesforceMarketingCloud\DataCloud\PrestaShopReadinessProbe::inspect(
+    \Emmakex\PrestaShopSalesforceMarketingCloud\Compatibility\ShopResolver::activeShopIds($context)
+);
+runtimeAssert($preflight['status'] === 'blocked', 'Data Cloud must remain blocked.');
+runtimeAssert($preflight['schema_upload_allowed'] === false
+    && $preflight['record_ingestion_allowed'] === false
+    && $preflight['marketing_sends_allowed'] === false,
+    'Read-only metadata cannot enable remote actions.');
+runtimeAssert($preflight['checks']['shops_identified'] === true,
+    'PrestaShop runtime preflight did not discover any shop.');
+runtimeAssert($preflight['checks']['date_columns_inspected'] === true,
+    'PrestaShop runtime preflight could not inspect core date columns.');
+$preflightHtml = (new \Emmakex\PrestaShopSalesforceMarketingCloud\DataCloud\InstallationReadinessDashboard())
+    ->render($preflight);
+runtimeAssert(strpos($preflightHtml, 'BLOCKED') !== false,
+    'Preflight BO panel must not suggest production activation.');
+
 fwrite(STDOUT, 'runtime smoke: ok on PrestaShop ' . _PS_VERSION_ . PHP_EOL);

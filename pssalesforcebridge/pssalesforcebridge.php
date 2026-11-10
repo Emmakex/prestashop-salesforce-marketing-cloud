@@ -9,6 +9,10 @@ require_once __DIR__ . '/src/Compatibility/CustomerHookAdapter.php';
 require_once __DIR__ . '/src/Compatibility/OrderHookAdapter.php';
 require_once __DIR__ . '/src/Compatibility/CartHookAdapter.php';
 require_once __DIR__ . '/src/Compatibility/ShopResolver.php';
+require_once __DIR__ . '/src/DataCloud/ShopTimezoneResolver.php';
+require_once __DIR__ . '/src/DataCloud/InstallationReadinessInspector.php';
+require_once __DIR__ . '/src/DataCloud/PrestaShopReadinessProbe.php';
+require_once __DIR__ . '/src/DataCloud/InstallationReadinessDashboard.php';
 require_once __DIR__ . '/src/Salesforce/AuthClient.php';
 require_once __DIR__ . '/src/Salesforce/RestClient.php';
 require_once __DIR__ . '/src/Salesforce/JourneyClient.php';
@@ -639,6 +643,7 @@ class PsSalesforceBridge extends Module
 
         return $output
             . $this->renderHealthDashboard()
+            . $this->renderDataCloudReadiness()
             . $this->renderRetentionStatus()
             . $this->renderForm();
     }
