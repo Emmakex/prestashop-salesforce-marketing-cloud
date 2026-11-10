@@ -146,6 +146,17 @@ def main():
     raw_fixtures = subprocess.check_output(["php", str(FIXTURE)], cwd=str(ROOT))
     fixtures = json.loads(raw_fixtures)
     validate(schema, fixtures)
+    # Enforce exact parity between YAML, PHP mapper fixtures and batch contract.
+    allowed = json.loads(subprocess.check_output(
+        ["php", str(ROOT / "tests" / "data-cloud-batch-fields.php")], cwd=str(ROOT)))
+    definitions = schema["components"]["schemas"]
+    if set(allowed) != OBJECTS:
+        raise ValueError("Payload builder objects drifted from PST schema")
+    for object_name in OBJECTS:
+        actual = {field: spec["type"]
+                  for field, spec in definitions[object_name]["properties"].items()}
+        if allowed[object_name] != actual:
+            raise ValueError("Payload builder field names/types drifted from schema")
     negative_cases(schema, fixtures)
     print("ABH PST schema review gate passed: 2 flat objects, 22 fields; no Data Cloud writes.")
     print("This is offline structural validation only, NOT Salesforce tenant acceptance.")

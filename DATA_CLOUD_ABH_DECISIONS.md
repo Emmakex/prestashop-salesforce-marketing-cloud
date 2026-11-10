@@ -100,3 +100,13 @@ https://developer.salesforce.com/docs/data/data-cloud-int/guide/c360-a-ingestion
 https://developer.salesforce.com/docs/data/data-cloud-int/guide/c360-a-create-ingestion-data-stream.html
 https://developer.salesforce.com/docs/data/data-cloud-int/guide/c360-a-create-ingestion-api-connected-app.html
 https://developer.salesforce.com/docs/data/data-cloud-int/references/data-cloud-ingestionapi-ref/c360-a-api-get-started.html
+
+## Auth gate update (2026-11-09)
+
+Data Cloud OAuth token exchange has now succeeded in manual GitHub run
+#42655156432, using the **existing** approved Growth OAuth application and
+protected secrets. A second client app is NOT required for this integration.
+This replaces the earlier provisional statement that a dedicated second
+app or GitHub Environment had to be created. Data Cloud payload validation,
+final schema upload, Data Streams, DMO mapping and commercial sends remain
+separate unapproved operations.
