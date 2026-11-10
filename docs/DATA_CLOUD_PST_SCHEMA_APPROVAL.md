@@ -40,3 +40,10 @@ Official Salesforce references:
 - https://developer.salesforce.com/docs/data/data-cloud-int/guide/c360-a-ingestion-api-schema-req.html
 - https://developer.salesforce.com/docs/data/data-cloud-int/guide/c360-a-create-ingestion-data-stream.html
 - https://developer.salesforce.com/docs/marketing/marketing-cloud-growth/guide/mc-manage-objects-create-streaming-data-cloud.html
+
+
+## Staged schema v0.3 for UTC review (not uploaded)
+
+PrestaShop's `PS_TIMEZONE` setting can be resolved with an explicit shop ID via `Configuration::get('PS_TIMEZONE', null, null, $shopId)`, as demonstrated by the new offline `ShopTimezoneResolver` and tests. This avoids assuming `Europe/Madrid` or the PHP/server timezone for all merchants. The actual timezone and the meaning of historical SQL `date_upd` values still require shop/DB verification before the production field is approved.
+
+The alternative `schemas/ABH_PST_SCHEMA_UTC_CANDIDATE.yaml` is a separate, review-only **v0.3** schema containing **12 fields per object (24 total)**. It adds a valid `source_updated_utc` `date-time` field to PSCustomer and PSOrder. The original `ABH_PST_SCHEMA_REVIEW.yaml` v0.2 with 22 fields is deliberately untouched. A synthetic `StagedUtcRecordMapper` and CI check prove the candidate matches the exact extra fields and valid Zulu format. **Neither candidate is authorized for upload.** If ABH approves the timestamp policy, the production payload builder and mapper must be updated to use the same approved schema, and a version/hash must be frozen before Salesforce Save.

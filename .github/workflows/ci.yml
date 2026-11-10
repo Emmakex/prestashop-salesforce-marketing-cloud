@@ -132,6 +132,7 @@ jobs:
           php tests/data-cloud-mapping-contract.php
           php tests/data-cloud-batch-contract.php
           php tests/data-cloud-timestamp-contract.php
+          php tests/data-cloud-shop-timezone-contract.php
           php tests/data-cloud-token-exchange-contract.php
           php tests/data-cloud-token-only-workflow-contract.php
 
