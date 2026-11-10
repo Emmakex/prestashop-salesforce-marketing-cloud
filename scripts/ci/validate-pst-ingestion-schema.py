@@ -196,7 +196,7 @@ def main():
                 raise ValueError("UTC candidate staged number field mismatch")
             if typ == "boolean" and not isinstance(value, bool):
                 raise ValueError("UTC candidate staged boolean field mismatch")
-        if not re.fullmatch(r"\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z",
+        if not re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z",
                             staged_fixtures[obj]["source_updated_utc"]):
             raise ValueError("Staged UTC value not valid Zulu timestamp")
 
