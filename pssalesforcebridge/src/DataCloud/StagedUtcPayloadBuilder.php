@@ -50,10 +50,14 @@ final class StagedUtcPayloadBuilder
             )) {
                 throw new RuntimeException('data_cloud_utc_payload_invalid_timestamp');
             }
+            // PHP 7.1 (PrestaShop 1.7) cannot reliably parse the millisecond
+            // "v" date format specifier. Regex already verifies exactly three
+            // fractional digits, so validate calendar and UTC clock separately.
+            $clock = substr($timestamp, 0, 19);
             $date = DateTimeImmutable::createFromFormat(
-                '!Y-m-d\TH:i:s.v\Z', $timestamp, new DateTimeZone('UTC')
+                '!Y-m-d\TH:i:s', $clock, new DateTimeZone('UTC')
             );
-            if (!$date || $date->format('Y-m-d\TH:i:s.v\Z') !== $timestamp) {
+            if (!$date || $date->format('Y-m-d\TH:i:s') !== $clock) {
                 throw new RuntimeException('data_cloud_utc_payload_invalid_timestamp');
             }
             $copy = $record;
