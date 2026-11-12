@@ -134,6 +134,7 @@ jobs:
           php tests/data-cloud-timestamp-contract.php
           php tests/data-cloud-timestamp-quality-contract.php
           php tests/cart-segmentation-contract.php
+          php tests/cart-consent-current-state-contract.php
           php tests/data-cloud-shop-timezone-contract.php
           php tests/data-cloud-v03-payload-contract.php
           php tests/data-cloud-multi-installation-contract.php
