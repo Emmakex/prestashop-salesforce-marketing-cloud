@@ -5,31 +5,42 @@ Europe/Madrid, customer/orders date_add and date_upd DATETIME. The technical
 preflight **does not** prove historical UTC provenance or authorize ingestion.
 Do not launch backfill, schema upload, Data Streams or any Marketing Cloud send.
 
-## Business decision: clean data is more important than full history
+## Business decision: retain valuable history; segment by permitted use
 
-- Reject the assumption that a syntactically valid DATETIME is historically
-  correct. Current PS_TIMEZONE, SQL SYSTEM/CET and PHP timezone are not evidence
-  for each past write or import.
-- Prefer **a fresh-data cutover**, after independently verifying the exact write
-  path for new customer/order updates and setting an explicit UTC start instant.
-  The cutover is NOT inferred from the calendar, DB now or module installation.
-  New events before verified cutover remain unverified.
-- Historical rows may be included ONLY if their absolute instant is corroborated
-  by a trustworthy independent UTC event/audit log, or through a separately
-  approved migration with equivalent provenance. Never guess ambiguous DST
-  fall-back hours; reject DST spring gaps.
-- If most history is unreliable, **do not block the project on repairing it**:
-  quarantine the old timestamps, approve a clean starting point, validate fresh
-  incremental records, and only then consider whether a lawful, consent-safe
-  snapshot of current customer state is required. A fresh snapshot timestamp
-  (observed_at_utc) is NOT the same as PrestaShop source_updated_utc and requires
-  a distinct, explicitly reviewed schema/Record Modified policy before use.
-- Existing customers not modified after cutover are not silently treated as
-  newly updated. Orders and customer references must remain consistent; no
-  orphan/cross-shop relationships or cross-merchant deduplication.
-- No marketing eligibility from newsletter_flag / partner_optin_flag alone.
-  Record-level consent, suppression, legal basis and erasure must be approved
-  separately.
+**Updated BC decision (2026-11-12):** The merchant explicitly wants to use
+historical customer and order data. **Do not discard older or guest records
+merely for their age, opt-in flags, or unverified source_update timestamps.**
+Prioritize segmentation and fitness for a specific purpose. Quality and
+eligibility are separate dimensions, not a binary "send/do not send" pool.
+
+- Retain source history in PrestaShop. Prepare a scoped, purpose-specific
+  initial history import only after source-data quality, legal basis,
+  minimization, retention and Salesforce mapping have been reviewed.
+- Segments: (1) usable customer profile; (2) order/transactional history;
+  (3) verified marketing-eligible audience; (4) legitimate non-marketing
+  contacts; (5) guest customers linked to purchases; (6) review/quarantine
+  for invalid, duplicate, erased/suppressed, inconsistent or unverified data.
+  A record may be useful for analytics without being eligible for marketing.
+- Historical timestamps are **a distinct gate**. A valid DATETIME is not
+  proof of an absolute UTC instant. Never manufacture source_updated_utc
+  or use unverified date_upd as Record Modified. For records lacking
+  per-row UTC provenance, consider a separately approved initial snapshot
+  with a clearly named observed-at UTC timestamp, a defined refresh/
+  version-ordering policy, and incremental capture of subsequent updates.
+  This is a future design option, not permission to ingest today.
+- Keep original customer/order IDs under a stable merchant + shop namespace;
+  deduplicate without collapsing two merchants or guest and registered
+  customers on email alone. Preserve cross-object references.
+- Old/new status is an analytical segment (recency, frequency, monetary
+  value, category, repeat purchase), **not** an automatic exclusion rule.
+- PrestaShop newsletter/partner flags are raw source indicators. Campaign
+  eligibility requires documented legal basis/consent evidence as applicable,
+  unsubscribe/suppression/erasure checks and correct channel/purpose.
+- Do not use production credentials or real customer data in PRs or CI.
+  No schema upload, Data Stream, backfill or Marketing Cloud send is enabled.
+
+See `docs/BC_HISTORICAL_SEGMENTATION_POLICY.md` for the cohort/mapping
+contract and evidence gaps.
 
 ## Offline deterministic quality gate
 
@@ -92,10 +103,10 @@ proof that older rows have no DST problems.
 1. Confirm the actual clock semantics of current PrestaShop 1.7.8.11
    customer/order writes and custom import modules against a trusted UTC
    audit source (without copying personal data into the repo).
-2. If provenance is not established, disable historical sync. Propose an
-   auditable, explicit UTC cutover no earlier than the point when writes are
-   verified. Recheck new records after cutover; do not declare success just
-   from an empty or clean-looking sample.
+2. If historical source_updated_utc cannot be proven, do not discard
+   useful customer/order history. Keep it in scope for a separately approved
+   snapshot or timestamp strategy that does not invent a historical instant;
+   validate a trustworthy incremental UTC capture for subsequent changes.
 3. Design idempotent, merchant + shop scoped source_key, event ordering and
    durable replay checkpoints for new changes. Consider that customer updates
    to existing customers must still be observed.
@@ -106,5 +117,7 @@ proof that older rows have no DST problems.
    purpose/minimization/consent/suppression/retention/erasure and DLO/DMO
    mapping. Only then authorize a separate synthetic test. No live sends.
 
-**Current state**: No real BC aggregate audit was run by CI or this code.
-This branch adds a decision/control mechanism, not a production activation.
+**Current state**: BC operator ran the bounded date SQL audit (500 customers
+and 500 orders, no anomaly flags in that sample) and a customer segmentation
+sample. Neither proves the full population's UTC provenance or campaign
+consent. CI and this quality-gate class are offline; no activation occurred.
