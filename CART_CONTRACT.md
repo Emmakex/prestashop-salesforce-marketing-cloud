@@ -43,10 +43,12 @@ The default policy is `marketing_optin` and is intentionally fail-closed. It req
 1. at least one product;
 2. a known PrestaShop customer/ContactKey;
 3. a syntactically valid email;
-4. an active customer;
-5. `newsletter` or `optin` enabled.
+4. an active, non-deleted customer;
+5. first-party `newsletter` enabled (partner `optin` alone is insufficient).
 
-A configurable `known_contact` mode exists for installations whose documented legal basis permits abandoned-cart communication without the marketing opt-in fields. The connector does not decide the merchant's legal basis; the strict policy remains the default.
+A configurable `known_contact` mode exists for installations whose independently documented legal basis permits abandoned-cart communication without the marketing opt-in fields. It is not safe for BC by default and must not be enabled without a lawful basis and reviewed suppression controls. The connector does not decide the merchant's legal basis; the strict policy remains the default.
+
+Starting in 0.7.1, the Journey worker re-reads the current PrestaShop customer immediately before issuing a recovery URL. Changed email, deleted/inactive/missing or cross-shop customer, or lost first-party subscription under `marketing_optin` causes suppression rather than a send. A local PrestaShop newsletter flag is only a technical signal; external unsubscribes, current suppression status, checkbox wording and legal purpose still require independent verification. No production campaign is automatically authorized by installing the patch.
 
 ## Conversion suppression
 
