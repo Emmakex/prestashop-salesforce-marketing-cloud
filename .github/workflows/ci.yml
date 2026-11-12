@@ -189,7 +189,7 @@ jobs:
           sha256sum "$ZIP" > "${ZIP}.sha256"
       - uses: actions/upload-artifact@v4
         with:
-          name: pssalesforcebridge-0.7.0
+          name: pssalesforcebridge-0.7.1
           path: |
             build/pssalesforcebridge-0.7.1.zip
             build/pssalesforcebridge-0.7.1.zip.sha256
