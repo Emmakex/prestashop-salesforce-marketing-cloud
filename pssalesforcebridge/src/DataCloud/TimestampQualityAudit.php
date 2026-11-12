@@ -138,8 +138,11 @@ final class TimestampQualityAudit
             !preg_match('/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.000Z$/D', $value)) {
             throw new RuntimeException('data_cloud_quality_utc_evidence_invalid');
         }
-        $parsed = DateTimeImmutable::createFromFormat('!Y-m-d\TH:i:s.v\Z', $value, new DateTimeZone('UTC'));
-        if ($parsed === false || $parsed->format('Y-m-d\TH:i:s.v\Z') !== $value) {
+        $seconds = substr($value, 0, 19);
+        // PHP 7.1 does not consistently support millisecond parsing (v).
+        // The strict regex already requires the canonical .000Z suffix.
+        $parsed = DateTimeImmutable::createFromFormat('!Y-m-d\TH:i:s', $seconds, new DateTimeZone('UTC'));
+        if ($parsed === false || $parsed->format('Y-m-d\TH:i:s') !== $seconds) {
             throw new RuntimeException('data_cloud_quality_utc_evidence_invalid');
         }
         return $parsed->getTimestamp();
