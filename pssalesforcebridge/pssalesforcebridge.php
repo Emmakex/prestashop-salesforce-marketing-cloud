@@ -32,6 +32,7 @@ require_once __DIR__ . '/src/Order/OrderEventService.php';
 require_once __DIR__ . '/src/Order/OrderDataExtensionWriter.php';
 require_once __DIR__ . '/src/Cart/CartNormalizer.php';
 require_once __DIR__ . '/src/Cart/CartEligibilityPolicy.php';
+require_once __DIR__ . '/src/Cart/CartContactStateReader.php';
 require_once __DIR__ . '/src/Cart/CartRepository.php';
 require_once __DIR__ . '/src/Cart/CartCaptureService.php';
 require_once __DIR__ . '/src/Cart/CartAbandonmentDetector.php';
