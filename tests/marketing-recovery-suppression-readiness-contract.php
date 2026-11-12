@@ -1,6 +1,6 @@
 <?php
 
-require_once dirname(__DIR__) . '/pssalesforcebridge/src/Marketing/RecoverySuppressionReadiness.php';
+require_once __DIR__ . '/review/RecoverySuppressionReadiness.php';
 
 use Emmakex\PrestaShopSalesforceMarketingCloud\Marketing\RecoverySuppressionReadiness;
 
@@ -97,7 +97,7 @@ unset($invalid['suppression_state']);
 readinessRejected($invalid, 'recovery_readiness_status_signal_required');
 
 $src = file_get_contents(dirname(__DIR__)
-    . '/pssalesforcebridge/src/Marketing/RecoverySuppressionReadiness.php');
+    . '/tests/review/RecoverySuppressionReadiness.php');
 foreach (['curl_', 'Db::', 'file_get_contents(', '->fire(', '->enqueue('] as $forbidden) {
     readinessAssert(strpos($src, $forbidden) === false, 'Review contract must have no side effects.');
 }
