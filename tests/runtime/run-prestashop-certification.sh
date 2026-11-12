@@ -92,21 +92,21 @@ fetch_endpoint() {
 }
 
 echo "==> Preparing exact module fixtures"
-rm -rf /tmp/pssfmc-runtime-061 /tmp/pssfmc-runtime-070 "$ROOT/build/runtime"
-mkdir -p /tmp/pssfmc-runtime-061 /tmp/pssfmc-runtime-070 "$ROOT/build/runtime"
+rm -rf /tmp/pssfmc-runtime-061 /tmp/pssfmc-runtime-071 "$ROOT/build/runtime"
+mkdir -p /tmp/pssfmc-runtime-061 /tmp/pssfmc-runtime-071 "$ROOT/build/runtime"
 
 git -C "$ROOT" archive "$BASE_061" pssalesforcebridge | tar -x -C /tmp/pssfmc-runtime-061
 (
   cd "$ROOT"
-  zip -qr build/runtime/pssalesforcebridge-0.7.0.zip pssalesforcebridge -x '*/vendor/*' '*.DS_Store'
+  zip -qr build/runtime/pssalesforcebridge-0.7.1.zip pssalesforcebridge -x '*/vendor/*' '*.DS_Store'
 )
-unzip -q "$ROOT/build/runtime/pssalesforcebridge-0.7.0.zip" -d /tmp/pssfmc-runtime-070
+unzip -q "$ROOT/build/runtime/pssalesforcebridge-0.7.1.zip" -d /tmp/pssfmc-runtime-071
 
 test -f /tmp/pssfmc-runtime-061/pssalesforcebridge/pssalesforcebridge.php
-test -f /tmp/pssfmc-runtime-070/pssalesforcebridge/pssalesforcebridge.php
+test -f /tmp/pssfmc-runtime-071/pssalesforcebridge/pssalesforcebridge.php
 
 grep -Fq "\$this->version = '0.6.1';" /tmp/pssfmc-runtime-061/pssalesforcebridge/pssalesforcebridge.php
-grep -Fq "\$this->version = '0.7.0';" /tmp/pssfmc-runtime-070/pssalesforcebridge/pssalesforcebridge.php
+grep -Fq "\$this->version = '0.7.1';" /tmp/pssfmc-runtime-071/pssalesforcebridge/pssalesforcebridge.php
 
 echo "==> Pulling pinned runtime images"
 pull_image "$MYSQL_IMAGE"
@@ -175,7 +175,7 @@ if [ "$ACTUAL_VERSION" != "$PS_VERSION" ]; then
   exit 1
 fi
 
-echo "==> Phase A: real 0.6.1 -> 0.7.0 upgrade"
+echo "==> Phase A: real 0.6.1 -> 0.7.1 upgrade"
 copy_module /tmp/pssfmc-runtime-061/pssalesforcebridge
 console prestashop:module install pssalesforcebridge --no-interaction
 INSTALLED_VERSION="$(sql "SELECT version FROM ps_module WHERE name='pssalesforcebridge' LIMIT 1")"
@@ -184,16 +184,16 @@ test "$INSTALLED_VERSION" = '0.6.1'
 sql "UPDATE ps_configuration SET value='365' WHERE name='PS_SFMC_RETENTION_QUEUE_DAYS'"
 sql "DELETE FROM ps_configuration WHERE name='PS_SFMC_RETENTION_LOG_DAYS'"
 
-copy_module /tmp/pssfmc-runtime-070/pssalesforcebridge
+copy_module /tmp/pssfmc-runtime-071/pssalesforcebridge
 console prestashop:module upgrade pssalesforcebridge --no-interaction
 UPGRADED_VERSION="$(sql "SELECT version FROM ps_module WHERE name='pssalesforcebridge' LIMIT 1")"
-test "$UPGRADED_VERSION" = '0.7.0'
+test "$UPGRADED_VERSION" = '0.7.1'
 test "$(sql "SELECT value FROM ps_configuration WHERE name='PS_SFMC_RETENTION_QUEUE_DAYS' LIMIT 1")" = '365'
 test "$(sql "SELECT value FROM ps_configuration WHERE name='PS_SFMC_RETENTION_LOG_DAYS' LIMIT 1")" = '30'
 
-echo "==> Phase B: clean 0.7.0 installation from exact ZIP"
+echo "==> Phase B: clean 0.7.1 installation from exact ZIP"
 console prestashop:module uninstall pssalesforcebridge --no-interaction
-copy_module /tmp/pssfmc-runtime-070/pssalesforcebridge
+copy_module /tmp/pssfmc-runtime-071/pssalesforcebridge
 console prestashop:module install pssalesforcebridge --no-interaction
 
 docker cp "$ROOT/tests/runtime/prestashop-smoke.php" "$PS_CONTAINER:/tmp/prestashop-smoke.php"
@@ -213,7 +213,7 @@ import json
 with open('/tmp/pssfmc-health.json', 'r', encoding='utf-8') as fh:
     report = json.load(fh)
 assert report['mode'] == 'test', report
-assert report['module_version'] == '0.7.0', report
+assert report['module_version'] == '0.7.1', report
 assert report['ok'] is True, report
 PY
 

@@ -54,6 +54,7 @@ final class CartNormalizer
             'newsletter' => is_object($customer) && !empty($customer->newsletter),
             'optin' => is_object($customer) && !empty($customer->optin),
             'customer_active' => is_object($customer) && (!isset($customer->active) || !empty($customer->active)),
+            'customer_deleted' => is_object($customer) && !empty($customer->deleted),
             'is_guest' => is_object($customer) && !empty($customer->is_guest),
             'currency' => (string) $currencyIso,
             'total' => (float) $total,

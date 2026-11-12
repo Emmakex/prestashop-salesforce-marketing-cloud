@@ -134,6 +134,7 @@ jobs:
           php tests/data-cloud-timestamp-contract.php
           php tests/data-cloud-timestamp-quality-contract.php
           php tests/cart-segmentation-contract.php
+          php tests/cart-consent-current-state-contract.php
           php tests/data-cloud-shop-timezone-contract.php
           php tests/data-cloud-v03-payload-contract.php
           php tests/data-cloud-multi-installation-contract.php
@@ -172,24 +173,24 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          VERSION=0.7.0
+          VERSION=0.7.1
           mkdir -p build
           ZIP="build/pssalesforcebridge-${VERSION}.zip"
           zip -r "$ZIP" pssalesforcebridge \
             -x '*/vendor/*' '*.DS_Store'
           unzip -Z1 "$ZIP" | grep -qx 'pssalesforcebridge/pssalesforcebridge.php'
-          unzip -Z1 "$ZIP" | grep -qx 'pssalesforcebridge/upgrade/upgrade-0.7.0.php'
+          unzip -Z1 "$ZIP" | grep -qx 'pssalesforcebridge/upgrade/upgrade-0.7.1.php'
           if unzip -Z1 "$ZIP" | grep -q '^pssalesforcebridge/vendor/'; then
             echo 'vendor directory must not be packaged'
             exit 1
           fi
-          unzip -p "$ZIP" pssalesforcebridge/pssalesforcebridge.php | grep -Fq "\$this->version = '0.7.0';"
+          unzip -p "$ZIP" pssalesforcebridge/pssalesforcebridge.php | grep -Fq "\$this->version = '0.7.1';"
           unzip -p "$ZIP" pssalesforcebridge/composer.json | grep -Fq '"php": ">=7.1"'
           sha256sum "$ZIP" > "${ZIP}.sha256"
       - uses: actions/upload-artifact@v4
         with:
-          name: pssalesforcebridge-0.7.0
+          name: pssalesforcebridge-0.7.1
           path: |
-            build/pssalesforcebridge-0.7.0.zip
-            build/pssalesforcebridge-0.7.0.zip.sha256
+            build/pssalesforcebridge-0.7.1.zip
+            build/pssalesforcebridge-0.7.1.zip.sha256
           if-no-files-found: error

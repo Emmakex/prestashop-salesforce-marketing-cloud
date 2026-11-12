@@ -33,17 +33,20 @@ $moduleFile = $root . '/pssalesforcebridge/pssalesforcebridge.php';
 $composerFile = $root . '/pssalesforcebridge/composer.json';
 $platformFile = $root . '/pssalesforcebridge/src/Compatibility/Platform.php';
 $upgradeFile = $root . '/pssalesforcebridge/upgrade/upgrade-0.7.0.php';
+$patchUpgradeFile = $root . '/pssalesforcebridge/upgrade/upgrade-0.7.1.php';
 
 $module = file_get_contents($moduleFile);
 $composer = json_decode(file_get_contents($composerFile), true);
 $platform = file_get_contents($platformFile);
 $upgrade = file_get_contents($upgradeFile);
+$patchUpgrade = file_get_contents($patchUpgradeFile);
 
-releaseAssert(strpos($module, "\$this->version = '0.7.0';") !== false, 'Module version must be 0.7.0.');
+releaseAssert(strpos($module, "\$this->version = '0.7.1';") !== false, 'Module version must be 0.7.1.');
 releaseAssert(isset($composer['require']['php']) && $composer['require']['php'] === '>=7.1', 'Composer PHP requirement must match the PHP 7.1 compatibility floor.');
 releaseAssert(strpos($platform, "const MIN_PRESTASHOP = '1.7.8.0';") !== false, 'Minimum PrestaShop version must remain 1.7.8.0.');
 releaseAssert(strpos($platform, "const MAX_PRESTASHOP = '9.99.99';") !== false, 'Maximum PrestaShop version must remain within the declared PrestaShop 9 family.');
 releaseAssert(strpos($upgrade, 'CREATE TABLE') === false && strpos($upgrade, 'ALTER TABLE') === false && strpos($upgrade, 'DROP TABLE') === false, '0.7.0 upgrade must not contain schema DDL.');
+releaseAssert(strpos($patchUpgrade, 'CREATE TABLE') === false && strpos($patchUpgrade, 'ALTER TABLE') === false && strpos($patchUpgrade, 'DROP TABLE') === false, '0.7.1 patch must not contain schema DDL.');
 
 $defaults = [
     'PS_SFMC_RETENTION_QUEUE_DAYS' => 30,
@@ -60,7 +63,9 @@ foreach ($defaults as $key => $value) {
 }
 
 require_once $upgradeFile;
+require_once $patchUpgradeFile;
 releaseAssert(function_exists('upgrade_module_0_7_0'), '0.7.0 upgrade function must exist.');
+releaseAssert(function_exists('upgrade_module_0_7_1'), '0.7.1 upgrade function must exist.');
 
 Configuration::$values = [
     'PS_SFMC_RETENTION_QUEUE_DAYS' => 365,
@@ -76,4 +81,9 @@ foreach ($defaults as $key => $value) {
     releaseAssert(Configuration::$values[$key] === $value, 'Upgrade default mismatch for ' . $key . '.');
 }
 
-fwrite(STDOUT, "release contract: ok\n");
+$previousSettings = Configuration::$values;
+releaseAssert(upgrade_module_0_7_1(null) === true, '0.7.1 patch upgrade should succeed.');
+releaseAssert(Configuration::$values === $previousSettings,
+    '0.7.1 patch upgrade must not mutate existing merchant settings.');
+
+fwrite(STDOUT, "release contract: ok\\n");

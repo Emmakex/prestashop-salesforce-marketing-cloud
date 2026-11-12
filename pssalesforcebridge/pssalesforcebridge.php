@@ -32,6 +32,7 @@ require_once __DIR__ . '/src/Order/OrderEventService.php';
 require_once __DIR__ . '/src/Order/OrderDataExtensionWriter.php';
 require_once __DIR__ . '/src/Cart/CartNormalizer.php';
 require_once __DIR__ . '/src/Cart/CartEligibilityPolicy.php';
+require_once __DIR__ . '/src/Cart/CartContactStateReader.php';
 require_once __DIR__ . '/src/Cart/CartRepository.php';
 require_once __DIR__ . '/src/Cart/CartCaptureService.php';
 require_once __DIR__ . '/src/Cart/CartAbandonmentDetector.php';
@@ -105,7 +106,7 @@ class PsSalesforceBridge extends Module
     {
         $this->name = 'pssalesforcebridge';
         $this->tab = 'advertising_marketing';
-        $this->version = '0.7.0';
+        $this->version = '0.7.1';
         $this->author = 'Emmakex';
         $this->need_instance = 0;
         $this->bootstrap = true;
