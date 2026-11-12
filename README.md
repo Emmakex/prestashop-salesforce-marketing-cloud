@@ -12,7 +12,7 @@ The connector is intentionally asynchronous: storefront hooks only persist local
 
 One module targets PrestaShop **1.7.8.x, 8.x and 9.x**. Version-specific behavior must stay behind the compatibility/adaptor boundary; Salesforce-facing contracts remain identical across PrestaShop generations.
 
-The 0.7.0 runtime-certified reference matrix is **PrestaShop 1.7.8.11, 8.2.8 and 9.1.5**. These are exact pinned certifications, not a blanket claim that every patch release in each family has been executed.
+The 0.7.1 target runtime reference matrix is **PrestaShop 1.7.8.11, 8.2.8 and 9.1.5**. These are exact pinned certifications, not a blanket claim that every patch release in each family has been executed.
 
 The source and Composer compatibility floor is PHP **7.1**. Runtime certification against real PrestaShop installations is tracked separately from syntax/contract CI.
 
@@ -20,7 +20,7 @@ See `COMPATIBILITY.md` and `RUNTIME_CERTIFICATION.md` for the certification poli
 
 ## Current scope
 
-Version `0.7.0` provides:
+Version `0.7.1` provides all 0.7.0 capabilities, plus a safety patch requiring first-party newsletter rather than partner opt-in and re-checking current PrestaShop customer status before abandoned-cart Journey sends. The historical 0.7.0 feature list is:
 
 - module installation/uninstallation and sequential upgrade scripts;
 - Salesforce OAuth 2.0 server-to-server configuration and connection test;
@@ -94,7 +94,7 @@ The protected health endpoint and Back Office dashboard expose local operational
 
 Privacy retention runs locally, never deletes unresolved queue work and never removes recovered-order attribution merely to delete token identity. Recovery records that must remain for attribution are anonymized instead.
 
-The 0.7.0 release artifact is versioned as `pssalesforcebridge-0.7.0.zip` and is accompanied by a SHA-256 checksum. CI verifies the embedded module version, Composer PHP floor, upgrade script and package contents before upload.
+The 0.7.1 release artifact is versioned as `pssalesforcebridge-0.7.1.zip` and is accompanied by a SHA-256 checksum. CI verifies the embedded module version, Composer PHP floor, upgrade script and package contents before upload.
 
 Runtime Certification provisions real PrestaShop installations for 1.7.8.11, 8.2.8 and 9.1.5. Each job tests the real 0.6.1 → 0.7.0 upgrade path, a clean 0.7.0 install, tables/configuration/hooks, local customer/cart/order behavior, test-mode delivery safety, backfill/detection/retention, health, protected cron and Front Office reachability. Live Salesforce/Journey delivery remains a separate deployment certification.
 
