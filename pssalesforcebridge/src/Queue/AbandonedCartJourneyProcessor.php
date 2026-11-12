@@ -142,6 +142,27 @@ final class AbandonedCartJourneyProcessor
                     throw new RuntimeException('Current cart snapshot payload is invalid JSON.');
                 }
 
+                // The cart snapshot may predate a newsletter unsubscribe,
+                // account deactivation, deletion or email change. Check the
+                // CURRENT authoritative PrestaShop customer state at send time.
+                $sourceCustomerId = isset($currentPayload['customer_id'])
+                    ? (int) $currentPayload['customer_id'] : 0;
+                $liveContact = \Emmakex\PrestaShopSalesforceMarketingCloud\Cart\CartContactStateReader::read(
+                    $shopId,
+                    $sourceCustomerId
+                );
+                if (!is_array($liveContact)) {
+                    $this->suppress($queueId, 'current_customer_unavailable', $result);
+                    continue;
+                }
+                if (strtolower(trim((string) $liveContact['email']))
+                    !== strtolower(trim(isset($currentPayload['email']) ? (string) $currentPayload['email'] : ''))) {
+                    $this->suppress($queueId, 'customer_email_changed', $result);
+                    continue;
+                }
+                foreach (['newsletter', 'optin', 'customer_active', 'customer_deleted'] as $field) {
+                    $currentPayload[$field] = $liveContact[$field];
+                }
                 $eligibility = $this->eligibility->evaluate($currentPayload, $this->consentMode);
                 if (empty($eligibility['eligible'])) {
                     $reason = isset($eligibility['reason']) ? (string) $eligibility['reason'] : 'ineligible';
