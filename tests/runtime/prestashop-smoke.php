@@ -117,7 +117,7 @@ if ($expectedVersion) {
 runtimeAssert(Module::isInstalled('pssalesforcebridge'), 'module is not installed');
 $module = Module::getInstanceByName('pssalesforcebridge');
 runtimeAssert(is_object($module), 'module instance could not be loaded');
-runtimeAssert((string) $module->version === '0.7.0', 'module runtime version is not 0.7.0');
+runtimeAssert((string) $module->version === '0.7.1', 'module runtime version is not 0.7.1');
 runtimeAssert(!empty($module->id), 'module has no installed id');
 
 $tables = [
@@ -218,7 +218,7 @@ runtimeAssert(is_array($retention), 'retention cron component did not return an 
 $health = $module->healthReport();
 runtimeAssert(is_array($health), 'health report did not return an array');
 runtimeAssert(isset($health['mode']) && $health['mode'] === 'test', 'health report mode mismatch');
-runtimeAssert(isset($health['module_version']) && $health['module_version'] === '0.7.0', 'health report module version mismatch');
+runtimeAssert(isset($health['module_version']) && $health['module_version'] === '0.7.1', 'health report module version mismatch');
 runtimeAssert(!empty($health['ok']), 'health report should be healthy in test mode');
 
 $preflight = \Emmakex\PrestaShopSalesforceMarketingCloud\DataCloud\PrestaShopReadinessProbe::inspect(
