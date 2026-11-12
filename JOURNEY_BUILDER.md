@@ -56,6 +56,9 @@ The queue event is revalidated immediately before calling Salesforce. Delivery i
 - the cart is no longer in `abandoned` state;
 - the cart is empty or no longer eligible;
 - the configured consent policy no longer permits the contact;
+- the latest authoritative PrestaShop customer record is missing, deleted, inactive, associated with a different shop, or its email has changed;
+- the customer is no longer subscribed to the first-party newsletter in default `marketing_optin` mode (partner `optin` does not count);
+- externally managed unsubscribe/suppression and the message's legal purpose have not been verified before activation;
 - the abandonment window has changed.
 
 Suppressed events are considered terminally processed locally and are never sent to Journey Builder.
