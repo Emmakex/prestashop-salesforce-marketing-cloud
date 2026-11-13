@@ -17,6 +17,8 @@ Cada objeto del esquema de Ingestion API se convertirá, una vez publicado y apr
 
 Se mantienen dos espacios de identidad **por objeto**: un cliente y un pedido de una tienda pueden tener textualmente el mismo `source_key`, pero eso **no** autoriza guardar ambas entidades en el mismo DMO, ni mezclar sus identificadores. El namespace debe ser único por instalación (G3-01 aún pendiente).
 
+**Hallazgo real en ABH (13/11/2026):** la lectura GET de metadatos [run #43488387453](https://github.com/Emmakex/prestashop-salesforce-marketing-cloud/actions/runs/43488387453) vio el DMO `SalesOrder` pero **su categoría no coincidió** con `OTHER`; los campos `SoldToCustomerId` y `BillToContactId` existen, pero la relación con Individual **no quedó confirmada**. La categoría **DMO** leída no implica por sí misma categoría **Data Stream**. Las relaciones estándar pueden estar inactivas hasta completar mapeos de campos. Se prepara una segunda lectura estrictamente de metadatos para registrar la categoría exacta saneada y las relaciones visibles desde ambos lados. Hasta entonces no cambiar ni aprobar `config/g3-pst-dlo-dmo-mapping-candidate.json`.
+
 ## 2. Relación 1:N propuesta, no activada
 
 `PSOrder.customer_source_key` debe coincidir exactamente con `PSCustomer.source_key` y pertenecer al **mismo** `source_namespace` y `shop_id`. Una cadena `ps_1_17` por sí sola no identifica globalmente un cliente, por lo que nunca debemos unir relaciones por email, nombres, `customer_id` aislado o coincidencias entre comerciantes.

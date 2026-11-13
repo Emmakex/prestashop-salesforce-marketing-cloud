@@ -1,19 +1,28 @@
 # G3-05/G3-06 · Verificación del catálogo DMO real de ABH, solo lectura
 
-**13/11/2026.** **Comercio:** ABH / Barcelona Confort. **Producto:** Marketing Cloud Growth/Next sobre Core + Data 360, **NO** Engagement.  
+**13/11/2026, segunda lectura de catálogo.** **Comercio:** ABH / Barcelona Confort. **Producto:** Marketing Cloud Growth/Next sobre Core + Data 360, **NO** Engagement.  
 **Gate:** G3 permanece bloqueado por aprobaciones del responsable; ningún catálogo consultado autoriza cambiar el esquema o los mapeos.
 
 ## Qué se va a inspeccionar realmente
 
-La API oficial **Salesforce Data 360 Connect REST** permite consultar metadatos de DMO y relaciones mediante `GET /services/data/v68.0/ssot/data-model-objects/{apiName}`. En este proyecto, versión REST v68.0 ya observada. El [workflow protegido](../.github/workflows/g3-dmo-catalog-readonly.yml) ejecuta **solo tres consultas GET fijas** usando la misma External Client App Growth y el mismo entorno GitHub `salesforce-growth-certification`. No solicita secretos nuevos ni modifica permisos.
+La API oficial **Salesforce Data 360 Connect REST** permite consultar metadatos de DMO y relaciones mediante `GET /services/data/v68.0/ssot/data-model-objects/{apiName}`. En este proyecto, versión REST v68.0 ya observada. El [workflow protegido](../.github/workflows/g3-dmo-catalog-readonly.yml) ejecuta **solo cuatro consultas GET fijas** usando la misma External Client App Growth y el mismo entorno GitHub `salesforce-growth-certification`. No solicita secretos nuevos ni modifica permisos.
 
 | Consulta | Qué se comprueba | Qué no demuestra |
 |---|---|---|
 | `GET …/ssot__Individual__dlm` | Existencia/lectura de Individual, categoría `PROFILE`, Data Space `default`, `ssot__Id__c` PK | Que sea el DMO aprobado para PSCustomer o que existan datos |
 | `GET …/ssot__SalesOrder__dlm` | Existencia/lectura de Sales Order, categoría `OTHER`, PK, posibles campos `SoldToCustomerId` / `BillToContactId` | Que un campo concreto sea el destino correcto de `PSOrder.customer_source_key` |
-| `GET …/ssot__SalesOrder__dlm/relationships` | Si es accesible, detecta solo las relaciones **del DMO Sales Order hacia Individual** y los campos candidatos | Que esa relación esté usada por el mapeo PST o que se haya guardado el DLO→DMO |
+| `GET …/ssot__SalesOrder__dlm/relationships` | Cuenta las relaciones visibles desde Sales Order, sin publicar sus nombres ni IDs; reconoce exclusivamente los campos candidatos hacia Individual | Que una relación no visible esté ausente en la definición estándar |
+| `GET …/ssot__Individual__dlm/relationships` | Segunda perspectiva de las relaciones visibles que involucren Individual y Sales Order | Que exista ya un mapeo DLO→DMO o una relación activa en ABH |
 
-Las respuestas se reducen **solo** a indicadores booleanos conocidos: ningún nombre de campo personalizado, objeto desconocido, dato individual, ID de Salesforce, token, URL real del tenant ni respuesta HTTP original se publica. Errores `401`, `403`, `404` o formatos no admitidos quedan como código fijo, sin cuerpo de error. Si la consulta de relaciones devuelve `403/404`, la evidencia indicará *metadata_accessible=false*, **no** “no existe relación”.
+Las respuestas se reducen **solo** a indicadores booleanos conocidos, categoría explícita de la allowlist `PROFILE / OTHER / ENGAGEMENT / UNRECOGNIZED` y recuentos limitados de relaciones: ningún nombre de campo personalizado, objeto desconocido, dato individual, ID de Salesforce, token, URL real del tenant ni respuesta HTTP original se publica. Errores `401`, `403`, `404` o formatos no admitidos quedan como código fijo, sin cuerpo de error. Si la consulta de relaciones devuelve `403/404`, la evidencia indicará *metadata_accessible=false*, **no** “no existe relación”.
+
+## Evidencia del primer GET real y por qué se amplía la lectura
+
+El [run #43488387453](https://github.com/Emmakex/prestashop-salesforce-marketing-cloud/actions/runs/43488387453) en el commit `e4435ee` confirmó `Individual` con categoría `PROFILE` y PK visible, además de `SalesOrder` con PK y dos campos candidatos visibles, pero su categoría **no coincidió** con la propuesta `OTHER`. El lector inicial ocultaba el valor concreto y consultaba relaciones solo desde `SalesOrder`, sin encontrar una relación hacia `Individual` con esos campos.
+
+La segunda lectura reportará únicamente la categoría de Salesforce como **enum saneado** y recuentos de relaciones en ambas direcciones. Salesforce indica que relaciones estándar pueden permanecer inactivas hasta mapear los campos pertinentes; **cero relaciones visibles no es prueba de inexistencia**. La categoría observada del **DMO** tampoco debe confundirse con una autorización de categoría para el **Data Stream** PST. No se elegirán ni guardarán mapeos como consecuencia de la lectura.
+
+Documentación: [Get DMO/relationships, Connect REST](https://developer.salesforce.com/docs/data/connectapi/references/spec?meta=type%3AOutput+D360+Node+Input) y [relaciones estándar activas/inactivas](https://help.salesforce.com/s/articleView?id=data.c360_a_data_model_object_relationships.htm&language=en_US&type=5).
 
 ## Seguridad y activación
 

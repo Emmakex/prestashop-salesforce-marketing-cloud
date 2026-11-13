@@ -55,51 +55,16 @@ final class G3TenantDmoCatalogProbe
             ),
         ];
 
-        // A missing relationship endpoint must NOT be interpreted as a
-        // verified absence of relationship; permissions may differ.
-        $relationsResult = $this->fetch(
+        // Both directions are inspected. The documented endpoint can list a
+        // DMO as either source or target. An unreported standard relationship
+        // may simply be inactive until its fields are mapped.
+        $orderRelations = $this->fetch(
             $api . 'ssot__SalesOrder__dlm/relationships', $transport, true
         );
-        $relation = [
-            'metadata_accessible' => $relationsResult !== null,
-            'sales_order_to_individual_candidate_present' => false,
-            'sold_to_customer_relation_seen' => false,
-            'bill_to_contact_relation_seen' => false,
-        ];
-        if ($relationsResult !== null) {
-            if (!isset($relationsResult['relationships'])
-                || !is_array($relationsResult['relationships'])
-                || count($relationsResult['relationships']) > 250) {
-                throw new RuntimeException('g3_dmo_invalid_relationship_metadata');
-            }
-            foreach ($relationsResult['relationships'] as $entry) {
-                if (!is_array($entry)
-                    || !isset($entry['sourceEntity'], $entry['targetEntity'])
-                    || !is_array($entry['sourceEntity'])
-                    || !is_array($entry['targetEntity'])) {
-                    // Unknown/unexpected metadata cannot certify a link.
-                    continue;
-                }
-                if (!isset($entry['sourceEntity']['name'],
-                    $entry['targetEntity']['name'])
-                    || $entry['sourceEntity']['name'] !== 'ssot__SalesOrder__dlm'
-                    || $entry['targetEntity']['name'] !== 'ssot__Individual__dlm'
-                    || !isset($entry['sourceField'])
-                    || !is_array($entry['sourceField'])
-                    || !isset($entry['sourceField']['name'])) {
-                    continue;
-                }
-                if ($entry['sourceField']['name'] === 'ssot__SoldToCustomerId__c') {
-                    $relation['sold_to_customer_relation_seen'] = true;
-                }
-                if ($entry['sourceField']['name'] === 'ssot__BillToContactId__c') {
-                    $relation['bill_to_contact_relation_seen'] = true;
-                }
-            }
-            $relation['sales_order_to_individual_candidate_present'] =
-                $relation['sold_to_customer_relation_seen']
-                || $relation['bill_to_contact_relation_seen'];
-        }
+        $individualRelations = $this->fetch(
+            $api . 'ssot__Individual__dlm/relationships', $transport, true
+        );
+        $relation = self::summarizeRelations($orderRelations, $individualRelations);
 
         return [
             'stage' => 'g3_data_360_dmo_catalog_readonly',
@@ -116,6 +81,80 @@ final class G3TenantDmoCatalogProbe
             'salesforce_record_reads' => false,
             'salesforce_data_writes' => false,
         ];
+    }
+
+    /**
+     * Report only bounded counts and a fixed allowlist of field matches.
+     * Visibility is NOT approval or a proof of source-mapped relationship.
+     */
+    private static function summarizeRelations($orderRelations, $individualRelations)
+    {
+        $result = [
+            'metadata_accessible' => $orderRelations !== null,
+            'individual_relationship_metadata_accessible' =>
+                $individualRelations !== null,
+            'sales_order_relationship_count' => null,
+            'individual_relationship_count' => null,
+            'any_relation_between_objects_seen' => false,
+            'sales_order_to_individual_candidate_present' => false,
+            'sold_to_customer_relation_seen' => false,
+            'bill_to_contact_relation_seen' => false,
+            'active_candidate_relation_seen' => false,
+            'standard_relation_unmapped_cannot_be_excluded' => true,
+        ];
+        foreach (['sales_order' => $orderRelations,
+            'individual' => $individualRelations] as $which => $listing) {
+            if ($listing === null) {
+                continue;
+            }
+            if (!isset($listing['relationships'])
+                || !is_array($listing['relationships'])
+                || count($listing['relationships']) > 250) {
+                throw new RuntimeException('g3_dmo_invalid_relationship_metadata');
+            }
+            $result[$which . '_relationship_count'] =
+                count($listing['relationships']);
+            foreach ($listing['relationships'] as $entry) {
+                if (!is_array($entry) || !isset(
+                    $entry['sourceEntity']['name'], $entry['targetEntity']['name']
+                ) || !is_string($entry['sourceEntity']['name'])
+                || !is_string($entry['targetEntity']['name'])) {
+                    continue;
+                }
+                $source = $entry['sourceEntity']['name'];
+                $target = $entry['targetEntity']['name'];
+                $forward = $source === 'ssot__SalesOrder__dlm'
+                    && $target === 'ssot__Individual__dlm';
+                $reverse = $source === 'ssot__Individual__dlm'
+                    && $target === 'ssot__SalesOrder__dlm';
+                if (!$forward && !$reverse) {
+                    continue;
+                }
+                $result['any_relation_between_objects_seen'] = true;
+                // Reverse relationships expose SalesOrder fields as the
+                // targetField rather than the sourceField.
+                $field = $forward ? 'sourceField' : 'targetField';
+                if (!isset($entry[$field]['name'])
+                    || !is_string($entry[$field]['name'])) {
+                    continue;
+                }
+                $name = $entry[$field]['name'];
+                if ($name === 'ssot__SoldToCustomerId__c') {
+                    $result['sold_to_customer_relation_seen'] = true;
+                } elseif ($name === 'ssot__BillToContactId__c') {
+                    $result['bill_to_contact_relation_seen'] = true;
+                } else {
+                    continue;
+                }
+                if (isset($entry['status']) && $entry['status'] === 'ACTIVE') {
+                    $result['active_candidate_relation_seen'] = true;
+                }
+            }
+        }
+        $result['sales_order_to_individual_candidate_present'] =
+            $result['sold_to_customer_relation_seen']
+            || $result['bill_to_contact_relation_seen'];
+        return $result;
     }
 
     private static function summarize(array $entry, $expectedName,
@@ -145,10 +184,17 @@ final class G3TenantDmoCatalogProbe
                 $pk = true;
             }
         }
+        // Do not leak arbitrary tenant metadata but do expose which exact
+        // documented category was observed. This fixes the previous opaque
+        // true/false mismatch, without treating it as an authorization.
+        $category = strtoupper(trim($entry['category']));
+        if (!in_array($category, ['PROFILE', 'ENGAGEMENT', 'OTHER'], true)) {
+            $category = 'UNRECOGNIZED';
+        }
         return [
             'metadata_readable' => true,
-            'category_matches_proposal' =>
-                strtoupper($entry['category']) === $expectedCategory,
+            'observed_category' => $category,
+            'category_matches_proposal' => $category === $expectedCategory,
             'data_space_matches_observed_default' =>
                 isset($entry['dataSpaceName'])
                 && $entry['dataSpaceName'] === 'default',
@@ -167,6 +213,8 @@ final class G3TenantDmoCatalogProbe
                 . '/ssot/data-model-objects/ssot__SalesOrder__dlm',
             '/services/data/' . self::API_VERSION
                 . '/ssot/data-model-objects/ssot__SalesOrder__dlm/relationships',
+            '/services/data/' . self::API_VERSION
+                . '/ssot/data-model-objects/ssot__Individual__dlm/relationships',
         ];
         if (!in_array($path, $allowed, true)) {
             throw new RuntimeException('g3_dmo_path_not_allowlisted');
