@@ -50,6 +50,32 @@ function g3UpgradeRun()
     $phase = isset($GLOBALS['argv'][1]) ? $GLOBALS['argv'][1] : '';
     $baselinePath = '/tmp/g3-upgrade-baseline.json';
     $snapshot = g3UpgradeSnapshot();
+    if ($phase === 'removed') {
+        $baseline = json_decode((string) file_get_contents($baselinePath), true);
+        g3UpgradeCheck(!Module::isInstalled('pssalesforcebridge'), 'native_uninstall_failed');
+        g3UpgradeCheck(is_array($baseline) && $baseline === $snapshot,
+            'native_uninstall_deleted_legacy_data_or_configuration');
+        $db = Db::getInstance();
+        foreach (['g3_provider_binding_v1', 'g3_growth_outbox_v1',
+            'g3_growth_entity_ledger_v1'] as $name) {
+            g3UpgradeCheck((int) $db->getValue(
+                "SELECT COUNT(*) FROM information_schema.TABLES
+                 WHERE TABLE_SCHEMA = DATABASE()
+                 AND TABLE_NAME = '" . _DB_PREFIX_ . $name . "'"
+            ) === 1, 'native_uninstall_deleted_growth_schema');
+        }
+        g3UpgradeCheck((int) $db->getValue(
+            'SELECT COUNT(*) FROM ' . _DB_PREFIX_ . "g3_growth_outbox_v1
+             WHERE source_namespace = 'growth_ci_abhtest'
+             AND entity_id = 29001 AND status = 'blocked'"
+        ) === 1, 'native_uninstall_deleted_growth_observation');
+        g3UpgradeCheck((int) $db->getValue(
+            'SELECT COUNT(*) FROM ' . _DB_PREFIX_ . "g3_growth_entity_ledger_v1
+             WHERE source_namespace = 'growth_ci_abhtest'
+             AND entity_id = 29001 AND status = 'blocked'"
+        ) === 1, 'native_uninstall_deleted_growth_ledger');
+        return;
+    }
     $module = Module::getInstanceByName('pssalesforcebridge');
     g3UpgradeCheck(is_object($module), 'module_missing');
     if ($phase === 'before') {
@@ -79,10 +105,13 @@ function g3UpgradeRun()
     $customer = $module->processCustomerQueue(1);
     $order = $module->processOrderQueue(1);
     $cart = $module->processAbandonedCartJourneyQueue(1);
-    g3UpgradeCheck(isset($customer['skipped']) && $customer['skipped'] === 'test_mode'
-        && isset($order['skipped']) && $order['skipped'] === 'test_mode'
-        && isset($cart['skipped']) && $cart['skipped'] === 'test_mode',
-        'legacy_sender_not_blocked');
+    g3UpgradeCheck(isset($customer['skipped'])
+        && $customer['skipped'] === 'g3_growth_delivery_not_approved'
+        && isset($order['skipped'])
+        && $order['skipped'] === 'g3_growth_delivery_not_approved'
+        && isset($cart['skipped'])
+        && $cart['skipped'] === 'g3_growth_delivery_not_approved',
+        'growth_binding_failed_to_block_engagement_senders');
 
     $db = Db::getInstance();
     $outbox = _DB_PREFIX_ . 'g3_growth_outbox_v1';
