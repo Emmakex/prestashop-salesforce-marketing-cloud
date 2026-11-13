@@ -25,6 +25,8 @@
 
 **Advertencia de evidencia G3-06:** las respuestas de 20 relaciones vistas en los primeros runs eran **páginas truncadas por defecto**, no catálogos íntegros. [Nueva comprobación paginada y acotada](G3_ABH_DMO_TENANT_READONLY_DISCOVERY.md). Hasta certificar la completitud, no afirmar que `SalesOrder` carece de relación con `Account` o `Individual` ni considerar la opción C como decisión impuesta por Salesforce. G3 sigue sin aprobación.
 
+**G3-08 · Cobertura real del objetivo de negocio:** [verificador reproducible de campañas de clientes, carritos abandonados y supresión por compra](G3_08_BUSINESS_GOAL_COVERAGE.md). Los esquemas v0.2/v0.3 **no contienen PSCart** y no habilitan por sí solos recuperación de carritos; la alternativa G3-06 de pedidos aislados tampoco resuelve automáticamente la segmentación de compradores en Data 360. La inspección completa [ABH run #43495007989](https://github.com/Emmakex/prestashop-salesforce-marketing-cloud/actions/runs/43495007989) no encontró relaciones candidatas visibles en 527 metadatos completos; **no se infiere imposibilidad de configurarlas ni una decisión de arquitectura**. Ninguna autorización G3/G4/G7 cambia.
+
 ## Qué necesita decidir cada responsable
 
 Esta hoja separa **propuesta técnica**, **evidencia necesaria** y **decisión humana**. No atribuye permisos al indicador newsletter, no fija plazos legales, no transforma fechas históricas inciertas, no elige el esquema automáticamente y no invoca ningún servicio de Salesforce.
