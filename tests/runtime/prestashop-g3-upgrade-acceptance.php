@@ -8,6 +8,13 @@ if (PHP_SAPI !== 'cli' || getenv('GITHUB_ACTIONS') !== 'true'
 }
 require_once '/var/www/html/config/config.inc.php';
 require_once '/tmp/G3PrestaShopRuntimeLifecycleCandidate.php';
+// The installed candidate already loads this class from its own module.
+// On the removed phase, load it only if no module class has been loaded.
+$g3Phase = isset($argv[1]) ? $argv[1] : '';
+if (in_array($g3Phase, ['removed', 'reinstalled'], true)
+    && !class_exists('G3CandidateCredentialLifecycle', false)) {
+    require_once '/var/www/html/modules/pssalesforcebridge/src/Provider/G3CandidateCredentialLifecycle.php';
+}
 
 function g3UpgradeCheck($ok, $reason)
 {
@@ -74,6 +81,60 @@ function g3UpgradeRun()
              WHERE source_namespace = 'growth_ci_abhtest'
              AND entity_id = 29001 AND status = 'blocked'"
         ) === 1, 'native_uninstall_deleted_growth_ledger');
+
+        foreach (G3CandidateCredentialLifecycle::sensitiveKeys() as $key) {
+            g3UpgradeCheck(Configuration::get($key) === false,
+                'native_uninstall_left_stale_credential');
+        }
+        return;
+    }
+    if ($phase === 'reinstalled') {
+        $baseline = json_decode((string) file_get_contents($baselinePath), true);
+        g3UpgradeCheck(Module::isInstalled('pssalesforcebridge'),
+            'native_reinstall_missing_module');
+        g3UpgradeCheck(is_array($baseline) && $baseline === $snapshot,
+            'native_reinstall_reset_operator_settings_or_legacy_data');
+
+        foreach (G3CandidateCredentialLifecycle::sensitiveKeys() as $key) {
+            if ($key !== 'PS_SFMC_CRON_TOKEN') {
+                g3UpgradeCheck(Configuration::get($key) === false,
+                    'native_reinstall_revived_legacy_credentials_or_routes');
+            }
+        }
+        $newToken = (string) Configuration::get('PS_SFMC_CRON_TOKEN');
+        $oldTokenHash = trim((string) file_get_contents('/tmp/g3-old-cron-sha256.txt'));
+        g3UpgradeCheck((bool) preg_match('/^[a-f0-9]{48}$/D', $newToken)
+            && hash('sha256', $newToken) !== $oldTokenHash,
+            'native_reinstall_reused_cron_token');
+
+        $candidate = new G3PrestaShopRuntimeLifecycleCandidate();
+        g3UpgradeCheck(count($candidate->present()) === 3
+            && $candidate->install('ABH', 'marketing_cloud_growth',
+                'growth_ci_abhtest') === 'already_installed',
+            'native_reinstall_lost_provider_binding');
+
+        $db = Db::getInstance();
+        g3UpgradeCheck((int) $db->getValue(
+            'SELECT COUNT(*) FROM ' . _DB_PREFIX_ . "g3_growth_outbox_v1
+             WHERE source_namespace = 'growth_ci_abhtest'
+             AND entity_id = 29001 AND status = 'blocked'"
+        ) === 1, 'native_reinstall_lost_growth_observation');
+        g3UpgradeCheck((int) $db->getValue(
+            'SELECT COUNT(*) FROM ' . _DB_PREFIX_ . "g3_growth_entity_ledger_v1
+             WHERE source_namespace = 'growth_ci_abhtest'
+             AND entity_id = 29001 AND status = 'blocked'"
+        ) === 1, 'native_reinstall_lost_growth_ledger');
+        $module = Module::getInstanceByName('pssalesforcebridge');
+        g3UpgradeCheck(is_object($module) && (string) $module->version === '0.8.0',
+            'native_reinstall_version_mismatch');
+        $customer = $module->processCustomerQueue(1);
+        $order = $module->processOrderQueue(1);
+        $cart = $module->processAbandonedCartJourneyQueue(1);
+        g3UpgradeCheck(isset($customer['skipped'], $order['skipped'], $cart['skipped'])
+            && $customer['skipped'] === 'g3_growth_delivery_not_approved'
+            && $order['skipped'] === 'g3_growth_delivery_not_approved'
+            && $cart['skipped'] === 'g3_growth_delivery_not_approved',
+            'native_reinstall_allowed_outbound_delivery');
         return;
     }
     $module = Module::getInstanceByName('pssalesforcebridge');
@@ -83,6 +144,30 @@ function g3UpgradeRun()
             && $snapshot['mode'] === 'test', 'before_version_or_mode');
         $candidate = new G3PrestaShopRuntimeLifecycleCandidate();
         g3UpgradeCheck(count($candidate->present()) === 0, 'stale_candidate_tables');
+
+        // Synthetic CI-only legacy credentials ensure removal is exercised.
+        // Never record these values in an artifact or CLI output.
+        foreach ([
+            'PS_SFMC_AUTH_BASE_URI' => 'https://example.invalid/ci-auth',
+            'PS_SFMC_REST_BASE_URI' => 'https://example.invalid/ci-rest',
+            'PS_SFMC_CLIENT_ID' => 'g3-ci-only-client-id',
+            'PS_SFMC_CLIENT_SECRET' => 'g3-ci-only-synthetic-secret',
+            'PS_SFMC_ACCOUNT_ID' => 'g3-ci-only-account',
+        ] as $key => $value) {
+            g3UpgradeCheck(Configuration::updateValue($key, $value),
+                'cannot_seed_synthetic_credentials');
+        }
+        g3UpgradeCheck(Configuration::updateValue('PS_SFMC_CART_ABANDON_MINUTES', 77)
+            && Configuration::updateValue('PS_SFMC_RETENTION_QUEUE_DAYS', 73),
+            'cannot_seed_nondefault_settings');
+
+        $originalToken = (string) Configuration::get('PS_SFMC_CRON_TOKEN');
+        g3UpgradeCheck((bool) preg_match('/^[a-f0-9]{48}$/D', $originalToken),
+            'original_cron_token_invalid');
+        g3UpgradeCheck(file_put_contents(
+            '/tmp/g3-old-cron-sha256.txt', hash('sha256', $originalToken)
+        ) !== false, 'cannot_record_token_fingerprint');
+        $snapshot = g3UpgradeSnapshot();
         g3UpgradeCheck(file_put_contents($baselinePath, json_encode($snapshot)) !== false,
             'cannot_write_fixture_baseline');
         return;
@@ -96,6 +181,8 @@ function g3UpgradeRun()
         'legacy_data_or_settings_mutated');
     g3UpgradeCheck((string) $module->version === '0.8.0' && $snapshot['mode'] === 'test',
         'candidate_version_or_test_mode');
+    g3UpgradeCheck(Configuration::get('PS_SFMC_CLIENT_SECRET')
+        === 'g3-ci-only-synthetic-secret', 'upgrade_unexpectedly_changed_credentials');
     $candidate = new G3PrestaShopRuntimeLifecycleCandidate();
     g3UpgradeCheck(count($candidate->present()) === 3, 'new_tables_missing');
     g3UpgradeCheck($candidate->install('ABH', 'marketing_cloud_growth', 'growth_ci_abhtest')

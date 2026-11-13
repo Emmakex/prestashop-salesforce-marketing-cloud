@@ -149,6 +149,7 @@ jobs:
           php tests/data-cloud-atomic-utc-acceptance-contract.php
           php tests/g3-prestashop-adapter-contract.php
           php tests/g3-provider-egress-contract.php
+          php tests/g3-credential-lifecycle-contract.php
           php tests/cart-segmentation-contract.php
           php tests/cart-consent-current-state-contract.php
           php tests/marketing-recovery-suppression-readiness-contract.php

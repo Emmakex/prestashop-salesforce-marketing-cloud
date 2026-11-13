@@ -15,7 +15,11 @@ cleanup() {
   set +e
   if docker ps -a --format '{{.Names}}' | grep -qx "$PS_CONTAINER"; then
     echo '--- PrestaShop logs ---'
-    docker logs "$PS_CONTAINER" 2>&1 | tail -n 200 || true
+    # Local CI cron bearer appears in Apache access URLs on failures.
+    # Never expose even synthetic bearer values in exported job logs.
+    docker logs "$PS_CONTAINER" 2>&1 \
+      | sed -E 's/([?&]token=)[^ &"]+/\1[REDACTED]/g' \
+      | tail -n 200 || true
     docker rm -f "$PS_CONTAINER" >/dev/null 2>&1 || true
   fi
   if docker ps -a --format '{{.Names}}' | grep -qx "$DB_CONTAINER"; then
@@ -261,6 +265,8 @@ GITHUB_ACTIONS=true G3_RUNTIME_CI_ONLY=yes_disposable_prestashop \
 mkdir -p /tmp/pssfmc-runtime-080/pssalesforcebridge/src/Provider
 cp "$ROOT/tests/runtime/G3CandidateProviderGate.php" \
   /tmp/pssfmc-runtime-080/pssalesforcebridge/src/Provider/G3CandidateProviderGate.php
+cp "$ROOT/tests/runtime/G3CandidateCredentialLifecycle.php" \
+  /tmp/pssfmc-runtime-080/pssalesforcebridge/src/Provider/G3CandidateCredentialLifecycle.php
 cp "$ROOT/tests/runtime/g3-candidate-upgrade-0.8.0.php" \
    /tmp/pssfmc-runtime-080/pssalesforcebridge/upgrade/upgrade-0.8.0.php
 docker cp "$ROOT/tests/runtime/prestashop-g3-upgrade-acceptance.php" \
@@ -304,5 +310,16 @@ docker exec -u www-data \
     php bin/console prestashop:module uninstall pssalesforcebridge --no-interaction
 test "$(sql "SELECT COUNT(*) FROM ps_module WHERE name='pssalesforcebridge'")" = '0'
 g3_fixture_php /tmp/prestashop-g3-upgrade-acceptance.php removed
+
+echo "==> G3 future 0.8.0 native reinstall: no stale credentials; preserve history"
+docker exec -u www-data \
+    -e GITHUB_ACTIONS=true \
+    -e G3_RUNTIME_CI_ONLY=yes_disposable_prestashop \
+    -e G3_080_UPGRADE_FIXTURE=candidate_ci_only \
+    -e EXPECTED_PS_VERSION="$PS_VERSION" \
+    -w /var/www/html "$PS_CONTAINER" \
+    php bin/console prestashop:module install pssalesforcebridge --no-interaction
+test "$(sql "SELECT version FROM ps_module WHERE name='pssalesforcebridge'")" = '0.8.0'
+g3_fixture_php /tmp/prestashop-g3-upgrade-acceptance.php reinstalled
 
 echo "runtime certification: PASS for PrestaShop ${PS_VERSION}"
