@@ -1,0 +1,43 @@
+{
+  "contract_version": 1,
+  "snapshot_label": "G3_ABH_PST_DRAFT_REVIEW_2026_11_13",
+  "merchant": "ABH",
+  "target_product": "marketing_cloud_growth_data_360",
+  "connector_alias": "PST",
+  "review_only": true,
+  "owner_signoff": "pending",
+  "approved_by": null,
+  "approved_at": null,
+  "schema_to_publish": "undecided",
+  "data_360_upload_authorized": false,
+  "data_360_ingestion_authorized": false,
+  "growth_marketing_sends_authorized": false,
+  "open_decision_ids": [
+    "G3-01",
+    "G3-02",
+    "G3-03",
+    "G3-04",
+    "G3-05",
+    "G3-06",
+    "G3-07",
+    "G3-08"
+  ],
+  "artifacts": {
+    "schemas/ABH_PST_SCHEMA_REVIEW.yaml": {
+      "sha256": "8595c2f9acb5be388ba3b2ec156ec65379ab04bf5ebf3718e63231cb06b43e9d",
+      "candidate_version": "v0.2",
+      "field_count": 22
+    },
+    "schemas/ABH_PST_SCHEMA_UTC_CANDIDATE.yaml": {
+      "sha256": "3405a884d9cbe7691ad363825f3a730cf88a6742117925113a4f36633cda05f0",
+      "candidate_version": "v0.3",
+      "field_count": 24
+    },
+    "config/g3-pst-schema-review.json": {
+      "sha256": "e1b1894cce21afce84a5806edca4ea5645a672a041c46805340895a189fcc4db",
+      "candidate_version": "pending_owner_review",
+      "field_count": 24
+    }
+  },
+  "caveat": "Integrity snapshot only; a SHA256 fingerprint is NOT a data-owner signature or tenant upload permission."
+}
