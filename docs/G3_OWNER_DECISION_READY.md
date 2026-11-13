@@ -11,6 +11,8 @@
 
 **Nueva evidencia técnica G3-01 (sin aprobación):** [rotación/revocación atómica de claves, versiones de desafío y rechazo de claves comprometidas](G3_INSTALLATION_KEY_LIFECYCLE_CI.md), con [ADR de alternativas pendiente](adr/2026-11-13-g3-key-rotation-revocation-candidate.md). El operador central, la custodia externa y la recuperación aún requieren revisión y aprobación.
 
+**G3-02/G3-07 — matriz lista para decisión:** [24 campos y alternativas de minimización, finalidad y retención](G3_FIELD_PURPOSE_MINIMIZATION_SIGNOFF.md); [registro machine-readable](../config/g3-field-purpose-owner-decisions.json) con permisos de exportación y marketing expresamente bloqueados. No supone aprobación legal ni de esquema.
+
 ## Qué necesita decidir cada responsable
 
 Esta hoja separa **propuesta técnica**, **evidencia necesaria** y **decisión humana**. No atribuye permisos al indicador newsletter, no fija plazos legales, no transforma fechas históricas inciertas, no elige el esquema automáticamente y no invoca ningún servicio de Salesforce.
