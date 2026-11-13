@@ -225,7 +225,9 @@ jobs:
           php -l tests/integration/G3SandboxPdoJournal.php
           php -l tests/integration/g3_mysql_acceptance.php
       - name: Test real transactional journal, rollback and concurrent dedupe (CI database ONLY)
-        run: php tests/integration/g3_mysql_acceptance.php
+        run: |
+          php tests/integration/g3_mysql_acceptance.php
+          php tests/integration/g3_prestashop_071_queue_mirror.php
 
   package:
     name: Build release package
