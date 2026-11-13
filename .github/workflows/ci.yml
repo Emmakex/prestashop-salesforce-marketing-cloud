@@ -178,6 +178,8 @@ jobs:
         run: |
           python scripts/ci/verify-g3-schema-review.py
           python -m unittest discover -s tests -p 'test_g3_schema_review.py'
+          python scripts/ci/verify-bc-timestamp-sql-readonly.py
+          python -m unittest discover -s tests -p 'test_bc_timestamp_sql_readonly.py'
 
   package:
     name: Build release package

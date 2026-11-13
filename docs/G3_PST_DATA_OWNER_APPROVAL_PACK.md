@@ -9,6 +9,24 @@
 - **Sin verificar/aprobar:** finalización de campos, finalidad y retención, fuente de verdad de UTC histórico, namespace definitivo y unicidad global, categorías/PK, refresh, Record Modified, mapeo DLO→DMO, bajas y permisos de envío. Ninguno de los dos YAML se puede subir aún.
 - **No confundir:** el historial de BC conserva 99 emails con algún indicador positivo, pero no constituye una audiencia Growth autorizada.
 
+### Preflight de BC confirmado sin acceso SQL del usuario
+
+Captura del Back Office del módulo 0.7.1, 13/11/2026: tienda **1**,
+`PS_TIMEZONE=Europe/Madrid`, **3/3 controles locales PASS**,
+`customer.date_add/date_upd` y `orders.date_add/date_upd`
+como `DATETIME`. El panel permanece **BLOCKED — review only** por
+diseño. Esto certifica **metadatos actuales**, NO la zona horaria
+histórica usada al escribir cada fila, la legalidad de envíos,
+la aprobación de UTC v0.3 ni los Data Streams.
+
+El responsable no tiene acceso SQL directo a producción; no se le debe
+volver a exigir phpMyAdmin. Evidencia detallada y opción SQL
+solo para DBA autorizado en
+[`BC_G3_TIMESTAMP_PROVENANCE_AUDIT.md`](BC_G3_TIMESTAMP_PROVENANCE_AUDIT.md).
+La auditoría de fechas históricas queda pendiente; el avance técnico
+se centrará en capturas futuras con UTC fiable y separación explícita
+de históricos de procedencia desconocida.
+
 ## Inventario completo y clasificación
 
 Este inventario procede exactamente de los dos YAML del repositorio y del mapper. El fichero `config/g3-pst-schema-review.json` lo mantiene sincronizado mediante CI y marca las decisiones como propuestas. Ningún campo aparece como autorización comercial por defecto.
@@ -47,6 +65,20 @@ Este inventario procede exactamente de los dos YAML del repositorio y del mapper
 | `source_updated_local` | v0.2 y v0.3 | Tiempo ambiguo | Timezone/DST provenance unknown. No ordering/Record Modified use. |
 | `source_updated_utc` | Solo v0.3 | Fecha candidata | v0.3 only; must not be derived from historical local time without provenance. |
 
+
+> **G3-03, evidencia técnica adicional:** en PrestaShop 1.7.8.11 las
+> fechas normales de ObjectModel se escriben con `date()` tras fijar
+> `PS_TIMEZONE` en PHP. Esto respalda una hipótesis de hora local,
+> pero no prueba el origen de importaciones e históricos de BC.
+> Hemos preparado la [auditoría agregada sin PII](BC_G3_TIMESTAMP_PROVENANCE_AUDIT.md)
+> y su [SQL de solo lectura](../scripts/sql/bc_g3_timestamp_provenance_aggregate_readonly.sql).
+> G3-03 **sigue pendiente** y el esquema v0.3 **no está autorizado**.
+> **Sin acceso SQL directo a producción:** no se pedirá al responsable
+> ejecutar consultas. El módulo BC 0.7.1 ya muestra el panel BO
+> `Data Cloud - installation preflight` (zona horaria y metadatos de
+> columnas), sin consultar filas. El SQL agregado es **opcional para DBA**,
+> no un paso obligatorio. Diseñar una fuente UTC nueva y verificable
+> para futuros eventos sin reinterpretar los DATETIME históricos.
 
 ## Ocho decisiones pendientes del responsable
 
