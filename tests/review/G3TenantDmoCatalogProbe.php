@@ -42,6 +42,10 @@ final class G3TenantDmoCatalogProbe
         $api = '/services/data/' . self::API_VERSION . '/ssot/data-model-objects/';
         $individual = $this->fetch($api . 'ssot__Individual__dlm', $transport);
         $order = $this->fetch($api . 'ssot__SalesOrder__dlm', $transport);
+        // Optional third standard DMO: Account is the documented Bill To
+        // Account relationship target for the standard Sales Order DMO.
+        // A 403/404 means unverified for this OAuth identity, not absent.
+        $account = $this->fetch($api . 'ssot__Account__dlm', $transport, true);
 
         $objects = [
             'Individual' => self::summarize(
@@ -50,9 +54,25 @@ final class G3TenantDmoCatalogProbe
             ),
             'SalesOrder' => self::summarize(
                 $order, 'ssot__SalesOrder__dlm', 'OTHER',
-                ['ssot__Id__c', 'ssot__SoldToCustomerId__c',
-                 'ssot__BillToContactId__c']
+                ['ssot__Id__c', 'ssot__BillToAccountId__c',
+                 'ssot__SoldToCustomerId__c', 'ssot__BillToContactId__c']
             ),
+            'Account' => $account === null
+                ? [
+                    'metadata_readable' => false,
+                    'observed_category' => 'UNVERIFIED',
+                    'category_matches_proposal' => false,
+                    'data_space_matches_observed_default' => false,
+                    'id_field_is_primary_key' => false,
+                    'candidate_fields_present' => [
+                        'ssot__Id__c' => false,
+                        'ssot__IndividualId__c' => false,
+                    ],
+                ]
+                : self::summarize(
+                    $account, 'ssot__Account__dlm', 'PROFILE',
+                    ['ssot__Id__c', 'ssot__IndividualId__c']
+                ),
         ];
 
         // Both directions are inspected. The documented endpoint can list a
@@ -64,7 +84,12 @@ final class G3TenantDmoCatalogProbe
         $individualRelations = $this->fetch(
             $api . 'ssot__Individual__dlm/relationships', $transport, true
         );
-        $relation = self::summarizeRelations($orderRelations, $individualRelations);
+        $accountRelations = $this->fetch(
+            $api . 'ssot__Account__dlm/relationships', $transport, true
+        );
+        $relation = self::summarizeRelations(
+            $orderRelations, $individualRelations, $accountRelations
+        );
 
         return [
             'stage' => 'g3_data_360_dmo_catalog_readonly',
@@ -87,7 +112,9 @@ final class G3TenantDmoCatalogProbe
      * Report only bounded counts and a fixed allowlist of field matches.
      * Visibility is NOT approval or a proof of source-mapped relationship.
      */
-    private static function summarizeRelations($orderRelations, $individualRelations)
+    private static function summarizeRelations(
+        $orderRelations, $individualRelations, $accountRelations
+    )
     {
         $result = [
             'metadata_accessible' => $orderRelations !== null,
@@ -101,9 +128,18 @@ final class G3TenantDmoCatalogProbe
             'bill_to_contact_relation_seen' => false,
             'active_candidate_relation_seen' => false,
             'standard_relation_unmapped_cannot_be_excluded' => true,
+            'account_relationship_metadata_accessible' =>
+                $accountRelations !== null,
+            'account_relationship_count' => null,
+            'sales_order_to_account_bill_to_relation_seen' => false,
+            'account_to_individual_relation_seen' => false,
+            'active_sales_order_to_account_bill_to_relation_seen' => false,
+            'active_account_to_individual_relation_seen' => false,
+            'account_bridge_verified_by_metadata_only' => false,
         ];
         foreach (['sales_order' => $orderRelations,
-            'individual' => $individualRelations] as $which => $listing) {
+            'individual' => $individualRelations,
+            'account' => $accountRelations] as $which => $listing) {
             if ($listing === null) {
                 continue;
             }
@@ -127,6 +163,38 @@ final class G3TenantDmoCatalogProbe
                     && $target === 'ssot__Individual__dlm';
                 $reverse = $source === 'ssot__Individual__dlm'
                     && $target === 'ssot__SalesOrder__dlm';
+                // Inspect an alternative two-hop topology, but never
+                // declare that a logical PrestaShop customer can be inserted
+                // as an Account without approved data modelling.
+                $orderAccountForward = $source === 'ssot__SalesOrder__dlm'
+                    && $target === 'ssot__Account__dlm';
+                $orderAccountReverse = $source === 'ssot__Account__dlm'
+                    && $target === 'ssot__SalesOrder__dlm';
+                $accountIndividualForward = $source === 'ssot__Account__dlm'
+                    && $target === 'ssot__Individual__dlm';
+                $accountIndividualReverse = $source === 'ssot__Individual__dlm'
+                    && $target === 'ssot__Account__dlm';
+
+                if ($orderAccountForward || $orderAccountReverse) {
+                    $side = $orderAccountForward ? 'sourceField' : 'targetField';
+                    if (isset($entry[$side]['name'])
+                        && $entry[$side]['name'] === 'ssot__BillToAccountId__c') {
+                        $result['sales_order_to_account_bill_to_relation_seen'] = true;
+                        if (isset($entry['status']) && $entry['status'] === 'ACTIVE') {
+                            $result['active_sales_order_to_account_bill_to_relation_seen'] = true;
+                        }
+                    }
+                }
+                if ($accountIndividualForward || $accountIndividualReverse) {
+                    $side = $accountIndividualForward ? 'sourceField' : 'targetField';
+                    if (isset($entry[$side]['name'])
+                        && $entry[$side]['name'] === 'ssot__IndividualId__c') {
+                        $result['account_to_individual_relation_seen'] = true;
+                        if (isset($entry['status']) && $entry['status'] === 'ACTIVE') {
+                            $result['active_account_to_individual_relation_seen'] = true;
+                        }
+                    }
+                }
                 if (!$forward && !$reverse) {
                     continue;
                 }
@@ -154,6 +222,10 @@ final class G3TenantDmoCatalogProbe
         $result['sales_order_to_individual_candidate_present'] =
             $result['sold_to_customer_relation_seen']
             || $result['bill_to_contact_relation_seen'];
+        // Observing two standard metadata edges is STILL not validation
+        // of the PST custom DLO mapping, Account record identity or privacy.
+        // The term "verified" is deliberately false regardless of flags.
+        $result['account_bridge_verified_by_metadata_only'] = false;
         return $result;
     }
 
@@ -216,6 +288,10 @@ final class G3TenantDmoCatalogProbe
                 . '/ssot/data-model-objects/ssot__SalesOrder__dlm/relationships',
             '/services/data/' . self::API_VERSION
                 . '/ssot/data-model-objects/ssot__Individual__dlm/relationships',
+            '/services/data/' . self::API_VERSION
+                . '/ssot/data-model-objects/ssot__Account__dlm',
+            '/services/data/' . self::API_VERSION
+                . '/ssot/data-model-objects/ssot__Account__dlm/relationships',
         ];
         if (!in_array($path, $allowed, true)) {
             throw new RuntimeException('g3_dmo_path_not_allowlisted');
