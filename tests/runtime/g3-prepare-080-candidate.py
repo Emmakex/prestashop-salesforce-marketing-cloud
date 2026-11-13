@@ -26,7 +26,8 @@ replace_once("$this->version = '0.7.1';", "$this->version = '0.8.0';")
 replace_once(
     "require_once __DIR__ . '/src/Compatibility/Platform.php';",
     "require_once __DIR__ . '/src/Compatibility/Platform.php';\n"
-    "require_once __DIR__ . '/src/Provider/G3CandidateProviderGate.php';"
+    "require_once __DIR__ . '/src/Provider/G3CandidateProviderGate.php';\n"
+    "require_once __DIR__ . '/src/Provider/G3CandidateCredentialLifecycle.php';"
 )
 replace_once(
     """    public function uninstall()
@@ -37,12 +38,10 @@ replace_once(
     }""",
     """    public function uninstall()
     {
-        // CI-only proof: remove hooks/module registration, retain ALL tables,
-        // historical observations and operator configuration.
-        // Unlike 0.7.1, never call the destructive uninstall helpers.
-        if (getenv('GITHUB_ACTIONS') !== 'true'
-            || getenv('G3_RUNTIME_CI_ONLY') !== 'yes_disposable_prestashop'
-            || getenv('G3_080_UPGRADE_FIXTURE') !== 'candidate_ci_only') {
+        // Retain operational and business history; locally revoke legacy
+        // credentials and old cron bearer before removing module hooks.
+        // This does not revoke a Salesforce token at the remote provider.
+        if (!G3CandidateCredentialLifecycle::scrubLegacySecrets()) {
             return false;
         }
         return parent::uninstall();
@@ -64,6 +63,25 @@ for method, limit, extra in [
 
 """
     replace_once(old, new)
+
+# The 0.7.1 initializer resets every setting on fresh install.
+# An approved future 0.8 installer must instead preserve safe operator choices
+# and ALWAYS rotate local cron credentials on every reinstall.
+old_start = "    private function installConfiguration()\n    {\n"
+old_end = "    private function uninstallConfiguration()\n"
+if source.count(old_start) != 1 or source.count(old_end) != 1:
+    raise SystemExit("G3 install configuration boundary changed")
+start = source.index(old_start)
+end = source.index(old_end, start)
+old_install_config = source[start:end]
+if "Configuration::updateValue(self::CONFIG_CRON_TOKEN, bin2hex(random_bytes(24)))" not in old_install_config:
+    raise SystemExit("G3 0.7.1 initializer contract changed")
+replace_once(old_install_config,
+    "    private function installConfiguration()\n"
+    "    {\n"
+    "        return G3CandidateCredentialLifecycle::installSafeDefaults();\n"
+    "    }\n\n"
+)
 
 replace_once(
     "$this->confirmUninstall = $this->l('Uninstall the connector? Local queue and logs will be removed.');",
