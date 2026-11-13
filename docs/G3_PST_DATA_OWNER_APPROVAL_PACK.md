@@ -2,6 +2,8 @@
 
 **Estado: PENDIENTE DE APROBACIÓN. Uso: revisión humana y pruebas offline únicamente.** Fecha: 13/11/2026. Proyecto multiproveedor PrestaShop → **Marketing Cloud Growth + Data 360**, no Engagement.
 
+**Snapshot de revisión verificable (no firmada):** [huellas SHA-256 y comprobación CI de v0.2, v0.3 y el inventario G3](G3_REVIEW_FINGERPRINT_SNAPSHOT.md). Permite identificar el borrador exacto; las ocho decisiones y la autorización de publicación siguen **PENDIENTES**.
+
 ## Qué está verificado y qué no
 
 - **Verificado:** Salesforce Core OAuth, exchange Data 360 sin escrituras, fuente PST (`ABH_PrestaShop_Data_Cloud`) observada en estado **Schema Required**, Data Space observado `default`, BC módulo 0.7.1 activo en `test`, tienda `Europe/Madrid`.

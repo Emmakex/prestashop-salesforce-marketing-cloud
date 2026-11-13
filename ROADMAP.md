@@ -9,6 +9,7 @@
 - [x] G2: intercambio de token Data 360 certificado (sin escritura); conector `ABH_PrestaShop_Data_Cloud` / `PST` observado.
 - [x] BC instalado 0.7.1, activo, `test`, `marketing_optin`, umbral 60 min; no envíos.
 - [x] Historia local auditada: 99 direcciones con algún flag positivo, 8 contradicciones; **no** audiencia legal Growth.
+- [x] G3 preparación técnica: snapshots SHA-256 de los borradores v0.2/v0.3 y manifiesto de 24 campos, verificados en CI, **sin firma ni aprobación** ([revisión](docs/G3_REVIEW_FINGERPRINT_SNAPSHOT.md)).
 - [ ] **G3 BLOQUEANTE AHORA:** aprobación explícita del esquema `PSCustomer` / `PSOrder`, IDs con namespace, Data Space, retención, fechas UTC/DST, finalidad/consentimiento.
 - [ ] G4: publicar esquema e iniciar streams/mapeos con autorización separada.
 - [ ] G5: validación y pruebas sintéticas Data 360, después escritura sintética aprobada.
