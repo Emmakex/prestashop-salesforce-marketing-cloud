@@ -64,7 +64,7 @@ Una validación de OAuth, metadata, token exchange, tests unitarios o ZIP **no**
 `recuperación end-to-end con test` →
 `go-live autorizado`.
 
-El paso **actual** es la aprobación de esquema y modelo de datos (sin publicar aún). Data 360 y Growth son complementarios, no intercambiables.
+El paso **actual (G3)** es la aprobación de esquema y modelo de datos (sin publicar aún). Data 360 y Growth son complementarios, no intercambiables.
 
 ## 7. Registro de decisiones y guardas
 
