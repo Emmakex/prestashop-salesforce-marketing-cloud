@@ -46,6 +46,12 @@ Se amplía `tests/review/G3TenantDmoCatalogProbe.php`, ya autorizado **solo lect
 
 La misma conexión del entorno GitHub `salesforce-growth-certification` ejecutará el workflow `g3-dmo-catalog-readonly.yml` en `main` cuando el cambio se integre. No se crea otra app ni se amplían privilegios; **la evidencia irá al artefacto saneado, no al log de API**. La nueva ejecución podrá confirmar o descartar visibilidad de la topología B, pero nunca aplicarla.
 
+## Evidencia posterior y alcance comercial (13/11/2026)
+
+La [inspección con paginación verificada #43495007989](https://github.com/Emmakex/prestashop-salesforce-marketing-cloud/actions/runs/43495007989), integrada por el [PR #69](https://github.com/Emmakex/prestashop-salesforce-marketing-cloud/pull/69), examinó **64 relaciones SalesOrder, 137 Individual y 326 Account**, todas con completitud declarada. **No detectó** las aristas candidatas, aunque esto no prueba que no puedan configurarse o activarse mediante un mapping futuro.
+
+**Decisión técnica temporal, sin aprobación:** mantener separados los pedidos y los perfiles evita una unión falsa (opción C). No es una solución final de negocio: no resuelve en Data 360 la segmentación persona–compra. Tampoco entrega **recuperación de carritos**, ya que PSCustomer/PSOrder v0.2/v0.3 no incluyen PSCart ni existe un Flow Growth aprobado. [Control ejecutable de cobertura del objetivo comercial](G3_08_BUSINESS_GOAL_COVERAGE.md). Los checks locales de pedido antes de enviar deben diseñarse y certificarse en el futuro adaptador Growth, no inferirse del flujo histórico Engagement.
+
 ## Decisión humana imprescindible para pasar a G3-08
 
 Arquitecto Data 360: seleccionar **A/B/C/D**, categoría del futuro Data Stream, DMO(s) destino, campos PK/FK y relaciones, semántica por `source_namespace` y `shop_id`; comprobar entidades necesarias en ABH y cómo manejar invitados, pedidos históricos y borrados. Responsable de datos: finalidad y necesidad de cada campo, consentimientos distintos, retención/supresión; resolver **G3-02/G3-07**. Responsable de implementación: fuente de fecha real de modificación **G3-03/G3-04**, identidad G3-01 y reversibilidad.
