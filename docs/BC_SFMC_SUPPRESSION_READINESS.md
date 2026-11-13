@@ -1,9 +1,12 @@
 # BC / reusable PrestaShop — SFMC suppression and consent-source readiness
 
 Status: **review only**. No Marketing Cloud subscriber API access was granted,
-and BC has not been certified for live abandoned-cart sends. PrestaShop 0.7.1
-is installed by the operator but its current Back Office mode/version
-has not been independently observed through an authenticated session.
+and BC has not been certified for live abandoned-cart sends. On 2026-11-13,
+the BC operator confirmed through read-only phpMyAdmin that the module is
+installed and active as **0.7.1**, with global `PS_SFMC_MODE=test`,
+`PS_SFMC_CART_CONSENT_MODE=marketing_optin` and
+`PS_SFMC_CART_ABANDON_MINUTES=60`. This is verified **configuration**,
+not proof of an active cron, certified timestamp semantics or external suppression.
 
 ## What source evidence we have
 
@@ -64,6 +67,15 @@ machine-readable rejection reasons, and always returns
 a production authorization. No DB, HTTP, token reads, worker wiring or
 module setting changes were made.
 
+An offline parser for SOAP Subscriber Retrieve results was added in
+`tests/review/SfmcSubscriberStatusParser.php`, with synthetic regression
+cases for Active, Unsubscribed, Held, Bounced, Deleted, SOAP Fault, identity
+mismatch, invalid XML and DTD attempts. It is **outside the installable
+module**, and even a valid Active response always returns
+`send_authorized=false`. A real authenticated BU-scoped read-only SOAP
+adapter, publication-list checks and suppression reconciliation are
+**not** implemented by this change.
+
 The live Journey worker remains 0.7.1's implementation. Therefore,
 **DO NOT switch BC to Production** until a real Marketing Cloud read-only
 status/suppression adapter with exact tenant/BU and subscriber key mapping
@@ -101,6 +113,16 @@ and wording. Check for custom themes/modules and legacy imports.
   wrong BU, changed email, stale data, no order, converted order.
 - Separate technical readiness, lawful purpose review and final
   operator approval for controlled sends.
+
+Official Salesforce API evidence: OAuth 2.0 server-to-server token responses
+contain `soap_instance_url` and the MID-bound `account_id` selects the
+Business Unit. SubscriberKey-based SOAP Retrieve yields the subscriber's
+status. Publication-list status and auto-suppression checks are separate
+from All Subscribers and must be implemented and independently tested:
+- https://developer.salesforce.com/docs/marketing/marketing-cloud/guide/access-token-s2s.html
+- https://developer.salesforce.com/docs/marketing/marketing-cloud/guide/retrieving_subscribers_by_subscriber_key
+- https://developer.salesforce.com/docs/marketing/marketing-cloud/guide/listsubscriber
+- https://help.salesforce.com/s/articleView?id=000389759&type=1
 
 The historical customer/order/cart analytical datasets stay in scope
 for their permitted purposes; they are **not** a mass recovery mailing list.
