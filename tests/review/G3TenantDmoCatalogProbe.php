@@ -185,10 +185,11 @@ final class G3TenantDmoCatalogProbe
             }
         }
         // Do not leak arbitrary tenant metadata but do expose which exact
-        // documented category was observed. This fixes the previous opaque
+        // documented category was observed, including standard DMOs
+        // with UNASSIGNED category. This fixes the previous opaque
         // true/false mismatch, without treating it as an authorization.
         $category = strtoupper(trim($entry['category']));
-        if (!in_array($category, ['PROFILE', 'ENGAGEMENT', 'OTHER'], true)) {
+        if (!in_array($category, ['PROFILE', 'ENGAGEMENT', 'OTHER', 'UNASSIGNED'], true)) {
             $category = 'UNRECOGNIZED';
         }
         return [
