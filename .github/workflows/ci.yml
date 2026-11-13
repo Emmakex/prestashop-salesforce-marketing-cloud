@@ -147,6 +147,7 @@ jobs:
           php tests/data-cloud-timestamp-quality-contract.php
           php tests/data-cloud-live-utc-observation-contract.php
           php tests/data-cloud-atomic-utc-acceptance-contract.php
+          php tests/g3-prestashop-adapter-contract.php
           php tests/cart-segmentation-contract.php
           php tests/cart-consent-current-state-contract.php
           php tests/marketing-recovery-suppression-readiness-contract.php
@@ -234,6 +235,7 @@ jobs:
           php tests/integration/g3_mysql_acceptance.php
           php tests/integration/g3_prestashop_071_queue_mirror.php
           php tests/integration/g3_growth_outbox_v1.php
+          php tests/integration/g3_prestashop_adapter.php
 
   package:
     name: Build release package
