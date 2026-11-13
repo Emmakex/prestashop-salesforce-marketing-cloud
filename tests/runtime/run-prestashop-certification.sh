@@ -15,7 +15,11 @@ cleanup() {
   set +e
   if docker ps -a --format '{{.Names}}' | grep -qx "$PS_CONTAINER"; then
     echo '--- PrestaShop logs ---'
-    docker logs "$PS_CONTAINER" 2>&1 | tail -n 200 || true
+    # Local CI cron bearer appears in Apache access URLs on failures.
+    # Never expose even synthetic bearer values in exported job logs.
+    docker logs "$PS_CONTAINER" 2>&1 \
+      | sed -E 's/([?&]token=)[^ &"]+/\1[REDACTED]/g' \
+      | tail -n 200 || true
     docker rm -f "$PS_CONTAINER" >/dev/null 2>&1 || true
   fi
   if docker ps -a --format '{{.Names}}' | grep -qx "$DB_CONTAINER"; then
@@ -263,8 +267,6 @@ cp "$ROOT/tests/runtime/G3CandidateProviderGate.php" \
   /tmp/pssfmc-runtime-080/pssalesforcebridge/src/Provider/G3CandidateProviderGate.php
 cp "$ROOT/tests/runtime/G3CandidateCredentialLifecycle.php" \
   /tmp/pssfmc-runtime-080/pssalesforcebridge/src/Provider/G3CandidateCredentialLifecycle.php
-docker cp "$ROOT/tests/runtime/G3CandidateCredentialLifecycle.php" \
-  "$PS_CONTAINER:/tmp/G3CandidateCredentialLifecycle.php"
 cp "$ROOT/tests/runtime/g3-candidate-upgrade-0.8.0.php" \
    /tmp/pssfmc-runtime-080/pssalesforcebridge/upgrade/upgrade-0.8.0.php
 docker cp "$ROOT/tests/runtime/prestashop-g3-upgrade-acceptance.php" \
