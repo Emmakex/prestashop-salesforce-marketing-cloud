@@ -145,6 +145,7 @@ jobs:
           php tests/data-cloud-batch-contract.php
           php tests/data-cloud-timestamp-contract.php
           php tests/data-cloud-timestamp-quality-contract.php
+          php tests/data-cloud-live-utc-observation-contract.php
           php tests/cart-segmentation-contract.php
           php tests/cart-consent-current-state-contract.php
           php tests/marketing-recovery-suppression-readiness-contract.php
