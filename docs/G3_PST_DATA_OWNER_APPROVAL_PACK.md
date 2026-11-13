@@ -48,6 +48,14 @@ Este inventario procede exactamente de los dos YAML del repositorio y del mapper
 | `source_updated_utc` | Solo v0.3 | Fecha candidata | v0.3 only; must not be derived from historical local time without provenance. |
 
 
+> **G3-03, evidencia técnica adicional:** en PrestaShop 1.7.8.11 las
+> fechas normales de ObjectModel se escriben con `date()` tras fijar
+> `PS_TIMEZONE` en PHP. Esto respalda una hipótesis de hora local,
+> pero no prueba el origen de importaciones e históricos de BC.
+> Hemos preparado la [auditoría agregada sin PII](BC_G3_TIMESTAMP_PROVENANCE_AUDIT.md)
+> y su [SQL de solo lectura](../scripts/sql/bc_g3_timestamp_provenance_aggregate_readonly.sql).
+> G3-03 **sigue pendiente** y el esquema v0.3 **no está autorizado**.
+
 ## Ocho decisiones pendientes del responsable
 
 **1. Identidad multiinstalación.** Conservar el formato `source_namespace:ps_{shop_id}_{entity_id}`. Exigir namespace inmutable asignado por un registro entre instalaciones; no usar email para fusionar personas. **Evidencia necesaria:** Confirmar namespace exclusivo de la instalación BC y política de cambios/colisiones.
