@@ -145,6 +145,7 @@ jobs:
           php tests/data-cloud-batch-contract.php
           php tests/data-cloud-timestamp-contract.php
           php tests/data-cloud-timestamp-quality-contract.php
+          php tests/g3-record-modified-refresh-review-contract.php
           php tests/data-cloud-live-utc-observation-contract.php
           php tests/data-cloud-atomic-utc-acceptance-contract.php
           php tests/g3-prestashop-adapter-contract.php
