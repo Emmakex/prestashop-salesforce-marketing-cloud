@@ -32,6 +32,8 @@ consentimiento ni como alternativa a G3-02/G3-07.
 
 ## El siguiente paso de decisión — sin SQL de producción
 
+[Hoja operativa para el responsable (G3-01…G3-08)](G3_OWNER_DECISION_READY.md): contiene propuestas, evidencia faltante y opciones de aceptar/modificar/rechazar, con **todas las decisiones pendientes**.
+
 El [dossier completo](G3_PST_DATA_OWNER_APPROVAL_PACK.md)
 identifica ocho decisiones concretas:
 
