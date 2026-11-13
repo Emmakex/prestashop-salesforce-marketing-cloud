@@ -17,6 +17,8 @@
 
 **G3-05/G3-06 — modelo DLO→DMO propuesto sin autorización:** [claves, categorías y relación cliente-pedido en Data 360](G3_DLO_DMO_RELATIONSHIP_REVIEW.md) + [registro de mapeo candidato](../config/g3-pst-dlo-dmo-mapping-candidate.json). Los dos DMOs y la relación Sales Order→Individual deben verificarse en el tenant; ningún mapeo se ha guardado ni aprobado.
 
+**Comprobación real G3-05/G3-06 preparada:** [consulta protegida y limitada al catálogo DMO de ABH](G3_ABH_DMO_TENANT_READONLY_DISCOVERY.md), reutilizando el entorno existente. Los resultados del tenant se incorporarán solo si GitHub ejecuta el workflow; este enlace no constituye por sí mismo evidencia ni aprobación.
+
 ## Qué necesita decidir cada responsable
 
 Esta hoja separa **propuesta técnica**, **evidencia necesaria** y **decisión humana**. No atribuye permisos al indicador newsletter, no fija plazos legales, no transforma fechas históricas inciertas, no elige el esquema automáticamente y no invoca ningún servicio de Salesforce.
