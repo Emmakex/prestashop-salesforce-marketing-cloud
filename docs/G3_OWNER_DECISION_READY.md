@@ -23,6 +23,8 @@
 
 **Último estado real G3-05/G3-06:** [ABH run #43491126597](https://github.com/Emmakex/prestashop-salesforce-marketing-cloud/actions/runs/43491126597) confirmó `SalesOrder=UNASSIGNED`, `Individual=PROFILE`, PK y Data Space `default`; **no hay relación directa certificada** entre los campos candidatos. [Opciones A/B/C/D y comprobación controlada de Account](G3_CUSTOMER_ORDER_RELATION_TOPOLOGY_DECISION.md). Se necesita elección del arquitecto; **ninguna opción queda aprobada automáticamente**.
 
+**Advertencia de evidencia G3-06:** las respuestas de 20 relaciones vistas en los primeros runs eran **páginas truncadas por defecto**, no catálogos íntegros. [Nueva comprobación paginada y acotada](G3_ABH_DMO_TENANT_READONLY_DISCOVERY.md). Hasta certificar la completitud, no afirmar que `SalesOrder` carece de relación con `Account` o `Individual` ni considerar la opción C como decisión impuesta por Salesforce. G3 sigue sin aprobación.
+
 ## Qué necesita decidir cada responsable
 
 Esta hoja separa **propuesta técnica**, **evidencia necesaria** y **decisión humana**. No atribuye permisos al indicador newsletter, no fija plazos legales, no transforma fechas históricas inciertas, no elige el esquema automáticamente y no invoca ningún servicio de Salesforce.
