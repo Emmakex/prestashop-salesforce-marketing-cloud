@@ -187,6 +187,8 @@ jobs:
           python -m unittest discover -s tests -p 'test_g3_review_fingerprint.py'
           python scripts/ci/verify-g3-owner-decision-brief.py
           python -m unittest discover -s tests -p 'test_g3_owner_decision_brief.py'
+          python scripts/ci/verify-g3-field-purpose-owner-decisions.py
+          python -m unittest discover -s tests -p 'test_g3_field_purpose_owner_decisions.py'
           python scripts/ci/verify-bc-timestamp-sql-readonly.py
           python -m unittest discover -s tests -p 'test_bc_timestamp_sql_readonly.py'
 
