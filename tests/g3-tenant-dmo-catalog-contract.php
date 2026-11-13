@@ -68,7 +68,21 @@ function fakeGet($fixtures, &$urls, $relationStatus = 200)
         assertDmo($token === 'synthetic-token', 'bearer_mismatch');
         $prefix = 'https://example.my.salesforce.com/services/data/v68.0/ssot/data-model-objects/';
         assertDmo(strpos($url, $prefix) === 0, 'unexpected_host_or_path');
-        $name = substr($url, strlen($prefix));
+        $suffix = substr($url, strlen($prefix));
+        $parts = explode('?', $suffix, 2);
+        $name = $parts[0];
+        if (strpos($name, '/relationships') !== false) {
+            assertDmo(isset($parts[1])
+                && preg_match('/^limit=100(?:&offset=[1-9][0-9]*)?$/D',
+                    $parts[1]) === 1, 'unsafe_pagination_query');
+            parse_str($parts[1], $params);
+            $offset = isset($params['offset']) ? (int) $params['offset'] : 0;
+            assertDmo($offset % 100 === 0 && $offset <= 400,
+                'unbounded_offset');
+        } else {
+            assertDmo(count($parts) === 1, 'object_get_has_query');
+            $offset = 0;
+        }
         assertDmo(in_array($name, ['ssot__Individual__dlm', 'ssot__SalesOrder__dlm',
             'ssot__SalesOrder__dlm/relationships',
             'ssot__Individual__dlm/relationships',
@@ -80,9 +94,15 @@ function fakeGet($fixtures, &$urls, $relationStatus = 200)
                 ? 'account_relationships'
                 : (strpos($name, '/relationships') !== false
                     ? 'relationships' : $name));
+        $record = $fixtures[$fixture];
+        if (strpos($name, '/relationships') !== false && $relationStatus === 200) {
+            $items = $record['relationships'];
+            $record['relationships'] = array_slice($items, $offset, 100);
+            $record['totalSize'] = count($items);
+        }
         return ['status' => strpos($name, '/relationships') !== false
             ? $relationStatus : 200,
-            'body' => json_encode($fixtures[$fixture])];
+            'body' => json_encode($record)];
     };
 }
 $probe = new G3TenantDmoCatalogProbe(
@@ -94,9 +114,9 @@ assertDmo(count($urls) === 6, 'expected_exactly_6_gets');
 assertDmo($urls[0] === 'https://example.my.salesforce.com/services/data/v68.0/ssot/data-model-objects/ssot__Individual__dlm', 'individual_path');
 assertDmo($urls[1] === 'https://example.my.salesforce.com/services/data/v68.0/ssot/data-model-objects/ssot__SalesOrder__dlm', 'sales_order_path');
 assertDmo($urls[2] === 'https://example.my.salesforce.com/services/data/v68.0/ssot/data-model-objects/ssot__Account__dlm', 'account_path');
-assertDmo($urls[3] === $urls[1] . '/relationships', 'relations_path');
-assertDmo($urls[4] === $urls[0] . '/relationships', 'individual_relations_path');
-assertDmo($urls[5] === $urls[2] . '/relationships', 'account_relations_path');
+assertDmo($urls[3] === $urls[1] . '/relationships?limit=100', 'relations_path');
+assertDmo($urls[4] === $urls[0] . '/relationships?limit=100', 'individual_relations_path');
+assertDmo($urls[5] === $urls[2] . '/relationships?limit=100', 'account_relations_path');
 assertDmo($result['objects']['Individual']['id_field_is_primary_key'],
     'individual_pk');
 assertDmo($result['objects']['SalesOrder']['category_matches_proposal']
@@ -116,7 +136,10 @@ assertDmo($result['relationship']['sold_to_customer_relation_seen']
     && $result['relationship']['account_to_individual_relation_seen']
     && $result['relationship']['active_sales_order_to_account_bill_to_relation_seen']
     && $result['relationship']['active_account_to_individual_relation_seen']
-    && !$result['relationship']['account_bridge_verified_by_metadata_only'],
+    && !$result['relationship']['account_bridge_verified_by_metadata_only']
+    && $result['relationship']['sales_order_relationship_scan_complete']
+    && $result['relationship']['individual_relationship_scan_complete']
+    && $result['relationship']['account_relationship_scan_complete'],
     'exact_relationship');
 assertDmo(!$result['relationship']['bill_to_contact_relation_seen'],
     'wrong_relation_target');
@@ -139,6 +162,7 @@ assertDmo(!$partial['relationship']['metadata_accessible']
     && !$partial['relationship']['individual_relationship_metadata_accessible']
     && $partial['relationship']['sales_order_relationship_count'] === null
     && $partial['relationship']['account_relationship_count'] === null
+    && !$partial['relationship']['sales_order_relationship_scan_complete']
     && !$partial['relationship']['sales_order_to_account_bill_to_relation_seen']
     && !$partial['relationship']['account_to_individual_relation_seen']
     && !$partial['relationship']['sales_order_to_individual_candidate_present'],
@@ -190,7 +214,7 @@ assertDmo($reverseResult['relationship']['any_relation_between_objects_seen']
 // The two original DMOs remain queryable and are not silently merged.
 $missingAccount = $probe->inspect(function ($url, $token) use ($fixture) {
     $prefix = 'https://example.my.salesforce.com/services/data/v68.0/ssot/data-model-objects/';
-    $name = substr($url, strlen($prefix));
+    $name = explode('?', substr($url, strlen($prefix)), 2)[0];
     if ($name === 'ssot__Account__dlm'
         || $name === 'ssot__Account__dlm/relationships') {
         return ['status' => 404, 'body' => '{"private":"no-log"}'];
@@ -199,12 +223,87 @@ $missingAccount = $probe->inspect(function ($url, $token) use ($fixture) {
         ? 'individual_relationships'
         : (strpos($name, '/relationships') !== false
             ? 'relationships' : $name);
-    return ['status' => 200, 'body' => json_encode($fixture[$key])];
+    $record = $fixture[$key];
+    if (isset($record['relationships'])) {
+        $record['totalSize'] = count($record['relationships']);
+    }
+    return ['status' => 200, 'body' => json_encode($record)];
 });
 assertDmo(!$missingAccount['objects']['Account']['metadata_readable']
     && !$missingAccount['relationship']['account_relationship_metadata_accessible']
     && !$missingAccount['relationship']['account_bridge_verified_by_metadata_only'],
     'optional_account_not_fail_closed');
+// Explicit pagination is essential: Salesforce defaults to 20 relations.
+// An edge on a later page must be detected without any dynamic URL follow.
+$many = fixtures();
+$rows = [];
+for ($i = 0; $i < 100; ++$i) {
+    $rows[] = [
+        'id' => 'synthetic_unrelated_' . $i,
+        'sourceEntity' => ['name' => 'ssot__SalesOrder__dlm'],
+        'targetEntity' => ['name' => 'ssot__Another__dlm'],
+    ];
+}
+$rows[] = [
+    'id' => 'synthetic_link_page_two',
+    'sourceEntity' => ['name' => 'ssot__SalesOrder__dlm'],
+    'targetEntity' => ['name' => 'ssot__Account__dlm'],
+    'sourceField' => ['name' => 'ssot__BillToAccountId__c'],
+    'status' => 'ACTIVE',
+];
+$many['relationships']['relationships'] = $rows;
+$paginatedUrls = [];
+$afterPage2 = $probe->inspect(fakeGet($many, $paginatedUrls));
+assertDmo(count($paginatedUrls) === 7
+    && strpos($paginatedUrls[4], '?limit=100&offset=100') !== false
+    && $afterPage2['relationship']['sales_order_relationship_count'] === 101
+    && $afterPage2['relationship']['sales_order_relationship_scan_complete']
+    && $afterPage2['relationship']['sales_order_to_account_bill_to_relation_seen'],
+    'second_page_edge_was_missed');
+
+// When the bounded scan reaches its cap, NO ABSENCE can be certified.
+$over = fixtures();
+$rows = [];
+for ($i = 0; $i < 501; ++$i) {
+    $rows[] = [
+        'id' => 'synthetic_unrelated_' . $i,
+        'sourceEntity' => ['name' => 'ssot__SalesOrder__dlm'],
+        'targetEntity' => ['name' => 'ssot__Another__dlm'],
+    ];
+}
+$over['relationships']['relationships'] = $rows;
+$limitedUrls = [];
+$limited = $probe->inspect(fakeGet($over, $limitedUrls));
+assertDmo($limited['relationship']['sales_order_relationship_count'] === 500
+    && !$limited['relationship']['sales_order_relationship_scan_complete']
+    && !$limited['relationship']['sales_order_to_account_bill_to_relation_seen']
+    && !$limited['relationship']['account_bridge_verified_by_metadata_only'],
+    'bounded_pagination_falsely_certified_absence');
+
+// Repeated/ignored offsets must not create a false complete relationship list.
+$repeated = fixtures();
+$repeated['relationships']['relationships'] = array_slice($rows, 0, 100);
+$duplicateUrls = [];
+$dup = $probe->inspect(function ($url, $token) use ($repeated, &$duplicateUrls) {
+    $duplicateUrls[] = $url;
+    $name = explode('?', substr($url, strlen(
+        'https://example.my.salesforce.com/services/data/v68.0/ssot/data-model-objects/'
+    )), 2)[0];
+    $key = $name === 'ssot__Individual__dlm/relationships'
+        ? 'individual_relationships' : ($name === 'ssot__Account__dlm/relationships'
+            ? 'account_relationships' : (strpos($name, '/relationships') !== false
+                ? 'relationships' : $name));
+    $record = $repeated[$key];
+    if (isset($record['relationships'])) {
+        $record['totalSize'] = $key === 'relationships'
+            ? 101 : count($record['relationships']);
+    }
+    return ['status' => 200, 'body' => json_encode($record)];
+});
+assertDmo($dup['relationship']['sales_order_relationship_count'] === 100
+    && !$dup['relationship']['sales_order_relationship_scan_complete'],
+    'repeated_pages_must_be_inconclusive');
+
 rejectDmo(function () use ($probe) {
     $probe->inspect(function () {
         return ['status' => 403, 'body' => '{"access_token":"secret"}'];
@@ -257,4 +356,4 @@ foreach (['branches: [main]', 'environment: salesforce-growth-certification',
 }
 assertDmo(strpos($workflow, 'pull_request:') === false,
     'secrets_exposed_to_pr');
-echo "G3 DMO metadata GET-only contract: six fixed GETs, 3 bounded DMOs, Account bridge held pending owner; no approvals.\n";
+echo "G3 DMO metadata-only contract: three DMO GETs plus bounded paginated relationships, never infer missing links from first page.\n";
