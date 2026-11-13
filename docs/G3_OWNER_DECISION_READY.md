@@ -5,6 +5,8 @@
 **Referencia operativa:** [issue #45](https://github.com/Emmakex/prestashop-salesforce-marketing-cloud/issues/45).  
 **Fuente contractual:** [dossier campo por campo](G3_PST_DATA_OWNER_APPROVAL_PACK.md), [inventario versionado](../config/g3-pst-schema-review.json) y [snapshot de integridad](G3_REVIEW_FINGERPRINT_SNAPSHOT.md).
 
+**Evidencia técnica adicional G3-01:** [reserva de namespaces y detección de copias en laboratorio CI](G3_NAMESPACE_GLOBAL_REGISTRY_CI_CANDIDATE.md). La unicidad real entre tiendas requiere un servicio autoritativo externo y una identidad de instalación no clonable; ninguna de las dos cosas está aprobada aún.
+
 ## Qué necesita decidir cada responsable
 
 Esta hoja separa **propuesta técnica**, **evidencia necesaria** y **decisión humana**. No atribuye permisos al indicador newsletter, no fija plazos legales, no transforma fechas históricas inciertas, no elige el esquema automáticamente y no invoca ningún servicio de Salesforce.
