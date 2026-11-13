@@ -383,7 +383,18 @@ final class G3InstallationProofSandbox
 
     private function assertTables()
     {
-        foreach ([self::KEY_TABLE, self::CHALLENGE_TABLE] as $table) {
+        $expected = [
+            self::KEY_TABLE => [
+                'source_namespace', 'external_installation_id', 'public_key_pem',
+                'public_key_sha256', 'status', 'key_version', 'key_state',
+                'revoked_at_epoch',
+            ],
+            self::CHALLENGE_TABLE => [
+                'nonce_sha256', 'source_namespace', 'external_installation_id',
+                'expires_epoch', 'key_version', 'public_key_sha256', 'consumed',
+            ],
+        ];
+        foreach ($expected as $table => $columns) {
             if (!$this->tableExists($table)) {
                 throw new RuntimeException('g3_proof_schema_incomplete');
             }
@@ -392,6 +403,13 @@ final class G3InstallationProofSandbox
             $stmt->execute([$table]);
             if (strtolower((string) $stmt->fetchColumn()) !== 'innodb') {
                 throw new RuntimeException('g3_proof_engine_mismatch');
+            }
+            $stmt = $this->pdo->prepare('SELECT COLUMN_NAME FROM information_schema.COLUMNS
+                WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?
+                ORDER BY ORDINAL_POSITION');
+            $stmt->execute([$table]);
+            if ($stmt->fetchAll(PDO::FETCH_COLUMN, 0) !== $columns) {
+                throw new RuntimeException('g3_proof_schema_column_drift');
             }
         }
     }
