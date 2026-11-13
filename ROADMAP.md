@@ -10,6 +10,7 @@
 - [x] BC instalado 0.7.1, activo, `test`, `marketing_optin`, umbral 60 min; no envíos.
 - [x] Historia local auditada: 99 direcciones con algún flag positivo, 8 contradicciones; **no** audiencia legal Growth.
 - [x] G3 preparación técnica: snapshots SHA-256 de los borradores v0.2/v0.3 y manifiesto de 24 campos, verificados en CI, **sin firma ni aprobación** ([revisión](docs/G3_REVIEW_FINGERPRINT_SNAPSHOT.md)).
+- [x] G3-03/G3-04 **diseño de revisión, no aprobación**: contrato sintético de frescura causal y distinción Full/Partial; bloquea Partial+bulk (upsert de campos omitidos), `date_upd` y `captured_at_utc` como Record Modified. [Matriz de decisión](docs/G3_RECORD_MODIFIED_REFRESH_MODE_DECISION.md). El propietario y arquitecto deben aprobar un modo por objeto antes del primer Data Stream.
 - [ ] **G3 BLOQUEANTE AHORA:** aprobación explícita del esquema `PSCustomer` / `PSOrder`, IDs con namespace, Data Space, retención, fechas UTC/DST, finalidad/consentimiento.
 - [ ] G4: publicar esquema e iniciar streams/mapeos con autorización separada.
 - [ ] G5: validación y pruebas sintéticas Data 360, después escritura sintética aprobada.
