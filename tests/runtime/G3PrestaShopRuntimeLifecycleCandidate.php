@@ -52,7 +52,7 @@ final class G3PrestaShopRuntimeLifecycleCandidate
             // DDL is not transactional; partial schema is never auto-dropped.
             throw new RuntimeException('g3_ps_runtime_partial_schema_manual_review');
         }
-        $this->execute("CREATE TABLE \`{$this->binding}\` (
+        $this->execute("CREATE TABLE `{$this->binding}` (
             source_namespace VARCHAR(32) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
             merchant VARCHAR(32) CHARACTER SET ascii NOT NULL,
             provider VARCHAR(40) CHARACTER SET ascii NOT NULL,
@@ -64,7 +64,7 @@ final class G3PrestaShopRuntimeLifecycleCandidate
             CONSTRAINT chk_g3_ps_blocked_v1 CHECK (status = 'blocked'),
             CONSTRAINT chk_g3_ps_growth_v1 CHECK (provider = 'marketing_cloud_growth')
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
-        $this->execute("INSERT INTO \`{$this->binding}\`
+        $this->execute("INSERT INTO `{$this->binding}`
             (source_namespace, merchant, provider, prestashop_version, mode, status)
             VALUES ('" . pSQL($plan['source_namespace']) . "',
                 '" . pSQL($plan['merchant']) . "',
@@ -94,16 +94,16 @@ final class G3PrestaShopRuntimeLifecycleCandidate
         }
         $this->assertBinding($plan);
         $this->assertGrowthShapes();
-        $outboxCount = (int) $this->db->getValue("SELECT COUNT(*) FROM \`{$this->outbox}\`");
-        $ledgerCount = (int) $this->db->getValue("SELECT COUNT(*) FROM \`{$this->ledger}\`");
+        $outboxCount = (int) $this->db->getValue("SELECT COUNT(*) FROM `{$this->outbox}`");
+        $ledgerCount = (int) $this->db->getValue("SELECT COUNT(*) FROM `{$this->ledger}`");
         if ($outboxCount !== 0 || $ledgerCount !== 0) {
             // No purging, even if events were captured in Test.
             return 'retained_nonempty';
         }
 
-        $this->execute("DROP TABLE \`{$this->ledger}\`");
-        $this->execute("DROP TABLE \`{$this->outbox}\`");
-        $this->execute("DROP TABLE \`{$this->binding}\`");
+        $this->execute("DROP TABLE `{$this->ledger}`");
+        $this->execute("DROP TABLE `{$this->outbox}`");
+        $this->execute("DROP TABLE `{$this->binding}`");
         return 'removed_empty';
     }
 
@@ -136,7 +136,7 @@ final class G3PrestaShopRuntimeLifecycleCandidate
             throw new RuntimeException('g3_ps_runtime_binding_schema_drift');
         }
         $rows = $this->db->executeS("SELECT source_namespace, merchant, provider,
-            prestashop_version, mode, status FROM \`{$this->binding}\`");
+            prestashop_version, mode, status FROM `{$this->binding}`");
         if (!is_array($rows) || count($rows) !== 1) {
             throw new RuntimeException('g3_ps_runtime_binding_count_invalid');
         }
