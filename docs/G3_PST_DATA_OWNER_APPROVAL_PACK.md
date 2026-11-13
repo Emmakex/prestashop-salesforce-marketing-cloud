@@ -2,6 +2,8 @@
 
 **Estado: PENDIENTE DE APROBACIÓN. Uso: revisión humana y pruebas offline únicamente.** Fecha: 13/11/2026. Proyecto multiproveedor PrestaShop → **Marketing Cloud Growth + Data 360**, no Engagement.
 
+**Hoja de decisión para responsables:** [8 opciones, evidencias, responsables y respuestas pendientes](G3_OWNER_DECISION_READY.md). No supone consentimiento, firma ni autorización de Data 360.
+
 **Snapshot de revisión verificable (no firmada):** [huellas SHA-256 y comprobación CI de v0.2, v0.3 y el inventario G3](G3_REVIEW_FINGERPRINT_SNAPSHOT.md). Permite identificar el borrador exacto; las ocho decisiones y la autorización de publicación siguen **PENDIENTES**.
 
 ## Qué está verificado y qué no
