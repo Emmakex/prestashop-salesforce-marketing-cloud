@@ -59,6 +59,16 @@ The CI job tests **real transactions**, not merely an in-memory fake:
 6. Verify every outbox row remains `blocked`; there is **no** outbound
    transport or Salesforce API in these tests.
 
+## Segundo laboratorio: tablas 0.7.1 reales, pero aisladas
+
+El [espejo transaccional de las tablas del módulo 0.7.1](G3_PRESTASHOP_071_ATOMIC_MIRROR.md)
+prueba atomicidad de diario UTC + `sfmc_queue` + ledgers de
+clientes y pedidos en MySQL/MariaDB, **sin crear tablas en BC**.
+La cola está siempre `blocked`, las colisiones con filas
+preexistentes se rechazan y el test valida las columnas/índices
+del instalador existente. Esto no convierte al adaptador de pruebas
+en un runtime Growth operativo.
+
 ## Production gates remain blocked
 
 The real 0.7.1 queue first updates
