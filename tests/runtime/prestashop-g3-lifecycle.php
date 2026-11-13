@@ -22,11 +22,12 @@ function g3RuntimeCheck($pass, $reason)
         throw new RuntimeException('g3_runtime_' . $reason);
     }
 }
-function g3RuntimeReject($callback, $reason)
+function g3RuntimeReject($callback, $reason, $expectedCode)
 {
     try {
         call_user_func($callback);
     } catch (RuntimeException $e) {
+        g3RuntimeCheck($e->getMessage() === $expectedCode, $reason . '_unexpected_failure');
         return;
     }
     g3RuntimeCheck(false, $reason);
@@ -58,13 +59,13 @@ function g3RuntimeSmoke()
         === 'already_installed', 'install_not_idempotent');
     g3RuntimeReject(function () use ($adapter, $namespace) {
         $adapter->install('ABH', 'marketing_cloud_engagement', $namespace);
-    }, 'engagement_fallback_accepted');
+    }, 'engagement_fallback_accepted', 'g3_adapter_abh_growth_only');
     g3RuntimeReject(function () use ($adapter) {
         $adapter->install('ABH', 'marketing_cloud_growth', 'growth_ci_other');
-    }, 'namespace_switch_accepted');
+    }, 'namespace_switch_accepted', 'g3_ps_runtime_binding_conflict');
     g3RuntimeReject(function () use ($adapter, $namespace) {
         $adapter->install('OTHER_MERCHANT', 'marketing_cloud_growth', $namespace);
-    }, 'merchant_switch_accepted');
+    }, 'merchant_switch_accepted', 'g3_ps_runtime_binding_conflict');
 
     $outbox = _DB_PREFIX_ . 'g3_growth_outbox_v1';
     $ledger = _DB_PREFIX_ . 'g3_growth_entity_ledger_v1';
@@ -112,10 +113,10 @@ function g3RuntimeSmoke()
         ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"), 'partial_fixture_setup');
     g3RuntimeReject(function () use ($adapter, $namespace) {
         $adapter->install('ABH', 'marketing_cloud_growth', $namespace);
-    }, 'partial_install_accepted');
+    }, 'partial_install_accepted', 'g3_ps_runtime_partial_schema_manual_review');
     g3RuntimeReject(function () use ($adapter, $namespace) {
         $adapter->uninstallCandidate('ABH', 'marketing_cloud_growth', $namespace);
-    }, 'partial_uninstall_accepted');
+    }, 'partial_uninstall_accepted', 'g3_ps_runtime_partial_schema_manual_review');
     g3RuntimeCheck($db->execute("DROP TABLE `{$binding}`"), 'manual_fixture_cleanup');
     g3RuntimeCheck(count($adapter->present()) === 0, 'partial_fixture_not_cleared');
     foreach ($legacy as $name => $count) {
