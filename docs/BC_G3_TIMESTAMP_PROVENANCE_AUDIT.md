@@ -34,6 +34,44 @@ de captura (con fuente y versión de escritura verificadas). Antes de
 habilitarlo, decidir idempotencia, regla de frescura, Record Modified,
 DST y aprobación de responsable. No inventar UTC del histórico.
 
+## Evidencia real del panel de BC — 13/11/2026
+
+**Verificado directamente por captura del operador del Back Office del módulo
+0.7.1**, sin ejecutar SQL ni modificar la tienda:
+
+| Elemento mostrado por el panel | Resultado |
+| --- | --- |
+| `shops_identified` | **PASS** |
+| `shop_timezones_valid` | **PASS** |
+| `date_columns_inspected` | **PASS** |
+| Shop ID | **1** |
+| Timezone IANA | **Europe/Madrid** (`valid`) |
+| `customer.date_add` / `customer.date_upd` | **datetime / datetime** |
+| `orders.date_add` / `orders.date_upd` | **datetime / datetime** |
+| Estado de activación PST | **BLOCKED — review only** |
+| Privacidad/retención | Aviso: **“Privacy retention has not run yet”** |
+
+Este resultado **cierra la comprobación técnica de metadatos y zona
+horaria actual** que proporciona el panel, pero **NO** cierra G3-03
+(procedencia temporal histórica) ni G3-04 (Record Modified + Refresh Mode).
+El tipo MySQL `DATETIME` no incorpora zona horaria ni confirma que todas
+las escrituras históricas utilizaran el bootstrap PHP estándar. Los
+recuentos de anomalías y DST del SQL opcional **no se han obtenido** y
+NO deben inventarse.
+
+El aviso de retención se observa, pero no se ha inspeccionado el estado
+del cron ni su primera ejecución; no pulsar acciones de retención,
+backfill o conexión como parte de esta auditoría. La etiqueta de
+“Marketing Cloud Engagement” del panel de salud del módulo 0.7.1
+corresponde a la interfaz heredada: **el destino de ABH sigue siendo
+Marketing Cloud Growth + Data 360**, no Engagement.
+
+**Siguiente trabajo sin permisos SQL del usuario:** diseñar y probar,
+con datos sintéticos, cómo registrar un instante de captura UTC verificable
+para los eventos **nuevos** en el futuro adaptador Growth, y marcar
+los `date_upd` históricos como `provenance_unverified` hasta demostrar
+su fuente; no activar el pipeline ni publicar v0.3.
+
 ### Consulta SQL opcional (solo DBA autorizado)
 **Objetivo:** aportar evidencia a **G3-03** (origen temporal) y **G3-04**
 (Record Modified + Refresh Mode) del conector `PST` de **Data 360 para
