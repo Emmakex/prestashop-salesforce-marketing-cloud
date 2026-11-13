@@ -55,6 +55,12 @@ Este inventario procede exactamente de los dos YAML del repositorio y del mapper
 > Hemos preparado la [auditoría agregada sin PII](BC_G3_TIMESTAMP_PROVENANCE_AUDIT.md)
 > y su [SQL de solo lectura](../scripts/sql/bc_g3_timestamp_provenance_aggregate_readonly.sql).
 > G3-03 **sigue pendiente** y el esquema v0.3 **no está autorizado**.
+> **Sin acceso SQL directo a producción:** no se pedirá al responsable
+> ejecutar consultas. El módulo BC 0.7.1 ya muestra el panel BO
+> `Data Cloud - installation preflight` (zona horaria y metadatos de
+> columnas), sin consultar filas. El SQL agregado es **opcional para DBA**,
+> no un paso obligatorio. Diseñar una fuente UTC nueva y verificable
+> para futuros eventos sin reinterpretar los DATETIME históricos.
 
 ## Ocho decisiones pendientes del responsable
 
