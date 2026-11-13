@@ -59,7 +59,8 @@ function fakeGet($fixtures, &$urls, $relationStatus = 200)
             ? 'individual_relationships'
             : (strpos($name, '/relationships') !== false
                 ? 'relationships' : $name);
-        return ['status' => $fixture === 'relationships' ? $relationStatus : 200,
+        return ['status' => strpos($name, '/relationships') !== false
+            ? $relationStatus : 200,
             'body' => json_encode($fixtures[$fixture])];
     };
 }
