@@ -19,11 +19,11 @@ Confirmed: connector `PST` / `ABH_PrestaShop_Data_Cloud`, Data Space `default`, 
 
 The current schema's `source_updated_local` is TEXT, not an ISO UTC timestamp. PrestaShop's local `date_upd` has no timezone suffix. Do not use it as Record Modified.
 
-**Recommended, not yet approved:** add a separate `source_updated_utc` date-time field **before the first schema upload**, derived from an explicit configured IANA timezone per PrestaShop shop. `SourceTimestampNormalizer` now handles exact `yyyy-MM-dd HH:mm:ss` and emits `yyyy-MM-ddTHH:mm:ss.SSSZ`, rejecting nonexistent or ambiguous DST wall-clock times, invalid dates and unknown timezones. `Europe/Madrid` is a test fixture and must **not** be forced globally on merchants.
+**Candidato técnico v0.3, NO recomendado para carga sin evidencia:** añadir `source_updated_utc` como posible Record Modified **solo después** de verificar el origen de cada marca temporal y la semántica de actualización del registro. Conocer la IANA `PS_TIMEZONE` actual no certifica el offset histórico, el camino de escritura, el reloj ni las importaciones. `SourceTimestampNormalizer` convierte una hora local bajo una zona *supuesta* y rechaza valores inválidos, horas inexistentes y ambigüedades DST; **su éxito no demuestra que el valor convertido sea la modificación real de origen**. `Europe/Madrid` está observado hoy en BC pero nunca se impone a otras instalaciones.
 
 At DST fall-back ambiguity, quarantine for a true absolute-source timestamp rather than guessing. This pure helper is not wired into any live worker or payload mapper.
 
-Alternative: choose **no** Record Modified field and Full refresh; this would require separate ordered-delivery/stale-update guarantees before real sync. Full versus Partial Refresh Mode becomes immutable at Data Stream creation. Neither choice has yet been approved.
+Alternativa: **no** Record Modified en v0.2 y modo Full para upserts de registros completos; no asegura orden de escrituras remotas ni borrado de filas ausentes, por lo que exige contrato explícito de reconciliación, revisión de estado actual y protección de replays antes de sincronizar. Para **Partial + streaming**, Salesforce requiere Primary Key y Record Modified verificado. **Partial + bulk no es una actualización parcial segura:** puede convertir campos omitidos en `null` porque funciona como upsert. El Refresh Mode se fija al crear el Data Stream y no puede cambiarse después. Ninguna alternativa está aprobada; [matriz G3-03/G3-04](G3_RECORD_MODIFIED_REFRESH_MODE_DECISION.md).
 
 ## Data owner and admin acceptance
 
