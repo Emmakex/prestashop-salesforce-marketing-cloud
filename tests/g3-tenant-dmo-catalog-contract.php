@@ -31,10 +31,12 @@ function fixtures()
                 ['name' => 'ssot__SoldToCustomerId__c'],
                 ['name' => 'ssot__BillToContactId__c']],
         ],
+        'individual_relationships' => ['relationships' => []],
         'relationships' => ['relationships' => [
             ['sourceEntity' => ['name' => 'ssot__SalesOrder__dlm'],
              'targetEntity' => ['name' => 'ssot__Individual__dlm'],
              'sourceField' => ['name' => 'ssot__SoldToCustomerId__c'],
+             'status' => 'ACTIVE',
              'secret' => 'no-print-tenant-secret'],
             ['sourceEntity' => ['name' => 'ssot__SalesOrder__dlm'],
              'targetEntity' => ['name' => 'ssot__Account__dlm'],
@@ -50,9 +52,13 @@ function fakeGet($fixtures, &$urls, $relationStatus = 200)
         assertDmo(strpos($url, $prefix) === 0, 'unexpected_host_or_path');
         $name = substr($url, strlen($prefix));
         assertDmo(in_array($name, ['ssot__Individual__dlm', 'ssot__SalesOrder__dlm',
-            'ssot__SalesOrder__dlm/relationships'], true), 'not_fixed_get');
+            'ssot__SalesOrder__dlm/relationships',
+            'ssot__Individual__dlm/relationships'], true), 'not_fixed_get');
         $urls[] = $url;
-        $fixture = strpos($name, '/relationships') !== false ? 'relationships' : $name;
+        $fixture = $name === 'ssot__Individual__dlm/relationships'
+            ? 'individual_relationships'
+            : (strpos($name, '/relationships') !== false
+                ? 'relationships' : $name);
         return ['status' => $fixture === 'relationships' ? $relationStatus : 200,
             'body' => json_encode($fixtures[$fixture])];
     };
@@ -62,15 +68,20 @@ $probe = new G3TenantDmoCatalogProbe(
 $fixture = fixtures();
 $urls = [];
 $result = $probe->inspect(fakeGet($fixture, $urls));
-assertDmo(count($urls) === 3, 'expected_exactly_3_gets');
+assertDmo(count($urls) === 4, 'expected_exactly_4_gets');
 assertDmo($urls[0] === 'https://example.my.salesforce.com/services/data/v68.0/ssot/data-model-objects/ssot__Individual__dlm', 'individual_path');
 assertDmo($urls[1] === 'https://example.my.salesforce.com/services/data/v68.0/ssot/data-model-objects/ssot__SalesOrder__dlm', 'sales_order_path');
 assertDmo($urls[2] === $urls[1] . '/relationships', 'relations_path');
+assertDmo($urls[3] === $urls[0] . '/relationships', 'individual_relations_path');
 assertDmo($result['objects']['Individual']['id_field_is_primary_key'],
     'individual_pk');
-assertDmo($result['objects']['SalesOrder']['category_matches_proposal'],
+assertDmo($result['objects']['SalesOrder']['category_matches_proposal']
+    && $result['objects']['SalesOrder']['observed_category'] === 'OTHER',
     'sales_order_category');
-assertDmo($result['relationship']['sold_to_customer_relation_seen'],
+assertDmo($result['relationship']['sold_to_customer_relation_seen']
+    && $result['relationship']['active_candidate_relation_seen']
+    && $result['relationship']['sales_order_relationship_count'] === 2
+    && $result['relationship']['individual_relationship_count'] === 0,
     'exact_relationship');
 assertDmo(!$result['relationship']['bill_to_contact_relation_seen'],
     'wrong_relation_target');
@@ -89,14 +100,42 @@ foreach (['no-print-tenant-secret', 'custom_private_field__c',
 $relUrls = [];
 $partial = $probe->inspect(fakeGet($fixture, $relUrls, 403));
 assertDmo(!$partial['relationship']['metadata_accessible']
+    && !$partial['relationship']['individual_relationship_metadata_accessible']
+    && $partial['relationship']['sales_order_relationship_count'] === null
     && !$partial['relationship']['sales_order_to_individual_candidate_present'],
     '403_relation_falsely_verified');
 $wrong = fixtures();
 $wrong['ssot__SalesOrder__dlm']['category'] = 'ENGAGEMENT';
 $wrongUrls = [];
 $wrongResult = $probe->inspect(fakeGet($wrong, $wrongUrls));
-assertDmo(!$wrongResult['objects']['SalesOrder']['category_matches_proposal'],
+assertDmo(!$wrongResult['objects']['SalesOrder']['category_matches_proposal']
+    && $wrongResult['objects']['SalesOrder']['observed_category'] === 'ENGAGEMENT',
     'unexpected_category_approved');
+// Untrusted/custom categories are not exported verbatim.
+$unknown = fixtures();
+$unknown['ssot__SalesOrder__dlm']['category'] = 'tenant_confidential_category';
+$unknownUrls = [];
+$unknownResult = $probe->inspect(fakeGet($unknown, $unknownUrls));
+assertDmo($unknownResult['objects']['SalesOrder']['observed_category'] === 'UNRECOGNIZED'
+    && strpos(json_encode($unknownResult), 'tenant_confidential_category') === false,
+    'unrecognized_category_was_leaked');
+// The reverse endpoint can identify fields belonging to Sales Order while
+// exposing that object as targetEntity, never as sourceEntity.
+$reverse = fixtures();
+$reverse['relationships']['relationships'] = [];
+$reverse['individual_relationships']['relationships'] = [[
+    'sourceEntity' => ['name' => 'ssot__Individual__dlm'],
+    'targetEntity' => ['name' => 'ssot__SalesOrder__dlm'],
+    'targetField' => ['name' => 'ssot__BillToContactId__c'],
+    'status' => 'INACTIVE'
+]];
+$reverseUrls = [];
+$reverseResult = $probe->inspect(fakeGet($reverse, $reverseUrls));
+assertDmo($reverseResult['relationship']['any_relation_between_objects_seen']
+    && $reverseResult['relationship']['bill_to_contact_relation_seen']
+    && !$reverseResult['relationship']['active_candidate_relation_seen'],
+    'reverse_relationship_not_reported');
+
 rejectDmo(function () use ($probe) {
     $probe->inspect(function () {
         return ['status' => 403, 'body' => '{"access_token":"secret"}'];
@@ -149,4 +188,4 @@ foreach (['branches: [main]', 'environment: salesforce-growth-certification',
 }
 assertDmo(strpos($workflow, 'pull_request:') === false,
     'secrets_exposed_to_pr');
-echo "G3 DMO metadata GET-only contract: three fixed GETs, sanitized evidence, no approvals.\n";
+echo "G3 DMO metadata GET-only contract: four fixed GETs, category enum and both relation directions; no approvals.\n";
