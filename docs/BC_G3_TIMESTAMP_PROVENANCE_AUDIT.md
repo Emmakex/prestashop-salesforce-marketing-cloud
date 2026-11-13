@@ -1,6 +1,40 @@
 # G3 · Auditoría de procedencia de marcas temporales BC (read-only)
 
-**Estado: PREPARADO, NO EJECUTADO EN BC.** 13/11/2026.
+**Estado: SQL OPCIONAL NO EJECUTADO EN BC.** 13/11/2026.
+**Restricción operativa confirmada:** el responsable del proyecto **no tiene
+acceso SQL directo a producción**. NO volver a solicitarle phpMyAdmin,
+credenciales SQL, túneles o exportaciones. Esta auditoría SQL es una vía
+alternativa solo si un DBA autorizado la necesita; no es requisito para
+continuar G3.
+
+### Vía principal SIN SQL directo: Back Office ya instalado
+
+La versión 0.7.1 de `pssalesforcebridge` incluye
+`ModuleHealthTrait::renderDataCloudReadiness()`,
+`PrestaShopReadinessProbe` y `InstallationReadinessDashboard`.
+El panel aparece al abrir **Módulos → Gestor de módulos →
+PrestaShop Salesforce Marketing Cloud → Configurar**, sección
+**“Data Cloud - installation preflight”**. Es una consulta local de
+**metadatos** por tienda (`PS_TIMEZONE`, tipos de
+`date_add/date_upd` vía `information_schema`) sin consulta de filas
+de clientes/pedidos, sin envíos HTTP ni mutaciones.
+
+Si el responsable dispone de acceso al BO y quiere aportar evidencia,
+bastará la tabla **“Per-shop zone”** y **“SQL date column types
+(metadata only)”**, sin hacer clic en botones de backfill, cron,
+retención, prueba de conexión o guardar configuración. Si no dispone
+del BO, continuar desde código y datos sintéticos; no solicitarle
+nuevas credenciales. El panel NO muestra recuentos DST, ni puede probar
+origen horario histórico.
+
+**Estrategia de avance:** conservar G3-03 como pendiente, separar
+registros históricos con procedencia no verificable de eventos futuros,
+y priorizar un mecanismo futuro de timestamp UTC obtenido en el instante
+de captura (con fuente y versión de escritura verificadas). Antes de
+habilitarlo, decidir idempotencia, regla de frescura, Record Modified,
+DST y aprobación de responsable. No inventar UTC del histórico.
+
+### Consulta SQL opcional (solo DBA autorizado)
 **Objetivo:** aportar evidencia a **G3-03** (origen temporal) y **G3-04**
 (Record Modified + Refresh Mode) del conector `PST` de **Data 360 para
 Marketing Cloud Growth**. No Data Streams, no ingesta, no campañas.
