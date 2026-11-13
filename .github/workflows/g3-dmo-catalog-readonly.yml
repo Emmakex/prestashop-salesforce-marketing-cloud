@@ -1,0 +1,63 @@
+name: ABH Data 360 DMO Catalog Read Only
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/g3-dmo-catalog-readonly.yml'
+      - 'tests/live/g3-tenant-dmo-catalog.php'
+      - 'tests/review/G3TenantDmoCatalogProbe.php'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: g3-abh-dmo-catalog-readonly
+  cancel-in-progress: false
+
+jobs:
+  dmo-metadata-only:
+    if: github.repository == 'Emmakex/prestashop-salesforce-marketing-cloud' && github.ref == 'refs/heads/main'
+    name: ABH metadata GET only, no records or writes
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: salesforce-growth-certification
+    steps:
+      - name: Checkout exact main commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Verify pinned commit and repository
+        shell: bash
+        run: |
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          test "$GITHUB_REF" = "refs/heads/main"
+          test "$GITHUB_REPOSITORY" = "Emmakex/prestashop-salesforce-marketing-cloud"
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: curl
+          coverage: none
+      - name: Lint restricted metadata runner
+        run: |
+          php -l tests/review/G3TenantDmoCatalogProbe.php
+          php -l tests/live/g3-tenant-dmo-catalog.php
+          php tests/g3-tenant-dmo-catalog-contract.php
+      - name: Inspect fixed DMO metadata allowlist (GET only)
+        env:
+          G3_TENANT_DMO_READ_ONLY: yes_metadata_only
+          SF_GROWTH_ORG_URL: ${{ vars.SF_GROWTH_ORG_URL }}
+          SF_GROWTH_CLIENT_ID: ${{ secrets.SF_GROWTH_CLIENT_ID }}
+          SF_GROWTH_CLIENT_SECRET: ${{ secrets.SF_GROWTH_CLIENT_SECRET }}
+          SF_G3_DMO_EVIDENCE_PATH: g3-abh-dmo-catalog-sanitized.json
+        run: php tests/live/g3-tenant-dmo-catalog.php
+      - name: Store sanitized metadata flags only
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: g3-abh-dmo-catalog-readonly-${{ github.run_id }}-${{ github.run_attempt }}
+          path: g3-abh-dmo-catalog-sanitized.json
+          if-no-files-found: ignore
+          retention-days: 14
