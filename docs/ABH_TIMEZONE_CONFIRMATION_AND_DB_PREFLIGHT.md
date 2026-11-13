@@ -42,6 +42,16 @@ This query reveals the current database session clock only. It does **not**
 prove the timezone of past PrestaShop date_upd writes. Do not use the current
 DB timezone to reinterpret historical values automatically.
 
+## Future live hook observation — candidate implementation only
+
+The [offline G3 UTC observation contract](G3_LIVE_UTC_OBSERVATION_CONTRACT.md)
+captures a new hook's PHP Unix clock instant as `captured_at_utc` independent
+of the shop timezone. **Observation time is NOT source modification time**.
+The class is not invoked by any hook, worker, queue or Data Cloud transport
+and does not change v0.2/v0.3; the host clock is not yet NTP-certified.
+The installed BC 0.7.1 remains in Test. Historical DATETIME semantics,
+Record Modified strategy and G3 owner approvals are still pending.
+
 ## What is prepared
 
 - v0.2 source schema remains 22 fields, review only.
