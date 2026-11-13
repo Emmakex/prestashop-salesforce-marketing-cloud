@@ -21,6 +21,8 @@
 
 **Nuevo bloqueo observado para G3-05/G3-06:** [run real ABH #43488387453](https://github.com/Emmakex/prestashop-salesforce-marketing-cloud/actions/runs/43488387453): `SalesOrder` es accesible pero su categoría no coincide con `OTHER`, y no se confirma relación hacia `Individual` desde el primer endpoint. La [segunda inspección limitada](G3_ABH_DMO_TENANT_READONLY_DISCOVERY.md) expondrá la categoría como enum y comprobará las dos perspectivas; **ninguna ausencia se toma como inexistencia definitiva**. El arquitecto debe seleccionar y aprobar el diseño; no se publica.
 
+**Último estado real G3-05/G3-06:** [ABH run #43491126597](https://github.com/Emmakex/prestashop-salesforce-marketing-cloud/actions/runs/43491126597) confirmó `SalesOrder=UNASSIGNED`, `Individual=PROFILE`, PK y Data Space `default`; **no hay relación directa certificada** entre los campos candidatos. [Opciones A/B/C/D y comprobación controlada de Account](G3_CUSTOMER_ORDER_RELATION_TOPOLOGY_DECISION.md). Se necesita elección del arquitecto; **ninguna opción queda aprobada automáticamente**.
+
 ## Qué necesita decidir cada responsable
 
 Esta hoja separa **propuesta técnica**, **evidencia necesaria** y **decisión humana**. No atribuye permisos al indicador newsletter, no fija plazos legales, no transforma fechas históricas inciertas, no elige el esquema automáticamente y no invoca ningún servicio de Salesforce.
