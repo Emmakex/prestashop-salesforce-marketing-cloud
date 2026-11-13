@@ -69,11 +69,11 @@ against the exact SQL column order.
 - Salesforce Marketing Cloud subscriber key mapping across separate
   PrestaShop installations, all-subscribers and publication-list status,
   exclusions/suppression, global unsubscribes and complaints.
-- The exact BC-installed `PS_SFMC_CART_CONSENT_MODE` is **not** observed
-  yet, despite the already verified `PS_SFMC_MODE=test`. The optional
-  `known_contact` mode bypasses the first-party newsletter condition.
-  Check the **non-sensitive policy flags** with
-  `scripts/sql/bc_cart_policy_mode_readonly.sql`.
+- **Resolved on 2026-11-13 via operator SQL:** global
+  `PS_SFMC_MODE=test`, `PS_SFMC_CART_CONSENT_MODE=marketing_optin`,
+  `PS_SFMC_CART_ABANDON_MINUTES=60`. The optional `known_contact`
+  mode is **not** configured for BC. This verifies configured values,
+  not live subscriber permissions or actual abandonment timestamps.
 - The earlier most-recent-500-cart sample had 58 provisional abandoned
   carts linked to 44 customers and 10 newsletter-positive carts linked
   to **7** distinct customers. It is a different cohort; never equate
