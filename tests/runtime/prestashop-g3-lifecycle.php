@@ -33,8 +33,8 @@ function g3RuntimeReject($callback, $reason)
 }
 function g3RuntimeReadCount($table)
 {
-    return (int) Db::getInstance()->getValue('SELECT COUNT(*) FROM \`'
-        . _DB_PREFIX_ . $table . '\`');
+    return (int) Db::getInstance()->getValue('SELECT COUNT(*) FROM `'
+        . _DB_PREFIX_ . $table . '`');
 }
 function g3RuntimeSmoke()
 {
@@ -68,7 +68,7 @@ function g3RuntimeSmoke()
 
     $outbox = _DB_PREFIX_ . 'g3_growth_outbox_v1';
     $ledger = _DB_PREFIX_ . 'g3_growth_entity_ledger_v1';
-    $insert = "INSERT INTO \`{$outbox}\`
+    $insert = "INSERT INTO `{$outbox}`
         (source_namespace, shop_id, entity_type, entity_id,
          dedupe_fingerprint, original_event_type, captured_at_utc,
          captured_at_precision, clock_source, clock_sync_verified,
@@ -80,7 +80,7 @@ function g3RuntimeSmoke()
     g3RuntimeCheck($db->execute($insert) === true, 'synthetic_event');
     $seq = (int) $db->Insert_ID();
     g3RuntimeCheck($seq > 0, 'accepted_sequence');
-    g3RuntimeCheck($db->execute("INSERT INTO \`{$ledger}\`
+    g3RuntimeCheck($db->execute("INSERT INTO `{$ledger}`
         (source_namespace, shop_id, entity_type, entity_id,
          latest_accepted_sequence, status) VALUES
         ('growth_ci_abhtest', 1, 'customer', 19001, " . $seq . ", 'blocked')") === true,
@@ -88,16 +88,16 @@ function g3RuntimeSmoke()
     g3RuntimeCheck($adapter->uninstallCandidate('ABH', 'marketing_cloud_growth', $namespace)
         === 'retained_nonempty', 'uninstall_deleted_accepted_data');
     g3RuntimeCheck(count($adapter->present()) === 3, 'retained_schema_missing');
-    g3RuntimeCheck((int) $db->getValue("SELECT COUNT(*) FROM \`{$outbox}\`
+    g3RuntimeCheck((int) $db->getValue("SELECT COUNT(*) FROM `{$outbox}`
         WHERE source_namespace = 'growth_ci_abhtest' AND entity_id = 19001") === 1,
         'retained_event_missing');
     g3RuntimeCheck($adapter->install('ABH', 'marketing_cloud_growth', $namespace)
         === 'already_installed', 'resuming_retained_install');
     // Explicitly remove our OWN synthetic rows only, never user/legacy data.
-    g3RuntimeCheck($db->execute("DELETE FROM \`{$ledger}\`
+    g3RuntimeCheck($db->execute("DELETE FROM `{$ledger}`
         WHERE source_namespace = 'growth_ci_abhtest' AND entity_id = 19001"),
         'cleanup_ledger');
-    g3RuntimeCheck($db->execute("DELETE FROM \`{$outbox}\`
+    g3RuntimeCheck($db->execute("DELETE FROM `{$outbox}`
         WHERE source_namespace = 'growth_ci_abhtest' AND entity_id = 19001"),
         'cleanup_outbox');
     g3RuntimeCheck($adapter->uninstallCandidate('ABH', 'marketing_cloud_growth', $namespace)
@@ -108,7 +108,7 @@ function g3RuntimeSmoke()
 
     // Simulate interrupted DDL; it must be diagnosed, not auto-repaired.
     $binding = _DB_PREFIX_ . 'g3_provider_binding_v1';
-    g3RuntimeCheck($db->execute("CREATE TABLE \`{$binding}\` (incomplete INT)
+    g3RuntimeCheck($db->execute("CREATE TABLE `{$binding}` (incomplete INT)
         ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"), 'partial_fixture_setup');
     g3RuntimeReject(function () use ($adapter, $namespace) {
         $adapter->install('ABH', 'marketing_cloud_growth', $namespace);
@@ -116,7 +116,7 @@ function g3RuntimeSmoke()
     g3RuntimeReject(function () use ($adapter, $namespace) {
         $adapter->uninstallCandidate('ABH', 'marketing_cloud_growth', $namespace);
     }, 'partial_uninstall_accepted');
-    g3RuntimeCheck($db->execute("DROP TABLE \`{$binding}\`"), 'manual_fixture_cleanup');
+    g3RuntimeCheck($db->execute("DROP TABLE `{$binding}`"), 'manual_fixture_cleanup');
     g3RuntimeCheck(count($adapter->present()) === 0, 'partial_fixture_not_cleared');
     foreach ($legacy as $name => $count) {
         g3RuntimeCheck(g3RuntimeReadCount($name) === $count,
