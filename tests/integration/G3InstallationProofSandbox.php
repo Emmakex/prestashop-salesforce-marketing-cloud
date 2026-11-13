@@ -42,6 +42,9 @@ final class G3InstallationProofSandbox
             public_key_pem TEXT NOT NULL,
             public_key_sha256 CHAR(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
             status VARCHAR(16) CHARACTER SET ascii NOT NULL DEFAULT 'blocked',
+            key_version BIGINT UNSIGNED NOT NULL DEFAULT 1,
+            key_state VARCHAR(16) CHARACTER SET ascii NOT NULL DEFAULT 'active',
+            revoked_at_epoch BIGINT UNSIGNED NULL,
             PRIMARY KEY (source_namespace),
             UNIQUE KEY uq_g3_proof_install (external_installation_id)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
@@ -50,6 +53,8 @@ final class G3InstallationProofSandbox
             source_namespace VARCHAR(32) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
             external_installation_id CHAR(36) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
             expires_epoch BIGINT UNSIGNED NOT NULL,
+            key_version BIGINT UNSIGNED NOT NULL,
+            public_key_sha256 CHAR(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
             consumed TINYINT UNSIGNED NOT NULL DEFAULT 0,
             PRIMARY KEY (nonce_sha256),
             KEY idx_g3_proof_source (source_namespace, external_installation_id),
@@ -68,20 +73,7 @@ final class G3InstallationProofSandbox
             throw new RuntimeException('g3_proof_external_operator_required');
         }
         $this->assertReserved($namespace, $installationId, $merchant, $provider);
-        if (!is_string($publicKeyPem) || strlen($publicKeyPem) > 4096) {
-            throw new RuntimeException('g3_proof_public_key_invalid');
-        }
-        $key = openssl_pkey_get_public($publicKeyPem);
-        if ($key === false) {
-            throw new RuntimeException('g3_proof_public_key_invalid');
-        }
-        $details = openssl_pkey_get_details($key);
-        if (!is_array($details) || $details['type'] !== OPENSSL_KEYTYPE_RSA
-            || $details['bits'] < 2048 || $details['bits'] > 4096
-            || !isset($details['key'])) {
-            throw new RuntimeException('g3_proof_public_key_invalid');
-        }
-        $normalized = $details['key'];
+        $normalized = self::validatedPublicKey($publicKeyPem);
         $fingerprint = hash('sha256', $normalized);
         $existing = $this->keyRows($namespace, $installationId);
         if ($existing) {
@@ -106,15 +98,26 @@ final class G3InstallationProofSandbox
     {
         $this->assertReserved($namespace, $installationId, $merchant, $provider);
         $this->assertTables();
-        $this->loadKey($namespace, $installationId);
-        // Issuer nonce is never saved in plaintext; short-lived challenge.
-        $nonce = bin2hex(random_bytes(32));
-        $expiry = time() + 60;
-        $stmt = $this->pdo->prepare('INSERT INTO g3_install_proof_challenge_ci_v1
-            (nonce_sha256, source_namespace, external_installation_id,
-             expires_epoch, consumed) VALUES (?, ?, ?, ?, 0)');
-        $stmt->execute([hash('sha256', $nonce), $namespace, $installationId, $expiry]);
-        return ['nonce' => $nonce, 'expires_epoch' => $expiry];
+        $this->pdo->beginTransaction();
+        try {
+            // Serializes issuance with operator key rotation / revocation.
+            $key = $this->loadKey($namespace, $installationId, true);
+            $nonce = bin2hex(random_bytes(32));
+            $expiry = time() + 60;
+            $stmt = $this->pdo->prepare('INSERT INTO g3_install_proof_challenge_ci_v1
+                (nonce_sha256, source_namespace, external_installation_id,
+                 expires_epoch, key_version, public_key_sha256, consumed)
+                VALUES (?, ?, ?, ?, ?, ?, 0)');
+            $stmt->execute([hash('sha256', $nonce), $namespace, $installationId,
+                $expiry, $key['key_version'], $key['public_key_sha256']]);
+            $this->pdo->commit();
+            return ['nonce' => $nonce, 'expires_epoch' => $expiry];
+        } catch (Throwable $e) {
+            if ($this->pdo->inTransaction()) {
+                $this->pdo->rollBack();
+            }
+            throw $e;
+        }
     }
 
     public static function signingMessage($namespace, $installationId, $merchant, $provider, $nonce, $expiry)
@@ -147,28 +150,130 @@ final class G3InstallationProofSandbox
         if (!is_string($signature) || strlen($signature) < 256 || strlen($signature) > 512) {
             throw new RuntimeException('g3_proof_invalid_signature');
         }
-        $key = $this->loadKey($namespace, $installationId);
-        if (openssl_verify($message, $signature, $key['public_key_pem'],
-            OPENSSL_ALGO_SHA256) !== 1) {
-            throw new RuntimeException('g3_proof_invalid_signature');
+        $this->pdo->beginTransaction();
+        try {
+            // Lock the key BEFORE signature verification. Concurrent revocation
+            // or rotation cannot pass between verification and nonce consume.
+            $key = $this->loadKey($namespace, $installationId, true);
+            if (openssl_verify($message, $signature, $key['public_key_pem'],
+                OPENSSL_ALGO_SHA256) !== 1) {
+                throw new RuntimeException('g3_proof_invalid_signature');
+            }
+            // A challenge is bound to one precise key generation and digest.
+            // An old, unconsumed challenge fails even if re-signed by a new key.
+            $stmt = $this->pdo->prepare('UPDATE g3_install_proof_challenge_ci_v1
+                SET consumed = 1 WHERE nonce_sha256 = ?
+                AND source_namespace = ? AND external_installation_id = ?
+                AND expires_epoch = ? AND key_version = ?
+                AND public_key_sha256 = ? AND consumed = 0 AND expires_epoch > ?');
+            $stmt->execute([hash('sha256', $nonce), $namespace, $installationId,
+                $expiry, $key['key_version'], $key['public_key_sha256'], time()]);
+            if ($stmt->rowCount() !== 1) {
+                throw new RuntimeException('g3_proof_missing_expired_or_replayed');
+            }
+            $this->pdo->commit();
+        } catch (Throwable $e) {
+            if ($this->pdo->inTransaction()) {
+                $this->pdo->rollBack();
+            }
+            throw $e;
         }
-        // Atomic compare-and-consume. No replay, no accepting expired proofs,
-        // even if two parallel workers verify the signature successfully.
-        $stmt = $this->pdo->prepare('UPDATE g3_install_proof_challenge_ci_v1
-            SET consumed = 1 WHERE nonce_sha256 = ?
-            AND source_namespace = ? AND external_installation_id = ?
-            AND expires_epoch = ? AND consumed = 0 AND expires_epoch > ?');
-        $stmt->execute([hash('sha256', $nonce), $namespace, $installationId,
-            $expiry, time()]);
-        if ($stmt->rowCount() !== 1) {
-            throw new RuntimeException('g3_proof_missing_expired_or_replayed');
-        }
-        // Possession proof != operator sign-off, data owner approval, or
-        // permission to create a Data 360 stream or send Growth messages.
         return ['proof_verified' => true, 'identity_owner_approved' => false,
             'schema_upload_authorized' => false,
             'data_360_ingestion_authorized' => false,
             'marketing_sends_authorized' => false];
+    }
+
+    /**
+     * An operator in a REAL product must be separately authenticated.
+     * CI-only fixture flag is not an actual second-person approval.
+     * A rotation never elevates the record's permanent blocked status.
+     */
+    public function rotateByExternalOperator($namespace, $installationId,
+        $merchant, $provider, $expectedOldFingerprint, $newPublicKeyPem)
+    {
+        self::requireOperatorFixture();
+        $this->assertReserved($namespace, $installationId, $merchant, $provider);
+        $this->assertTables();
+        $normalized = self::validatedPublicKey($newPublicKeyPem);
+        $newFingerprint = hash('sha256', $normalized);
+        if (!is_string($expectedOldFingerprint)
+            || !preg_match('/^[0-9a-f]{64}$/D', $expectedOldFingerprint)) {
+            throw new RuntimeException('g3_proof_expected_fingerprint_required');
+        }
+        $this->pdo->beginTransaction();
+        try {
+            $key = $this->loadKey($namespace, $installationId, true);
+            if (!hash_equals($key['public_key_sha256'], $expectedOldFingerprint)
+                || hash_equals($key['public_key_sha256'], $newFingerprint)) {
+                throw new RuntimeException('g3_proof_rotation_conflict_manual_review');
+            }
+            $next = (int) $key['key_version'] + 1;
+            $stmt = $this->pdo->prepare("UPDATE g3_install_proof_key_ci_v1
+                SET public_key_pem = ?, public_key_sha256 = ?, key_version = ?
+                WHERE source_namespace = ? AND external_installation_id = ?
+                AND status = 'blocked' AND key_state = 'active'
+                AND revoked_at_epoch IS NULL AND key_version = ?
+                AND public_key_sha256 = ?");
+            $stmt->execute([$normalized, $newFingerprint, $next, $namespace,
+                $installationId, $key['key_version'], $expectedOldFingerprint]);
+            if ($stmt->rowCount() !== 1) {
+                throw new RuntimeException('g3_proof_rotation_conflict_manual_review');
+            }
+            $this->pdo->commit();
+            return ['key_version' => $next, 'status' => 'blocked',
+                'identity_owner_approved' => false, 'data_360_ingestion_authorized' => false,
+                'marketing_sends_authorized' => false];
+        } catch (Throwable $e) {
+            if ($this->pdo->inTransaction()) {
+                $this->pdo->rollBack();
+            }
+            throw $e;
+        }
+    }
+
+    /**
+     * Irreversible CI revocation: recovery requires a NEW, separately reviewed
+     * enrollment flow. A fresh enroll/rotation cannot resurrect this record.
+     */
+    public function revokeByExternalOperator($namespace, $installationId,
+        $merchant, $provider, $expectedFingerprint)
+    {
+        self::requireOperatorFixture();
+        $this->assertReserved($namespace, $installationId, $merchant, $provider);
+        $this->assertTables();
+        if (!is_string($expectedFingerprint)
+            || !preg_match('/^[0-9a-f]{64}$/D', $expectedFingerprint)) {
+            throw new RuntimeException('g3_proof_expected_fingerprint_required');
+        }
+        $this->pdo->beginTransaction();
+        try {
+            $key = $this->loadKey($namespace, $installationId, true);
+            if (!hash_equals($key['public_key_sha256'], $expectedFingerprint)) {
+                throw new RuntimeException('g3_proof_revocation_conflict_manual_review');
+            }
+            $next = (int) $key['key_version'] + 1;
+            $stmt = $this->pdo->prepare("UPDATE g3_install_proof_key_ci_v1
+                SET key_state = 'revoked', revoked_at_epoch = ?, key_version = ?
+                WHERE source_namespace = ? AND external_installation_id = ?
+                AND status = 'blocked' AND key_state = 'active'
+                AND revoked_at_epoch IS NULL AND key_version = ?
+                AND public_key_sha256 = ?");
+            $stmt->execute([time(), $next, $namespace, $installationId,
+                $key['key_version'], $expectedFingerprint]);
+            if ($stmt->rowCount() !== 1) {
+                throw new RuntimeException('g3_proof_revocation_conflict_manual_review');
+            }
+            $this->pdo->commit();
+            return ['key_version' => $next, 'key_state' => 'revoked',
+                'identity_owner_approved' => false, 'data_360_ingestion_authorized' => false,
+                'marketing_sends_authorized' => false];
+        } catch (Throwable $e) {
+            if ($this->pdo->inTransaction()) {
+                $this->pdo->rollBack();
+            }
+            throw $e;
+        }
     }
 
     public function removeSyntheticChallenges()
@@ -205,22 +310,27 @@ final class G3InstallationProofSandbox
         $this->registry->inspect($namespace, $installationId, $merchant, $provider);
     }
 
-    private function keyRows($namespace, $installationId)
+    private function keyRows($namespace, $installationId, $forUpdate = false)
     {
         $stmt = $this->pdo->prepare('SELECT source_namespace, external_installation_id,
-            public_key_pem, public_key_sha256, status
+            public_key_pem, public_key_sha256, status, key_version,
+            key_state, revoked_at_epoch
             FROM g3_install_proof_key_ci_v1
-            WHERE source_namespace = ? OR external_installation_id = ? LIMIT 3');
+            WHERE source_namespace = ? OR external_installation_id = ? LIMIT 3'
+            . ($forUpdate ? ' FOR UPDATE' : ''));
         $stmt->execute([$namespace, $installationId]);
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
-    private function loadKey($namespace, $installationId)
+    private function loadKey($namespace, $installationId, $forUpdate = false)
     {
-        $rows = $this->keyRows($namespace, $installationId);
+        $rows = $this->keyRows($namespace, $installationId, $forUpdate);
         if (count($rows) !== 1 || $rows[0]['source_namespace'] !== $namespace
             || $rows[0]['external_installation_id'] !== $installationId
             || $rows[0]['status'] !== 'blocked'
+            || $rows[0]['key_state'] !== 'active'
+            || $rows[0]['revoked_at_epoch'] !== null
+            || (int) $rows[0]['key_version'] < 1
             || !hash_equals(hash('sha256', $rows[0]['public_key_pem']),
                 $rows[0]['public_key_sha256'])) {
             throw new RuntimeException('g3_proof_key_unenrolled_or_tampered');
@@ -233,7 +343,34 @@ final class G3InstallationProofSandbox
         return $row['source_namespace'] === $namespace
             && $row['external_installation_id'] === $installId
             && $row['public_key_sha256'] === $fingerprint
-            && $row['status'] === 'blocked';
+            && $row['status'] === 'blocked'
+            && $row['key_state'] === 'active'
+            && $row['revoked_at_epoch'] === null;
+    }
+
+    private static function requireOperatorFixture()
+    {
+        if (getenv('G3_CI_EXTERNAL_OPERATOR_FIXTURE') !== 'yes_manual_ci_only') {
+            throw new RuntimeException('g3_proof_external_operator_required');
+        }
+    }
+
+    private static function validatedPublicKey($pem)
+    {
+        if (!is_string($pem) || strlen($pem) > 4096) {
+            throw new RuntimeException('g3_proof_public_key_invalid');
+        }
+        $key = openssl_pkey_get_public($pem);
+        if ($key === false) {
+            throw new RuntimeException('g3_proof_public_key_invalid');
+        }
+        $details = openssl_pkey_get_details($key);
+        if (!is_array($details) || $details['type'] !== OPENSSL_KEYTYPE_RSA
+            || $details['bits'] < 2048 || $details['bits'] > 4096
+            || !isset($details['key'])) {
+            throw new RuntimeException('g3_proof_public_key_invalid');
+        }
+        return $details['key'];
     }
 
     private function tableExists($name)
