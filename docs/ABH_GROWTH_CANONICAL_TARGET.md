@@ -1,4 +1,4 @@
-# ABH canonical target — Marketing Cloud Growth, not Engagement
+# ABH canonical target — Marketing Cloud Growth, NOT Engagement
 
 **Canonical product decision (operator and project history, 2026-11-05 to
 2026-11-13): ABH uses Marketing Cloud Growth / Marketing Cloud Next on
