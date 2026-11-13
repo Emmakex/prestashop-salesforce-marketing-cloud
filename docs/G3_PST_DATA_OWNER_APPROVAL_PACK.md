@@ -59,6 +59,19 @@ de eventos. **No hay migración a BC ni adaptación del worker Growth.**
 G3 mantiene pendientes las decisiones de namespace, retención,
 procedencia de fechas y esquema PST.
 
+### Candidato a cola Growth independiente — **solo laboratorio**
+
+El [plan G3 de outbox Growth v1](G3_GROWTH_OUTBOX_V1_MIGRATION_REVIEW.md)
+separa el diario/cola Growth de `sfmc_queue` y de sus ledgers de
+Engagement. Prueba un esquema con
+`UNIQUE(source_namespace,dedupe_fingerprint)`, transacciones
+InnoDB, bloqueos de salida por restricciones SQL y migración
+reversible **solo cuando las dos tablas están vacías**.
+**No existe upgrade instalado en BC**, ni se ha conectado el worker
+Growth. El contrato usa `captured_at_utc` como observación, no
+como fecha de modificación fuente. Los gates G3-01/03/04/07
+continúan bloqueados por identidad, versiones y retención.
+
 ## Inventario completo y clasificación
 
 Este inventario procede exactamente de los dos YAML del repositorio y del mapper. El fichero `config/g3-pst-schema-review.json` lo mantiene sincronizado mediante CI y marca las decisiones como propuestas. Ningún campo aparece como autorización comercial por defecto.
