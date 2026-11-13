@@ -112,6 +112,17 @@ $wrongResult = $probe->inspect(fakeGet($wrong, $wrongUrls));
 assertDmo(!$wrongResult['objects']['SalesOrder']['category_matches_proposal']
     && $wrongResult['objects']['SalesOrder']['observed_category'] === 'ENGAGEMENT',
     'unexpected_category_approved');
+// Salesforce documents that some standard DMOs are UNASSIGNED until
+// mapped; this is observation only, not category/stream approval.
+$unassigned = fixtures();
+$unassigned['ssot__SalesOrder__dlm']['category'] = 'UNASSIGNED';
+$unassignedUrls = [];
+$unassignedResult = $probe->inspect(fakeGet($unassigned, $unassignedUrls));
+assertDmo($unassignedResult['objects']['SalesOrder']['observed_category'] === 'UNASSIGNED'
+    && !$unassignedResult['objects']['SalesOrder']['category_matches_proposal']
+    && !$unassignedResult['tenant_mapping_approved'],
+    'standard_unassigned_category_not_reported');
+
 // Untrusted/custom categories are not exported verbatim.
 $unknown = fixtures();
 $unknown['ssot__SalesOrder__dlm']['category'] = 'tenant_confidential_category';

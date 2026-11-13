@@ -14,7 +14,7 @@ La API oficial **Salesforce Data 360 Connect REST** permite consultar metadatos 
 | `GET …/ssot__SalesOrder__dlm/relationships` | Cuenta las relaciones visibles desde Sales Order, sin publicar sus nombres ni IDs; reconoce exclusivamente los campos candidatos hacia Individual | Que una relación no visible esté ausente en la definición estándar |
 | `GET …/ssot__Individual__dlm/relationships` | Segunda perspectiva de las relaciones visibles que involucren Individual y Sales Order | Que exista ya un mapeo DLO→DMO o una relación activa en ABH |
 
-Las respuestas se reducen **solo** a indicadores booleanos conocidos, categoría explícita de la allowlist `PROFILE / OTHER / ENGAGEMENT / UNRECOGNIZED` y recuentos limitados de relaciones: ningún nombre de campo personalizado, objeto desconocido, dato individual, ID de Salesforce, token, URL real del tenant ni respuesta HTTP original se publica. Errores `401`, `403`, `404` o formatos no admitidos quedan como código fijo, sin cuerpo de error. Si la consulta de relaciones devuelve `403/404`, la evidencia indicará *metadata_accessible=false*, **no** “no existe relación”.
+Las respuestas se reducen **solo** a indicadores booleanos conocidos, categoría explícita de la allowlist `PROFILE / OTHER / ENGAGEMENT / UNASSIGNED / UNRECOGNIZED` y recuentos limitados de relaciones: ningún nombre de campo personalizado, objeto desconocido, dato individual, ID de Salesforce, token, URL real del tenant ni respuesta HTTP original se publica. Errores `401`, `403`, `404` o formatos no admitidos quedan como código fijo, sin cuerpo de error. Si la consulta de relaciones devuelve `403/404`, la evidencia indicará *metadata_accessible=false*, **no** “no existe relación”.
 
 ## Evidencia del primer GET real y por qué se amplía la lectura
 
@@ -23,6 +23,12 @@ El [run #43488387453](https://github.com/Emmakex/prestashop-salesforce-marketing
 La segunda lectura reportará únicamente la categoría de Salesforce como **enum saneado** y recuentos de relaciones en ambas direcciones. Salesforce indica que relaciones estándar pueden permanecer inactivas hasta mapear los campos pertinentes; **cero relaciones visibles no es prueba de inexistencia**. La categoría observada del **DMO** tampoco debe confundirse con una autorización de categoría para el **Data Stream** PST. No se elegirán ni guardarán mapeos como consecuencia de la lectura.
 
 Documentación: [Get DMO/relationships, Connect REST](https://developer.salesforce.com/docs/data/connectapi/references/spec?meta=type%3AOutput+D360+Node+Input) y [relaciones estándar activas/inactivas](https://help.salesforce.com/s/articleView?id=data.c360_a_data_model_object_relationships.htm&language=en_US&type=5).
+
+## Segunda observación real de ABH (13/11/2026)
+
+El [run #43490356308](https://github.com/Emmakex/prestashop-salesforce-marketing-cloud/actions/runs/43490356308) sobre `81042f9` leyó **ambos** extremos correctamente: `Individual=PROFILE`, `SalesOrder=UNRECOGNIZED` según la allowlist inicial, 20 relaciones en la respuesta de cada DMO y **ninguna relación directa detectada** entre ambos mediante los campos candidatos. Esto no prueba que no exista una relación estándar inactiva: puede no mostrarse hasta mapear los dos campos. No se guardó un mapeo ni se autorizó ninguna operación.
+
+La [referencia oficial de DMO Sales Order](https://developer.salesforce.com/docs/data/data-cloud-dmo-mapping/guide/c360dm-si-salesorderdmo-dmo.html) documenta que un estándar puede tener categoría **`UNASSIGNED`**, y la [referencia de Connect REST](https://developer.salesforce.com/docs/data/connectapi/references/spec?meta=type%3AOutput+D360+Node+Input) incluye respuestas con `category: UNASSIGNED`. Se añade **exclusivamente** ese valor a la allowlist sanitizada y se repite la consulta para observar si ABH devuelve ese valor exacto. La categoría de un DMO no es una aprobación de categoría del Data Stream PST.
 
 ## Seguridad y activación
 
