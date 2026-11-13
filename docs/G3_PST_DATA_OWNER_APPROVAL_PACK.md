@@ -49,6 +49,16 @@ migración ni worker Growth. La secuencia de aceptación local **no**
 equivale al orden de modificación fuente; los envíos y Record Modified
 permanecen bloqueados. G3-01/03/04/07 siguen pendientes de aprobación.
 
+### Comprobación de integración con la estructura 0.7.1
+
+El [espejo de tablas heredadas en CI](G3_PRESTASHOP_071_ATOMIC_MIRROR.md)
+demuestra transacciones sobre las formas exactas de `sfmc_queue`,
+`sfmc_customer_sync` y `sfmc_order_sync`, con un diario UTC
+nuevo en una BD desechable. Detecta colisiones y bloquea la salida
+de eventos. **No hay migración a BC ni adaptación del worker Growth.**
+G3 mantiene pendientes las decisiones de namespace, retención,
+procedencia de fechas y esquema PST.
+
 ## Inventario completo y clasificación
 
 Este inventario procede exactamente de los dos YAML del repositorio y del mapper. El fichero `config/g3-pst-schema-review.json` lo mantiene sincronizado mediante CI y marca las decisiones como propuestas. Ningún campo aparece como autorización comercial por defecto.
