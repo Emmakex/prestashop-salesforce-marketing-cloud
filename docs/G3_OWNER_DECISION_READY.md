@@ -15,6 +15,8 @@
 
 **G3-03/G3-04 — tratamiento de fechas y Refresh Mode:** [alternativas por objeto y riesgo Partial+bulk](G3_RECORD_MODIFIED_REFRESH_MODE_DECISION.md), con prueba offline de cuarentena y replays. No se deduce ningún `Record Modified` de `date_upd` ni se selecciona Full/Partial automáticamente.
 
+**G3-05/G3-06 — modelo DLO→DMO propuesto sin autorización:** [claves, categorías y relación cliente-pedido en Data 360](G3_DLO_DMO_RELATIONSHIP_REVIEW.md) + [registro de mapeo candidato](../config/g3-pst-dlo-dmo-mapping-candidate.json). Los dos DMOs y la relación Sales Order→Individual deben verificarse en el tenant; ningún mapeo se ha guardado ni aprobado.
+
 ## Qué necesita decidir cada responsable
 
 Esta hoja separa **propuesta técnica**, **evidencia necesaria** y **decisión humana**. No atribuye permisos al indicador newsletter, no fija plazos legales, no transforma fechas históricas inciertas, no elige el esquema automáticamente y no invoca ningún servicio de Salesforce.
