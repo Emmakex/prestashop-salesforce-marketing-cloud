@@ -142,6 +142,7 @@ jobs:
           php tests/growth-discovery-contract.php
           php tests/growth-schema-contract.php
           php tests/data-cloud-mapping-contract.php
+          php tests/g3-dlo-dmo-relationship-contract.php
           php tests/data-cloud-batch-contract.php
           php tests/data-cloud-timestamp-contract.php
           php tests/data-cloud-timestamp-quality-contract.php
@@ -190,6 +191,8 @@ jobs:
           python -m unittest discover -s tests -p 'test_g3_owner_decision_brief.py'
           python scripts/ci/verify-g3-field-purpose-owner-decisions.py
           python -m unittest discover -s tests -p 'test_g3_field_purpose_owner_decisions.py'
+          python scripts/ci/verify-g3-dlo-dmo-mapping-candidate.py
+          python -m unittest discover -s tests -p 'test_g3_dlo_dmo_mapping_candidate.py'
           python scripts/ci/verify-bc-timestamp-sql-readonly.py
           python -m unittest discover -s tests -p 'test_bc_timestamp_sql_readonly.py'
 

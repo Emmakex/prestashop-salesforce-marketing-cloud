@@ -1,0 +1,91 @@
+{
+  "contract_version": 1,
+  "merchant": "ABH",
+  "target_product": "marketing_cloud_growth_data_360",
+  "connector_alias": "PST",
+  "source_api_name": "ABH_PrestaShop_Data_Cloud",
+  "schema_version_selected": "undecided",
+  "data_space_observed": "default",
+  "data_space_approved": false,
+  "owner_signoff": "pending",
+  "tenant_dmo_catalog_verified": false,
+  "dlo_dmo_mapping_save_authorized": false,
+  "identity_resolution_authorized": false,
+  "data_360_ingestion_authorized": false,
+  "growth_marketing_sends_authorized": false,
+  "objects": {
+    "PSCustomer": {
+      "data_stream_category_proposal": "Profile",
+      "dlo_primary_key_proposal": "source_key",
+      "dmo_candidate": "ssot__Individual__dlm",
+      "dmo_primary_key_candidate": "ssot__Id__c",
+      "dmo_primary_key_mapping_verified_in_tenant": false,
+      "field_dispositions": {
+        "source_key": "pk_candidate_no_dmo_write",
+        "source_namespace": "withheld_pending_owner",
+        "shop_id": "withheld_pending_owner",
+        "customer_id": "withheld_pending_owner",
+        "email": "withheld_pending_owner",
+        "first_name": "withheld_pending_owner",
+        "last_name": "withheld_pending_owner",
+        "newsletter_flag": "withheld_pending_owner",
+        "partner_optin_flag": "withheld_pending_owner",
+        "active_flag": "withheld_pending_owner",
+        "source_updated_local": "withheld_pending_owner",
+        "source_updated_utc": "withheld_pending_owner"
+      },
+      "category_approved": false,
+      "mapping_approved": false
+    },
+    "PSOrder": {
+      "data_stream_category_proposal": "Other",
+      "dlo_primary_key_proposal": "source_key",
+      "dmo_candidate": "ssot__SalesOrder__dlm",
+      "dmo_primary_key_candidate": "ssot__Id__c",
+      "dmo_primary_key_mapping_verified_in_tenant": false,
+      "field_dispositions": {
+        "source_key": "pk_candidate_no_dmo_write",
+        "source_namespace": "withheld_pending_owner",
+        "shop_id": "withheld_pending_owner",
+        "order_id": "withheld_pending_owner",
+        "customer_source_key": "foreign_reference_candidate_no_dmo_write",
+        "cart_source_key": "withheld_pending_owner",
+        "currency": "withheld_pending_owner",
+        "total_paid": "withheld_pending_owner",
+        "paid_flag": "withheld_pending_owner",
+        "state_id": "withheld_pending_owner",
+        "source_updated_local": "withheld_pending_owner",
+        "source_updated_utc": "withheld_pending_owner"
+      },
+      "category_approved": false,
+      "mapping_approved": false
+    }
+  },
+  "relation_proposal": {
+    "source_foreign_key": "PSOrder.customer_source_key",
+    "source_parent_key": "PSCustomer.source_key",
+    "cardinality": "one_customer_to_many_orders_candidate",
+    "match_dimensions": [
+      "source_namespace",
+      "shop_id",
+      "customer_source_key"
+    ],
+    "dmo_target_field_options": [
+      "ssot__SoldToCustomerId__c",
+      "ssot__BillToContactId__c"
+    ],
+    "selected_dmo_target_field": null,
+    "dmo_relationship_verified_in_tenant": false,
+    "missing_parent_action": "quarantine_not_merge",
+    "empty_foreign_key_action": "quarantine_not_merge",
+    "cross_scope_action": "quarantine_not_merge",
+    "email_dedupe_authorized": false,
+    "cart_stream_relationship_authorized": false,
+    "automatic_identity_stitching_authorized": false
+  },
+  "vendor_refs": [
+    "https://developer.salesforce.com/docs/data/data-cloud-ref/guide/c360dm-individual-dmo.html",
+    "https://developer.salesforce.com/docs/data/data-cloud-dmo-mapping/guide/c360dm-sales-order-dmo.html",
+    "https://help.salesforce.com/s/articleView?id=c360_a_data_mapping.htm&type=5"
+  ]
+}
