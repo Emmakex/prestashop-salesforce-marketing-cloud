@@ -244,6 +244,7 @@ jobs:
           php tests/integration/g3_prestashop_adapter.php
           php tests/integration/g3_namespace_registry.php
           php tests/integration/g3_installation_proof.php
+          php tests/integration/g3_proof_key_lifecycle.php
 
   package:
     name: Build release package
