@@ -199,6 +199,23 @@ console prestashop:module install pssalesforcebridge --no-interaction
 docker cp "$ROOT/tests/runtime/prestashop-smoke.php" "$PS_CONTAINER:/tmp/prestashop-smoke.php"
 docker exec -u www-data -e EXPECTED_PS_VERSION="$PS_VERSION" -e PS_ROOT=/var/www/html -w /var/www/html "$PS_CONTAINER" php /tmp/prestashop-smoke.php
 
+
+echo "==> G3 candidate: REAL PrestaShop CI-only lifecycle (no module update)"
+for fixture in \
+  tests/runtime/G3PrestaShopRuntimeLifecycleCandidate.php \
+  tests/runtime/prestashop-g3-lifecycle.php \
+  tests/integration/G3PrestaShopAdapterSandbox.php \
+  tests/integration/G3GrowthOutboxSandboxMigration.php \
+  tests/integration/g3_growth_outbox_v1_schema.sql; do
+  docker cp "$ROOT/$fixture" "$PS_CONTAINER:/tmp/$(basename "$fixture")"
+done
+docker exec -u www-data \
+  -e GITHUB_ACTIONS=true \
+  -e G3_RUNTIME_CI_ONLY=yes_disposable_prestashop \
+  -e EXPECTED_PS_VERSION="$PS_VERSION" \
+  -e PS_ROOT=/var/www/html \
+  -w /var/www/html "$PS_CONTAINER" php /tmp/prestashop-g3-lifecycle.php
+
 echo "==> Verifying protected health and cron endpoints"
 TOKEN="$(sql "SELECT value FROM ps_configuration WHERE name='PS_SFMC_CRON_TOKEN' ORDER BY id_configuration DESC LIMIT 1")"
 test -n "$TOKEN"
