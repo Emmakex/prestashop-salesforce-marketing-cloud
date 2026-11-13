@@ -2,6 +2,8 @@
 
 **DRAFT FOR DATA-OWNER SIGNOFF. NOT AN APPROVED RELEASE.**
 
+> **G3 dossier actualizado (2026-11-13):** para la revisión campo a campo y las ocho decisiones del responsable, consulte [`G3_PST_DATA_OWNER_APPROVAL_PACK.md`](G3_PST_DATA_OWNER_APPROVAL_PACK.md) y el contrato verificable [`config/g3-pst-schema-review.json`](../config/g3-pst-schema-review.json). Ambos borradores YAML siguen **sin aprobar y sin subir**. La CI de G3 comprueba que los 24 campos están clasificados y ninguna aprobación se presume; no sustituye la firma del responsable.
+
 Confirmed: connector `PST` / `ABH_PrestaShop_Data_Cloud`, Data Space `default`, OAuth exchange success (run #42655156432), PSCustomer/PSOrder candidate source schema in `schemas/ABH_PST_SCHEMA_REVIEW.yaml`. No real data ingestion.
 
 ## Current data model proposal

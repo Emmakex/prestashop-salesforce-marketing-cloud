@@ -1,0 +1,252 @@
+{
+  "contract_version": 1,
+  "merchant": "ABH",
+  "target_product": "marketing_cloud_growth_data_360",
+  "connector_alias": "PST",
+  "source_api_name": "ABH_PrestaShop_Data_Cloud",
+  "review_only": true,
+  "approval_state": "pending_data_owner",
+  "schema_to_publish": "undecided",
+  "uploaded_to_tenant": false,
+  "streams_approved": false,
+  "real_data_ingestion_approved": false,
+  "marketing_sends_approved": false,
+  "baseline_schema": "schemas/ABH_PST_SCHEMA_REVIEW.yaml",
+  "utc_candidate_schema": "schemas/ABH_PST_SCHEMA_UTC_CANDIDATE.yaml",
+  "data_space_observed": "default",
+  "field_decisions_are_proposals": true,
+  "object_decisions": {
+    "PSCustomer": {
+      "category_proposed": "Profile",
+      "primary_key_proposed": "source_key",
+      "record_modified_field": "pending",
+      "refresh_mode": "pending",
+      "dlo_dmo_mapping": "pending",
+      "retention_policy": "pending",
+      "privacy_signoff": "pending"
+    },
+    "PSOrder": {
+      "category_proposed": "Other",
+      "primary_key_proposed": "source_key",
+      "record_modified_field": "pending",
+      "refresh_mode": "pending",
+      "dlo_dmo_mapping": "pending",
+      "retention_policy": "pending",
+      "privacy_signoff": "pending"
+    }
+  },
+  "open_decisions": [
+    {
+      "id": "G3-01",
+      "label": "installation_namespace_global_registry",
+      "state": "pending",
+      "owner": "data_owner_and_technical_owner",
+      "evidence": "Immutable 2–32 safe-character unique namespace across all client installations; not derive from DB/domain"
+    },
+    {
+      "id": "G3-02",
+      "label": "field_minimization_and_processing_purpose",
+      "state": "pending",
+      "owner": "data_owner_privacy",
+      "evidence": "Written necessity and lawful basis for each customer/order field; emails/names and raw flags separately reviewed"
+    },
+    {
+      "id": "G3-03",
+      "label": "timezone_historical_storage_provenance",
+      "state": "pending",
+      "owner": "technical_owner",
+      "evidence": "Current Europe/Madrid verified; actual historical DATETIME semantics and DST ambiguous rows not verified"
+    },
+    {
+      "id": "G3-04",
+      "label": "record_modified_and_refresh_mode",
+      "state": "pending",
+      "owner": "data_owner_and_data_360_architect",
+      "evidence": "Choose v0.2 without date-time or v0.3 UTC field with proven provenance; approve stale update behavior before streams"
+    },
+    {
+      "id": "G3-05",
+      "label": "categories_pk_and_data_space",
+      "state": "pending",
+      "owner": "data_360_architect",
+      "evidence": "Confirm Profile/Other, source_key, default space and exact tenant mapping"
+    },
+    {
+      "id": "G3-06",
+      "label": "dlo_dmo_mapping_and_order_relationship",
+      "state": "pending",
+      "owner": "data_360_architect",
+      "evidence": "Confirm customer/order Data Lake → Data Model mappings; cart is reference only"
+    },
+    {
+      "id": "G3-07",
+      "label": "retention_erasure_and_deletion",
+      "state": "pending",
+      "owner": "privacy_and_data_owner",
+      "evidence": "Define actual retention/erasure and suppression lifecycle; no invented number of days"
+    },
+    {
+      "id": "G3-08",
+      "label": "final_yaml_hash_and_salesforce_preview",
+      "state": "pending",
+      "owner": "data_owner_and_data_360_admin",
+      "evidence": "Pin exact YAML SHA256 and review Salesforce preview before separate upload authorization"
+    }
+  ],
+  "field_inventory": {
+    "PSCustomer": [
+      {
+        "name": "source_key",
+        "sensitivity": "pseudonymous_identifier",
+        "purpose": "record_identity",
+        "review_note": "Proposed PK; must be globally stable by installation/shop/customer. Never dedupe by email."
+      },
+      {
+        "name": "source_namespace",
+        "sensitivity": "tenant_identifier",
+        "purpose": "tenant_isolation",
+        "review_note": "Proposed immutable merchant installation namespace; registry and format not signed off."
+      },
+      {
+        "name": "shop_id",
+        "sensitivity": "source_identifier",
+        "purpose": "tenant_isolation",
+        "review_note": "Shop-scoped PrestaShop ID, not globally unique."
+      },
+      {
+        "name": "customer_id",
+        "sensitivity": "source_identifier",
+        "purpose": "customer_relationship",
+        "review_note": "Per-shop source ID; never a Salesforce ID."
+      },
+      {
+        "name": "email",
+        "sensitivity": "direct_personal_data",
+        "purpose": "contact_matching_candidate",
+        "review_note": "Optional in source schema; lawful purpose, contact suppression, retention and mapping need approval."
+      },
+      {
+        "name": "first_name",
+        "sensitivity": "direct_personal_data",
+        "purpose": "profile_candidate",
+        "review_note": "Review necessity/minimization before any upload."
+      },
+      {
+        "name": "last_name",
+        "sensitivity": "direct_personal_data",
+        "purpose": "profile_candidate",
+        "review_note": "Review necessity/minimization before any upload."
+      },
+      {
+        "name": "newsletter_flag",
+        "sensitivity": "raw_preference_flag",
+        "purpose": "source_quality_only",
+        "review_note": "PrestaShop source flag is not permission to send; purpose, provenance and Growth suppression unresolved."
+      },
+      {
+        "name": "partner_optin_flag",
+        "sensitivity": "raw_preference_flag",
+        "purpose": "source_quality_only",
+        "review_note": "Partner offers flag; never infer first-party cart recovery marketing consent."
+      },
+      {
+        "name": "active_flag",
+        "sensitivity": "source_state",
+        "purpose": "source_quality_only",
+        "review_note": "PrestaShop customer active, not Salesforce campaign activation."
+      },
+      {
+        "name": "source_updated_local",
+        "sensitivity": "unqualified_timestamp",
+        "purpose": "diagnostics_only",
+        "review_note": "Timezone and DST provenance unknown; TEXT only, never Record Modified."
+      },
+      {
+        "name": "source_updated_utc",
+        "sensitivity": "proposed_datetime",
+        "purpose": "ordering_candidate",
+        "review_note": "v0.3 only; historical offset and DST must be audited before conversion/Record Modified."
+      }
+    ],
+    "PSOrder": [
+      {
+        "name": "source_key",
+        "sensitivity": "pseudonymous_identifier",
+        "purpose": "record_identity",
+        "review_note": "Proposed PK; installation + shop + order ID."
+      },
+      {
+        "name": "source_namespace",
+        "sensitivity": "tenant_identifier",
+        "purpose": "tenant_isolation",
+        "review_note": "Same immutable namespace as linked customer."
+      },
+      {
+        "name": "shop_id",
+        "sensitivity": "source_identifier",
+        "purpose": "tenant_isolation",
+        "review_note": "Source shop ID; cross-installation collision protection required."
+      },
+      {
+        "name": "order_id",
+        "sensitivity": "source_identifier",
+        "purpose": "order_relationship",
+        "review_note": "Source order identifier, not Salesforce CRM ID."
+      },
+      {
+        "name": "customer_source_key",
+        "sensitivity": "pseudonymous_identifier",
+        "purpose": "customer_relationship",
+        "review_note": "Must resolve inside same installation/shop. No relation inferred by email."
+      },
+      {
+        "name": "cart_source_key",
+        "sensitivity": "pseudonymous_identifier",
+        "purpose": "cart_relationship_reference_only",
+        "review_note": "Reference only; there is no approved PSCartEvent stream."
+      },
+      {
+        "name": "currency",
+        "sensitivity": "commercial_data",
+        "purpose": "order_reporting",
+        "review_note": "Three-character currency code; retention/mapping pending."
+      },
+      {
+        "name": "total_paid",
+        "sensitivity": "commercial_data",
+        "purpose": "order_reporting",
+        "review_note": "Commercial totals; lawful basis, retention, taxes/precision and DMO mapping pending."
+      },
+      {
+        "name": "paid_flag",
+        "sensitivity": "source_state",
+        "purpose": "order_reporting",
+        "review_note": "Transactional state, not marketing eligibility."
+      },
+      {
+        "name": "state_id",
+        "sensitivity": "source_identifier",
+        "purpose": "order_reporting",
+        "review_note": "Native order status ID, not cross-shop semantic status without mapping."
+      },
+      {
+        "name": "source_updated_local",
+        "sensitivity": "unqualified_timestamp",
+        "purpose": "diagnostics_only",
+        "review_note": "Timezone/DST provenance unknown. No ordering/Record Modified use."
+      },
+      {
+        "name": "source_updated_utc",
+        "sensitivity": "proposed_datetime",
+        "purpose": "ordering_candidate",
+        "review_note": "v0.3 only; must not be derived from historical local time without provenance."
+      }
+    ]
+  },
+  "notes": [
+    "12 candidate fields per object, 11 in v0.2 baseline; none approved to upload.",
+    "newsletter_flag and partner_optin_flag are raw source attributes, not marketing authorization.",
+    "source_updated_utc is v0.3 candidate only and is NOT derived from actual historical BC data.",
+    "No legitimate basis, retention number or mapping is claimed by offline schema CI."
+  ]
+}
