@@ -1,11 +1,11 @@
 # G3-05/G3-06 · Verificación del catálogo DMO real de ABH, solo lectura
 
-**13/11/2026, segunda lectura de catálogo.** **Comercio:** ABH / Barcelona Confort. **Producto:** Marketing Cloud Growth/Next sobre Core + Data 360, **NO** Engagement.  
+**13/11/2026, ampliación dirigida del catálogo.** **Comercio:** ABH / Barcelona Confort. **Producto:** Marketing Cloud Growth/Next sobre Core + Data 360, **NO** Engagement.  
 **Gate:** G3 permanece bloqueado por aprobaciones del responsable; ningún catálogo consultado autoriza cambiar el esquema o los mapeos.
 
 ## Qué se va a inspeccionar realmente
 
-La API oficial **Salesforce Data 360 Connect REST** permite consultar metadatos de DMO y relaciones mediante `GET /services/data/v68.0/ssot/data-model-objects/{apiName}`. En este proyecto, versión REST v68.0 ya observada. El [workflow protegido](../.github/workflows/g3-dmo-catalog-readonly.yml) ejecuta **solo cuatro consultas GET fijas** usando la misma External Client App Growth y el mismo entorno GitHub `salesforce-growth-certification`. No solicita secretos nuevos ni modifica permisos.
+La API oficial **Salesforce Data 360 Connect REST** permite consultar metadatos de DMO y relaciones mediante `GET /services/data/v68.0/ssot/data-model-objects/{apiName}`. En este proyecto, versión REST v68.0 ya observada. El [workflow protegido](../.github/workflows/g3-dmo-catalog-readonly.yml) ejecuta **seis consultas GET fijas** usando la misma External Client App Growth y el mismo entorno GitHub `salesforce-growth-certification`. No solicita secretos nuevos ni modifica permisos.
 
 | Consulta | Qué se comprueba | Qué no demuestra |
 |---|---|---|
@@ -13,6 +13,8 @@ La API oficial **Salesforce Data 360 Connect REST** permite consultar metadatos 
 | `GET …/ssot__SalesOrder__dlm` | Existencia/lectura de Sales Order, categoría `OTHER`, PK, posibles campos `SoldToCustomerId` / `BillToContactId` | Que un campo concreto sea el destino correcto de `PSOrder.customer_source_key` |
 | `GET …/ssot__SalesOrder__dlm/relationships` | Cuenta las relaciones visibles desde Sales Order, sin publicar sus nombres ni IDs; reconoce exclusivamente los campos candidatos hacia Individual | Que una relación no visible esté ausente en la definición estándar |
 | `GET …/ssot__Individual__dlm/relationships` | Segunda perspectiva de las relaciones visibles que involucren Individual y Sales Order | Que exista ya un mapeo DLO→DMO o una relación activa en ABH |
+| `GET …/ssot__Account__dlm` | Si es accesible, categoría, PK y campo `Account.IndividualId` | Que debamos crear/importar Accounts a partir de PSCustomer |
+| `GET …/ssot__Account__dlm/relationships` | Metadatos y flags fijos de los posibles enlaces `SalesOrder.BillToAccountId → Account.Id` y `Account.IndividualId → Individual.Id` | Que sean relaciones activas, que PSCustomer esté mapeado, ni que la ruta de dos saltos esté aprobada |
 
 Las respuestas se reducen **solo** a indicadores booleanos conocidos, categoría explícita de la allowlist `PROFILE / OTHER / ENGAGEMENT / UNASSIGNED / UNRECOGNIZED` y recuentos limitados de relaciones: ningún nombre de campo personalizado, objeto desconocido, dato individual, ID de Salesforce, token, URL real del tenant ni respuesta HTTP original se publica. Errores `401`, `403`, `404` o formatos no admitidos quedan como código fijo, sin cuerpo de error. Si la consulta de relaciones devuelve `403/404`, la evidencia indicará *metadata_accessible=false*, **no** “no existe relación”.
 
@@ -29,6 +31,8 @@ Documentación: [Get DMO/relationships, Connect REST](https://developer.salesfor
 El [run #43490356308](https://github.com/Emmakex/prestashop-salesforce-marketing-cloud/actions/runs/43490356308) sobre `81042f9` leyó **ambos** extremos correctamente: `Individual=PROFILE`, `SalesOrder=UNRECOGNIZED` según la allowlist inicial, 20 relaciones en la respuesta de cada DMO y **ninguna relación directa detectada** entre ambos mediante los campos candidatos. Esto no prueba que no exista una relación estándar inactiva: puede no mostrarse hasta mapear los dos campos. No se guardó un mapeo ni se autorizó ninguna operación.
 
 La [referencia oficial de DMO Sales Order](https://developer.salesforce.com/docs/data/data-cloud-dmo-mapping/guide/c360dm-si-salesorderdmo-dmo.html) documenta que un estándar puede tener categoría **`UNASSIGNED`**, y la [referencia de Connect REST](https://developer.salesforce.com/docs/data/connectapi/references/spec?meta=type%3AOutput+D360+Node+Input) incluye respuestas con `category: UNASSIGNED`. Se añade **exclusivamente** ese valor a la allowlist sanitizada y se repite la consulta para observar si ABH devuelve ese valor exacto. La categoría de un DMO no es una aprobación de categoría del Data Stream PST.
+
+**Tercera observación real:** el [run #43491126597](https://github.com/Emmakex/prestashop-salesforce-marketing-cloud/actions/runs/43491126597) confirmó `SalesOrder=UNASSIGNED`, `Individual=PROFILE`, PK y Data Space `default` en ambos; 20 relaciones visibles en cada extremo, ninguna directa demostrada. La siguiente inspección acotada se limita a comprobar el [posible puente Account](G3_CUSTOMER_ORDER_RELATION_TOPOLOGY_DECISION.md) sin activarlo.
 
 ## Seguridad y activación
 
@@ -51,6 +55,6 @@ Fuentes oficiales:
 
 ## Qué seguirá bloqueado
 
-Aunque los tres GET respondan, **G3-05/G3-06 seguirán pendientes** hasta que propietario y arquitecto Data 360 confirmen categoría, PK, Data Space, mapeo DLO→DMO por campo, DMO relación correcta, huéspedes/borrados y supresiones. G3-01/02/03/04/07/08 necesitan aprobaciones independientes; G4–G8 aún bloqueados.
+Aunque los seis GET respondan, **G3-05/G3-06 seguirán pendientes** hasta que propietario y arquitecto Data 360 confirmen categoría, PK, Data Space, mapeo DLO→DMO por campo, DMO relación correcta, huéspedes/borrados y supresiones. G3-01/02/03/04/07/08 necesitan aprobaciones independientes; G4–G8 aún bloqueados.
 
 **Ningún cambio al módulo BC 0.7.1 Test, schemas YAML, SQL, cliente, pedido, importación, fuente PST, Data Stream, campañas ni permisos. Sin ZIP ni reinstalación.**
