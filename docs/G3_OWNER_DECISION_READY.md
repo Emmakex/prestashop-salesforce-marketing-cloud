@@ -9,6 +9,8 @@
 
 **Prueba complementaria G3-01 (solo CI):** [desafío criptográfico con clave pública registrada externamente y protección anti-replay](G3_EXTERNAL_INSTALLATION_CHALLENGE_CI.md). Reduce suplantación por copia de IDs, pero **NO demuestra** que una clave privada no sea clonable; esa custodia y el enrolamiento fuera de PrestaShop siguen pendientes de aprobación.
 
+**Nueva evidencia técnica G3-01 (sin aprobación):** [rotación/revocación atómica de claves, versiones de desafío y rechazo de claves comprometidas](G3_INSTALLATION_KEY_LIFECYCLE_CI.md), con [ADR de alternativas pendiente](adr/2026-11-13-g3-key-rotation-revocation-candidate.md). El operador central, la custodia externa y la recuperación aún requieren revisión y aprobación.
+
 ## Qué necesita decidir cada responsable
 
 Esta hoja separa **propuesta técnica**, **evidencia necesaria** y **decisión humana**. No atribuye permisos al indicador newsletter, no fija plazos legales, no transforma fechas históricas inciertas, no elige el esquema automáticamente y no invoca ningún servicio de Salesforce.
