@@ -8,7 +8,13 @@ if (PHP_SAPI !== 'cli' || getenv('GITHUB_ACTIONS') !== 'true'
 }
 require_once '/var/www/html/config/config.inc.php';
 require_once '/tmp/G3PrestaShopRuntimeLifecycleCandidate.php';
-require_once '/tmp/G3CandidateCredentialLifecycle.php';
+// The installed candidate already loads this class from its own module.
+// On the removed phase, load it only if no module class has been loaded.
+$g3Phase = isset($argv[1]) ? $argv[1] : '';
+if (in_array($g3Phase, ['removed', 'reinstalled'], true)
+    && !class_exists('G3CandidateCredentialLifecycle', false)) {
+    require_once '/var/www/html/modules/pssalesforcebridge/src/Provider/G3CandidateCredentialLifecycle.php';
+}
 
 function g3UpgradeCheck($ok, $reason)
 {
