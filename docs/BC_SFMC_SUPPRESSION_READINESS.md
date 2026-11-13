@@ -1,5 +1,8 @@
 # BC / reusable PrestaShop — SFMC suppression and consent-source readiness
 
+> **Superseded as an ABH implementation plan:** ABH runs Marketing Cloud **Growth/Next**, NOT Engagement. All Subscribers/Publication List/SOAP Subscriber controls in this document are an **Engagement-only exploratory contract**, not a precondition ABH can satisfy or a reason to request an Engagement login. For BC use [`ABH_GROWTH_CANONICAL_TARGET.md`](ABH_GROWTH_CANONICAL_TARGET.md) and design purpose-specific Growth consent/suppression checks in Salesforce Core/Data 360 instead. The SOAP review parser from PR #40 is NOT connected to BC and does not certify Growth sending.
+
+
 Status: **review only**. No Marketing Cloud subscriber API access was granted,
 and BC has not been certified for live abandoned-cart sends. On 2026-11-13,
 the BC operator confirmed through read-only phpMyAdmin that the module is

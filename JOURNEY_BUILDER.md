@@ -1,5 +1,8 @@
 # Journey Builder contract
 
+> **Provider boundary:** this is the optional legacy **Marketing Cloud Engagement** Journey Builder API Entry Event contract. ABH / Barcelona Confort uses **Marketing Cloud Growth (Next)** instead; its current Core OAuth, Data 360 connector and proposed Flow activation cannot be validated using `/interaction/v1/events`. Do not enable this adapter for ABH. See [`docs/ABH_GROWTH_CANONICAL_TARGET.md`](docs/ABH_GROWTH_CANONICAL_TARGET.md).
+
+
 Version `0.5.0` delivers locally detected `CART_ABANDONED` events to Salesforce Marketing Cloud Journey Builder through the synchronous API Entry Event endpoint.
 
 ## Event Definition
