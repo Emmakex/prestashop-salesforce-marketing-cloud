@@ -224,8 +224,12 @@ jobs:
           php -m | grep -qi 'pdo_mysql'
           php -l tests/integration/G3SandboxPdoJournal.php
           php -l tests/integration/g3_mysql_acceptance.php
-      - name: Test real transactional journal, rollback and concurrent dedupe (CI database ONLY)
-        run: php tests/integration/g3_mysql_acceptance.php
+      - name: Verify sandbox mirrors exact installed module DDL
+        run: python3 scripts/ci/verify-g3-legacy-mirror.py
+      - name: Certify isolated transactional journal and legacy queue mirror
+        run: |
+          php tests/integration/g3_mysql_acceptance.php
+          php tests/integration/g3_prestashop_071_queue_mirror.php
 
   package:
     name: Build release package
