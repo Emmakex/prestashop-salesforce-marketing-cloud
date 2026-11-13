@@ -7,6 +7,8 @@
 
 **Evidencia técnica adicional G3-01:** [reserva de namespaces y detección de copias en laboratorio CI](G3_NAMESPACE_GLOBAL_REGISTRY_CI_CANDIDATE.md). La unicidad real entre tiendas requiere un servicio autoritativo externo y una identidad de instalación no clonable; ninguna de las dos cosas está aprobada aún.
 
+**Prueba complementaria G3-01 (solo CI):** [desafío criptográfico con clave pública registrada externamente y protección anti-replay](G3_EXTERNAL_INSTALLATION_CHALLENGE_CI.md). Reduce suplantación por copia de IDs, pero **NO demuestra** que una clave privada no sea clonable; esa custodia y el enrolamiento fuera de PrestaShop siguen pendientes de aprobación.
+
 ## Qué necesita decidir cada responsable
 
 Esta hoja separa **propuesta técnica**, **evidencia necesaria** y **decisión humana**. No atribuye permisos al indicador newsletter, no fija plazos legales, no transforma fechas históricas inciertas, no elige el esquema automáticamente y no invoca ningún servicio de Salesforce.
