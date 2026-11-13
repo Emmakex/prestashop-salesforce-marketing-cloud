@@ -48,6 +48,16 @@ el diseño final, no un campo presente en los esquemas PST v0.2/v0.3
 ni una autorización de incluirlo en Salesforce. No reemplazar
 `source_updated_utc` de v0.3 con el valor del momento de envío.
 
+## Persistencia candidata de aceptación (sin conexión al worker)
+
+El [contrato G3 de aceptación write-once](G3_ATOMIC_UTC_ACCEPTANCE_CONTRACT.md)
+documenta una función de almacenamiento inyectable con semántica
+`insert-or-load` y deduplicación por instalación. Un reintento
+conserva el `captured_at_utc` original **solo si el adaptador
+implementa el contrato atómico**; todavía no existe repositorio real
+ni migración. El orden de aceptación no es orden de modificación
+y ningún resultado autoriza Data 360 o campañas.
+
 ## Limitaciones que evitamos
 
 - **Historias anteriores:** no se reinterpretan registros existentes
