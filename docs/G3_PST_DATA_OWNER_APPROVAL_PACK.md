@@ -27,6 +27,17 @@ La auditoría de fechas históricas queda pendiente; el avance técnico
 se centrará en capturas futuras con UTC fiable y separación explícita
 de históricos de procedencia desconocida.
 
+### Prototipo UTC para eventos NUEVOS, sin cambiar la fuente
+
+Se ha implementado el [contrato offline de observación UTC](G3_LIVE_UTC_OBSERVATION_CONTRACT.md)
+que obtiene `captured_at_utc` desde el reloj Unix de PHP para los **seis hooks actuales**
+y lo mantiene expresamente diferente de `source_updated_utc`.
+No convierte los `DATETIME` históricos, no altera ninguno de los YAML v0.2/v0.3,
+no persiste el instante, no genera un watermark y no está conectado al worker.
+La sincronización del reloj, el guardado durable de la captura y la política
+de reintentos/frescura **siguen pendientes** de G3-03/G3-04. `captured_at_utc`
+no se ha propuesto automáticamente como Record Modified.
+
 ## Inventario completo y clasificación
 
 Este inventario procede exactamente de los dos YAML del repositorio y del mapper. El fichero `config/g3-pst-schema-review.json` lo mantiene sincronizado mediante CI y marca las decisiones como propuestas. Ningún campo aparece como autorización comercial por defecto.
