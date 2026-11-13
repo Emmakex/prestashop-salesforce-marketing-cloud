@@ -1,5 +1,7 @@
 # PrestaShop Salesforce Marketing Cloud
 
+> **ABH / Barcelona Confort pilot: Marketing Cloud Growth (Next) + Data Cloud/Data 360, NOT Engagement.** The existing 0.7.1 module's Engagement delivery paths are legacy/provider-specific and are NOT a working ABH marketing-send route. The existing ABH Core OAuth and Data Cloud token exchange have already passed; do not request Engagement Installed Packages, All Subscribers or `/interaction/v1/events` for this merchant. See [`docs/ABH_GROWTH_CANONICAL_TARGET.md`](docs/ABH_GROWTH_CANONICAL_TARGET.md) for the verified integration, outstanding schema/consent/Flow gates and why BC remains Test.
+
 A reusable PrestaShop bridge for Salesforce Marketing Cloud Engagement.
 
 ## Goal
