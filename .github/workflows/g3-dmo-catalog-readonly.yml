@@ -21,7 +21,7 @@ jobs:
     if: github.repository == 'Emmakex/prestashop-salesforce-marketing-cloud' && github.ref == 'refs/heads/main'
     name: ABH metadata GET only, no records or writes
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     environment: salesforce-growth-certification
     steps:
       - name: Checkout exact main commit
