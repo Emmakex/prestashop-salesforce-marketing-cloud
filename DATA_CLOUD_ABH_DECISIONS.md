@@ -1,5 +1,7 @@
 # ABH / PST — Data Cloud provisioning and schema approval matrix
 
+> **Instrucción actual vinculante:** `AGENTS.md` y `docs/PROJECT_DEVELOPMENT_RULES.md`. El bloque histórico que propone una *segunda* External Client App/Environment está **superado**: el 09/11/2026 se certificó el intercambio de token usando la **aplicación OAuth Growth existente** (run #42655156432). **NO crear otro paquete/secretos.** La publicación del esquema sigue BLOQUEADA, G3 sin aprobación.
+
 **Status: schema publication blocked.** Do not upload either YAML until
 approval of field retention, keys, categories and source data handling.
 This document records facts observed in the ABH Salesforce UI and the

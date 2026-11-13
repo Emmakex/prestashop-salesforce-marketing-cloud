@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "repository": "Emmakex/prestashop-salesforce-marketing-cloud",
+  "product": "Puente PrestaShop con Salesforce",
+  "architecture": "reusable_multi_merchant_provider_adapters",
+  "supported_prestashop_families": [
+    "1.7.8.x",
+    "8.x",
+    "9.x"
+  ],
+  "pilot": {
+    "merchant": "ABH",
+    "site": "Barcelona Confort",
+    "provider": "marketing_cloud_growth",
+    "salesforce_platform": "salesforce_core_lightning",
+    "data_platform": "data_cloud_data_360",
+    "route": "salesforce_core_rest_or_data_360_ingestion",
+    "engagement_for_pilot": false,
+    "installed_module_version_observed": "0.7.1",
+    "prestashop_runtime_mode_observed": "test",
+    "cart_consent_mode_observed": "marketing_optin",
+    "cart_abandon_minutes_observed": 60,
+    "oauth_status": "certified_no_write",
+    "data_cloud_token_exchange_status": "certified_no_write",
+    "data_cloud_connector_alias": "PST",
+    "data_cloud_source_api_name": "ABH_PrestaShop_Data_Cloud",
+    "data_cloud_schema_status": "schema_required_unapproved",
+    "customer_data_live_ingestion_authorized": false,
+    "live_campaign_sends_authorized": false,
+    "historical_backfill_authorized": false,
+    "external_sender_provider": "not_implemented_for_pilot"
+  },
+  "provider_registry": {
+    "marketing_cloud_growth": {
+      "pilot": true,
+      "transport": "core_rest_data360",
+      "enable_production": false
+    },
+    "marketing_cloud_engagement": {
+      "pilot": false,
+      "transport": "legacy_adapter_only",
+      "enable_for_abh": false
+    }
+  },
+  "current_delivery_gate": "pst_schema_data_owner_approval",
+  "next_action": "approve_PSCustomer_PSOrder_schema_identity_retention_and_timezone_without_publishing"
+}

@@ -13,6 +13,18 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  project-focus:
+    name: ABH provider focus (fail closed)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+      - name: Validate ABH canonical provider, Test gate and pilot rules
+        run: |
+          python3 scripts/ci/verify-project-focus.py
+          python3 -m unittest discover -s tests -p 'test_project_focus.py'
+
   php-syntax:
     name: PHP syntax (${{ matrix.php }})
     runs-on: ubuntu-latest

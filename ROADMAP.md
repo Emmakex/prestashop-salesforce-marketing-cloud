@@ -1,5 +1,28 @@
 # Roadmap
 
+## Piloto ABH Growth + Data 360 — plan vigente (13/11/2026)
+
+**Normas:** [AGENTS.md](AGENTS.md), [docs/PROJECT_DEVELOPMENT_RULES.md](docs/PROJECT_DEVELOPMENT_RULES.md) y [contrato](config/project-contract.json) son obligatorios. **Este apartado manda sobre los hitos 0.1–0.7 históricos de Engagement situados más abajo**, que certifican capacidades del módulo legado, NO campañas ABH.
+
+- [x] G0: identificación correcta **Marketing Cloud Growth (Next) + Data Cloud (Data 360)**, no Engagement; conexión existente.
+- [x] G1: External Client App, Salesforce Core OAuth Client Credentials y metadata API v68.0 certificados.
+- [x] G2: intercambio de token Data 360 certificado (sin escritura); conector `ABH_PrestaShop_Data_Cloud` / `PST` observado.
+- [x] BC instalado 0.7.1, activo, `test`, `marketing_optin`, umbral 60 min; no envíos.
+- [x] Historia local auditada: 99 direcciones con algún flag positivo, 8 contradicciones; **no** audiencia legal Growth.
+- [ ] **G3 BLOQUEANTE AHORA:** aprobación explícita del esquema `PSCustomer` / `PSOrder`, IDs con namespace, Data Space, retención, fechas UTC/DST, finalidad/consentimiento.
+- [ ] G4: publicar esquema e iniciar streams/mapeos con autorización separada.
+- [ ] G5: validación y pruebas sintéticas Data 360, después escritura sintética aprobada.
+- [ ] G6: seleccionar y certificar identidad/contacto, bajas, restricciones y supresiones de **Growth/Core/Data 360**, no las listas SOAP de Engagement.
+- [ ] G7: comprobar Flow y capacidad de campañas Growth; test de abandono → recuperación → pedido con destinatario sintético.
+- [ ] G8: implementar adaptador Growth reusable, compatibilidad PS 1.7/8/9, release, rollback y go-live autorizado.
+
+**Guardas:** no publicar schema ni enviar datos reales todavía. Nunca aconsejar Installed Packages de Engagement para ABH. Los pasos marcados hechos son evidencias puntuales, no el circuito end-to-end.
+
+---
+
+## Histórico de implementación del adaptador Engagement (NO es el plan de despliegue ABH)
+
+
 ## 0.1.0 — Bootstrap
 
 - [x] PrestaShop module skeleton

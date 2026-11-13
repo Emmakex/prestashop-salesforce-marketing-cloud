@@ -1,8 +1,10 @@
 # PrestaShop Salesforce Marketing Cloud
 
+> **Reglas del proyecto:** leer [AGENTS.md](AGENTS.md), [desarrollo y gates](docs/PROJECT_DEVELOPMENT_RULES.md) y [contrato de proveedor](config/project-contract.json) antes de implementar. El piloto ABH/BC **usa Growth + Data 360**, no Engagement. El objetivo de negocio es campañas de clientes y recuperación de carritos con identidad/consentimiento verificables, sin saltarse G3 de esquema PST.
+
 > **ABH / Barcelona Confort pilot: Marketing Cloud Growth (Next) + Data Cloud/Data 360, NOT Engagement.** The existing 0.7.1 module's Engagement delivery paths are legacy/provider-specific and are NOT a working ABH marketing-send route. The existing ABH Core OAuth and Data Cloud token exchange have already passed; do not request Engagement Installed Packages, All Subscribers or `/interaction/v1/events` for this merchant. See [`docs/ABH_GROWTH_CANONICAL_TARGET.md`](docs/ABH_GROWTH_CANONICAL_TARGET.md) for the verified integration, outstanding schema/consent/Flow gates and why BC remains Test.
 
-A reusable PrestaShop bridge for Salesforce Marketing Cloud Engagement.
+A reusable PrestaShop commerce-event bridge with provider-separated destinations. The current 0.7.1 code includes a historical Engagement destination; the Growth/Data 360 delivery adapter required by ABH is **not** yet certified or active.
 
 ## Goal
 
