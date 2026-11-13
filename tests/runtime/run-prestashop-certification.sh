@@ -253,4 +253,49 @@ PY
 
 curl -fsS --max-time 10 "http://127.0.0.1:${PORT}/" >/dev/null
 
+echo "==> G3 future 0.8.0 upgrade fixture: create from real 0.7.1 in CI only"
+mkdir -p /tmp/pssfmc-runtime-080
+cp -a /tmp/pssfmc-runtime-071/pssalesforcebridge /tmp/pssfmc-runtime-080/pssalesforcebridge
+python3 - /tmp/pssfmc-runtime-080/pssalesforcebridge/pssalesforcebridge.php <<'PY'
+import pathlib, sys
+path = pathlib.Path(sys.argv[1])
+old = "$this->version = '0.7.1';"
+new = "$this->version = '0.8.0';"
+content = path.read_text()
+assert content.count(old) == 1
+path.write_text(content.replace(old, new, 1))
+PY
+cp "$ROOT/tests/runtime/g3-candidate-upgrade-0.8.0.php" \
+   /tmp/pssfmc-runtime-080/pssalesforcebridge/upgrade/upgrade-0.8.0.php
+docker cp "$ROOT/tests/runtime/prestashop-g3-upgrade-acceptance.php" \
+  "$PS_CONTAINER:/tmp/prestashop-g3-upgrade-acceptance.php"
+
+g3_fixture_php() {
+  docker exec -u www-data \
+    -e GITHUB_ACTIONS=true \
+    -e G3_RUNTIME_CI_ONLY=yes_disposable_prestashop \
+    -e G3_080_UPGRADE_FIXTURE=candidate_ci_only \
+    -e G3_080_MERCHANT=ABH \
+    -e G3_080_PROVIDER=marketing_cloud_growth \
+    -e G3_080_NAMESPACE=growth_ci_abhtest \
+    -e EXPECTED_PS_VERSION="$PS_VERSION" \
+    -e PS_ROOT=/var/www/html \
+    -w /var/www/html "$PS_CONTAINER" php "$@"
+}
+g3_fixture_php /tmp/prestashop-g3-upgrade-acceptance.php before
+
+copy_module /tmp/pssfmc-runtime-080/pssalesforcebridge
+docker exec -u www-data \
+    -e GITHUB_ACTIONS=true \
+    -e G3_RUNTIME_CI_ONLY=yes_disposable_prestashop \
+    -e G3_080_UPGRADE_FIXTURE=candidate_ci_only \
+    -e G3_080_MERCHANT=ABH \
+    -e G3_080_PROVIDER=marketing_cloud_growth \
+    -e G3_080_NAMESPACE=growth_ci_abhtest \
+    -e EXPECTED_PS_VERSION="$PS_VERSION" \
+    -w /var/www/html "$PS_CONTAINER" \
+    php bin/console prestashop:module upgrade pssalesforcebridge --no-interaction
+test "$(sql "SELECT version FROM ps_module WHERE name='pssalesforcebridge'")" = '0.8.0'
+g3_fixture_php /tmp/prestashop-g3-upgrade-acceptance.php after
+
 echo "runtime certification: PASS for PrestaShop ${PS_VERSION}"
