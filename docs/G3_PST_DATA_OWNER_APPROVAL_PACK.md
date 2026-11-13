@@ -38,6 +38,17 @@ La sincronización del reloj, el guardado durable de la captura y la política
 de reintentos/frescura **siguen pendientes** de G3-03/G3-04. `captured_at_utc`
 no se ha propuesto automáticamente como Record Modified.
 
+### Dedupe y aceptación durable (contrato candidato, sin base de datos)
+
+El nuevo [contrato aislado de aceptación idempotente](G3_ATOMIC_UTC_ACCEPTANCE_CONTRACT.md)
+verifica en pruebas sintéticas que un evento nuevo conserva la misma
+`captured_at_utc` cuando se reintenta, con aislamiento por
+`source_namespace` y sin modificar el hash comercial ni
+`source_updated_utc`. **Aún no existe almacenamiento real**, ni
+migración ni worker Growth. La secuencia de aceptación local **no**
+equivale al orden de modificación fuente; los envíos y Record Modified
+permanecen bloqueados. G3-01/03/04/07 siguen pendientes de aprobación.
+
 ## Inventario completo y clasificación
 
 Este inventario procede exactamente de los dos YAML del repositorio y del mapper. El fichero `config/g3-pst-schema-review.json` lo mantiene sincronizado mediante CI y marca las decisiones como propuestas. Ningún campo aparece como autorización comercial por defecto.
