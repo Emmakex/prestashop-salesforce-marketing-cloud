@@ -2,8 +2,10 @@
 /** G3 offline acceptance test: replay keeps first UTC stamp; no database/API. */
 require_once dirname(__DIR__) . '/pssalesforcebridge/src/DataCloud/LiveEventUtcObservation.php';
 require_once dirname(__DIR__) . '/pssalesforcebridge/src/DataCloud/StagedAtomicUtcAcceptance.php';
+require_once dirname(__DIR__) . '/pssalesforcebridge/src/DataCloud/StagedAcceptedSequenceReview.php';
 
 use Emmakex\PrestaShopSalesforceMarketingCloud\DataCloud\StagedAtomicUtcAcceptance;
+use Emmakex\PrestaShopSalesforceMarketingCloud\DataCloud\StagedAcceptedSequenceReview;
 
 function stagedAcceptAssert($condition, $message)
 {
@@ -162,4 +164,26 @@ foreach (['Db::', 'curl_', 'file_get_contents(', '->enqueue(', '->execute(',
     stagedAcceptAssert(strpos($source, $forbidden) === false,
         'Staged contract must not invoke database, queue or Salesforce transport.');
 }
+// A later accepted event does not prove source chronology. An earlier
+// acceptance is quarantined; even the latest is NOT automatically sendable.
+$earlierReview = StagedAcceptedSequenceReview::inspect(1, 2);
+stagedAcceptAssert($earlierReview['status'] === 'older_local_acceptance_quarantine',
+    'Older acceptance must be quarantined from a newer acceptance.');
+$latestReview = StagedAcceptedSequenceReview::inspect(2, 2);
+stagedAcceptAssert($latestReview['status'] === 'latest_local_acceptance_unverified',
+    'Latest local acceptance cannot prove remote source revision.');
+foreach ([$earlierReview, $latestReview] as $decision) {
+    foreach (['source_order_verified', 'source_revision_verified', 'allow_outbound_apply',
+        'record_modified_authorized', 'data_360_ingestion_authorized',
+        'marketing_sends_authorized'] as $flag) {
+        stagedAcceptAssert($decision[$flag] === false,
+            'Acceptance sequence must never authorize a remote write: ' . $flag);
+    }
+}
+foreach ([[1, 0], [0, 1], [4, 3], [2, '3'], [-1, 8]] as $invalidPair) {
+    stagedReject(function () use ($invalidPair) {
+        StagedAcceptedSequenceReview::inspect($invalidPair[0], $invalidPair[1]);
+    }, 'invalid sequence evidence');
+}
+
 echo "G3 atomic acceptance candidate contract: write-once/retry/cross-shop safety passed; no DB or sends.\n";
