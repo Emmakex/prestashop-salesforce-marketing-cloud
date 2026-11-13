@@ -64,6 +64,19 @@ intencionado: un número de autoincremento refleja orden de aceptación
 en un diario, no necesariamente versión del registro ni orden de
 escritura en PrestaShop.
 
+## Prueba transaccional real, aislada de BC
+
+Se ha añadido el [laboratorio InnoDB MySQL/MariaDB](G3_MYSQL_ATOMIC_OUTBOX_SANDBOX.md)
+en `tests/integration/`. El nuevo CI ejecuta **transacciones reales**
+en una base desechable y demuestra rollback de journal/outbox/ledger,
+deduplicación y ocho procesos concurrentes sin perder la marca UTC.
+La salida del laboratorio está siempre `blocked`; su esquema y sus
+clases **no forman parte de un upgrade PrestaShop**. Esto valida la
+**viabilidad técnica de una arquitectura de aceptación**, no certifica
+las escrituras del módulo 0.7.1 ni autoriza Data 360 o Growth.
+La migración, la cola/ledger reales, la fuente de versiones y la
+retención continúan pendientes de aprobación G3.
+
 ## Futuro diseño físico (NO ejecutar; requiere aprobación + release)
 
 Se propone, no se crea, una tabla de diario por instalación con:
