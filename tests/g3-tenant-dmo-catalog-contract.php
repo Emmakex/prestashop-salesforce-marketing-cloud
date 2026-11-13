@@ -29,9 +29,26 @@ function fixtures()
             'dataSpaceName' => 'default',
             'fields' => [['name' => 'ssot__Id__c', 'isPrimaryKey' => true],
                 ['name' => 'ssot__SoldToCustomerId__c'],
-                ['name' => 'ssot__BillToContactId__c']],
+                ['name' => 'ssot__BillToContactId__c'],
+                ['name' => 'ssot__BillToAccountId__c']],
+        ],
+        'ssot__Account__dlm' => [
+            'name' => 'ssot__Account__dlm', 'category' => 'PROFILE',
+            'dataSpaceName' => 'default',
+            'fields' => [
+                ['name' => 'ssot__Id__c', 'isPrimaryKey' => true],
+                ['name' => 'ssot__IndividualId__c'],
+                ['name' => 'confidential_field__c']
+            ],
         ],
         'individual_relationships' => ['relationships' => []],
+        'account_relationships' => ['relationships' => [
+            ['sourceEntity' => ['name' => 'ssot__Account__dlm'],
+             'targetEntity' => ['name' => 'ssot__Individual__dlm'],
+             'sourceField' => ['name' => 'ssot__IndividualId__c'],
+             'status' => 'ACTIVE',
+             'confidential_attribute' => 'never-export-this']
+        ]],
         'relationships' => ['relationships' => [
             ['sourceEntity' => ['name' => 'ssot__SalesOrder__dlm'],
              'targetEntity' => ['name' => 'ssot__Individual__dlm'],
@@ -40,7 +57,8 @@ function fixtures()
              'secret' => 'no-print-tenant-secret'],
             ['sourceEntity' => ['name' => 'ssot__SalesOrder__dlm'],
              'targetEntity' => ['name' => 'ssot__Account__dlm'],
-             'sourceField' => ['name' => 'ssot__BillToContactId__c']]
+             'sourceField' => ['name' => 'ssot__BillToAccountId__c'],
+             'status' => 'ACTIVE']
         ]]
     ];
 }
@@ -53,12 +71,15 @@ function fakeGet($fixtures, &$urls, $relationStatus = 200)
         $name = substr($url, strlen($prefix));
         assertDmo(in_array($name, ['ssot__Individual__dlm', 'ssot__SalesOrder__dlm',
             'ssot__SalesOrder__dlm/relationships',
-            'ssot__Individual__dlm/relationships'], true), 'not_fixed_get');
+            'ssot__Individual__dlm/relationships',
+            'ssot__Account__dlm', 'ssot__Account__dlm/relationships'], true), 'not_fixed_get');
         $urls[] = $url;
         $fixture = $name === 'ssot__Individual__dlm/relationships'
             ? 'individual_relationships'
-            : (strpos($name, '/relationships') !== false
-                ? 'relationships' : $name);
+            : ($name === 'ssot__Account__dlm/relationships'
+                ? 'account_relationships'
+                : (strpos($name, '/relationships') !== false
+                    ? 'relationships' : $name));
         return ['status' => strpos($name, '/relationships') !== false
             ? $relationStatus : 200,
             'body' => json_encode($fixtures[$fixture])];
@@ -69,20 +90,33 @@ $probe = new G3TenantDmoCatalogProbe(
 $fixture = fixtures();
 $urls = [];
 $result = $probe->inspect(fakeGet($fixture, $urls));
-assertDmo(count($urls) === 4, 'expected_exactly_4_gets');
+assertDmo(count($urls) === 6, 'expected_exactly_6_gets');
 assertDmo($urls[0] === 'https://example.my.salesforce.com/services/data/v68.0/ssot/data-model-objects/ssot__Individual__dlm', 'individual_path');
 assertDmo($urls[1] === 'https://example.my.salesforce.com/services/data/v68.0/ssot/data-model-objects/ssot__SalesOrder__dlm', 'sales_order_path');
-assertDmo($urls[2] === $urls[1] . '/relationships', 'relations_path');
-assertDmo($urls[3] === $urls[0] . '/relationships', 'individual_relations_path');
+assertDmo($urls[2] === 'https://example.my.salesforce.com/services/data/v68.0/ssot/data-model-objects/ssot__Account__dlm', 'account_path');
+assertDmo($urls[3] === $urls[1] . '/relationships', 'relations_path');
+assertDmo($urls[4] === $urls[0] . '/relationships', 'individual_relations_path');
+assertDmo($urls[5] === $urls[2] . '/relationships', 'account_relations_path');
 assertDmo($result['objects']['Individual']['id_field_is_primary_key'],
     'individual_pk');
 assertDmo($result['objects']['SalesOrder']['category_matches_proposal']
     && $result['objects']['SalesOrder']['observed_category'] === 'OTHER',
     'sales_order_category');
+assertDmo($result['objects']['Account']['metadata_readable']
+    && $result['objects']['Account']['id_field_is_primary_key']
+    && $result['objects']['Account']['candidate_fields_present']['ssot__IndividualId__c']
+    && $result['objects']['SalesOrder']['candidate_fields_present']['ssot__BillToAccountId__c'],
+    'missing_account_bridge_fields');
 assertDmo($result['relationship']['sold_to_customer_relation_seen']
     && $result['relationship']['active_candidate_relation_seen']
     && $result['relationship']['sales_order_relationship_count'] === 2
-    && $result['relationship']['individual_relationship_count'] === 0,
+    && $result['relationship']['individual_relationship_count'] === 0
+    && $result['relationship']['account_relationship_count'] === 1
+    && $result['relationship']['sales_order_to_account_bill_to_relation_seen']
+    && $result['relationship']['account_to_individual_relation_seen']
+    && $result['relationship']['active_sales_order_to_account_bill_to_relation_seen']
+    && $result['relationship']['active_account_to_individual_relation_seen']
+    && !$result['relationship']['account_bridge_verified_by_metadata_only'],
     'exact_relationship');
 assertDmo(!$result['relationship']['bill_to_contact_relation_seen'],
     'wrong_relation_target');
@@ -94,6 +128,7 @@ foreach (['tenant_mapping_approved', 'identity_resolution_authorized',
 }
 $encoded = json_encode($result);
 foreach (['no-print-tenant-secret', 'custom_private_field__c',
+    'confidential_field__c', 'never-export-this',
     'synthetic-token', 'example.my.salesforce.com'] as $secret) {
     assertDmo(strpos($encoded, $secret) === false, 'unfiltered_evidence');
 }
@@ -103,6 +138,9 @@ $partial = $probe->inspect(fakeGet($fixture, $relUrls, 403));
 assertDmo(!$partial['relationship']['metadata_accessible']
     && !$partial['relationship']['individual_relationship_metadata_accessible']
     && $partial['relationship']['sales_order_relationship_count'] === null
+    && $partial['relationship']['account_relationship_count'] === null
+    && !$partial['relationship']['sales_order_to_account_bill_to_relation_seen']
+    && !$partial['relationship']['account_to_individual_relation_seen']
     && !$partial['relationship']['sales_order_to_individual_candidate_present'],
     '403_relation_falsely_verified');
 $wrong = fixtures();
@@ -148,6 +186,25 @@ assertDmo($reverseResult['relationship']['any_relation_between_objects_seen']
     && !$reverseResult['relationship']['active_candidate_relation_seen'],
     'reverse_relationship_not_reported');
 
+// A missing/forbidden Account DMO cannot be treated as a verified bridge.
+// The two original DMOs remain queryable and are not silently merged.
+$missingAccount = $probe->inspect(function ($url, $token) use ($fixture) {
+    $prefix = 'https://example.my.salesforce.com/services/data/v68.0/ssot/data-model-objects/';
+    $name = substr($url, strlen($prefix));
+    if ($name === 'ssot__Account__dlm'
+        || $name === 'ssot__Account__dlm/relationships') {
+        return ['status' => 404, 'body' => '{"private":"no-log"}'];
+    }
+    $key = $name === 'ssot__Individual__dlm/relationships'
+        ? 'individual_relationships'
+        : (strpos($name, '/relationships') !== false
+            ? 'relationships' : $name);
+    return ['status' => 200, 'body' => json_encode($fixture[$key])];
+});
+assertDmo(!$missingAccount['objects']['Account']['metadata_readable']
+    && !$missingAccount['relationship']['account_relationship_metadata_accessible']
+    && !$missingAccount['relationship']['account_bridge_verified_by_metadata_only'],
+    'optional_account_not_fail_closed');
 rejectDmo(function () use ($probe) {
     $probe->inspect(function () {
         return ['status' => 403, 'body' => '{"access_token":"secret"}'];
@@ -200,4 +257,4 @@ foreach (['branches: [main]', 'environment: salesforce-growth-certification',
 }
 assertDmo(strpos($workflow, 'pull_request:') === false,
     'secrets_exposed_to_pr');
-echo "G3 DMO metadata GET-only contract: four fixed GETs, category enum and both relation directions; no approvals.\n";
+echo "G3 DMO metadata GET-only contract: six fixed GETs, 3 bounded DMOs, Account bridge held pending owner; no approvals.\n";
