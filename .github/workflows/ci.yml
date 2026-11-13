@@ -183,6 +183,50 @@ jobs:
           python scripts/ci/verify-bc-timestamp-sql-readonly.py
           python -m unittest discover -s tests -p 'test_bc_timestamp_sql_readonly.py'
 
+  g3-mysql-sandbox:
+    name: G3 atomic DB sandbox (${{ matrix.database }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - database: mysql8
+            image: mysql:8.0
+          - database: mariadb10
+            image: mariadb:10.11
+    services:
+      db:
+        image: ${{ matrix.image }}
+        env:
+          MYSQL_ROOT_PASSWORD: g3_ci_root_only
+          MYSQL_DATABASE: g3_ci
+          MYSQL_USER: g3_ci_user
+          MYSQL_PASSWORD: g3_ci_pass_only
+        ports:
+          - 3306:3306
+    env:
+      G3_CI_ENABLE: yes_sandbox_only
+      G3_CI_DSN: 'mysql:host=127.0.0.1;port=3306;dbname=g3_ci;charset=utf8mb4'
+      G3_CI_USER: g3_ci_user
+      G3_CI_PASSWORD: g3_ci_pass_only
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: pdo_mysql
+          coverage: none
+      - name: Confirm PDO MySQL and fail-closed staging safeguards
+        run: |
+          php -m | grep -qi 'pdo_mysql'
+          php -l tests/integration/G3SandboxPdoJournal.php
+          php -l tests/integration/g3_mysql_acceptance.php
+      - name: Test real transactional journal, rollback and concurrent dedupe (CI database ONLY)
+        run: php tests/integration/g3_mysql_acceptance.php
+
   package:
     name: Build release package
     runs-on: ubuntu-latest
