@@ -5,7 +5,7 @@
 
 ## Qué se va a inspeccionar realmente
 
-La API oficial **Salesforce Data 360 Connect REST** permite consultar metadatos de DMO y relaciones mediante `GET /services/data/v68.0/ssot/data-model-objects/{apiName}`. En este proyecto, versión REST v68.0 ya observada. El [workflow protegido](../.github/workflows/g3-dmo-catalog-readonly.yml) ejecuta **seis consultas GET fijas** usando la misma External Client App Growth y el mismo entorno GitHub `salesforce-growth-certification`. No solicita secretos nuevos ni modifica permisos.
+La API oficial **Salesforce Data 360 Connect REST** permite consultar metadatos de DMO y relaciones mediante `GET /services/data/v68.0/ssot/data-model-objects/{apiName}`. En este proyecto, versión REST v68.0 ya observada. El [workflow protegido](../.github/workflows/g3-dmo-catalog-readonly.yml) ejecuta **tres GET de esquema DMO y tres familias GET de relaciones con paginación acotada** usando la misma External Client App Growth y el mismo entorno GitHub `salesforce-growth-certification`. No solicita secretos nuevos ni modifica permisos.
 
 | Consulta | Qué se comprueba | Qué no demuestra |
 |---|---|---|
@@ -34,6 +34,14 @@ La [referencia oficial de DMO Sales Order](https://developer.salesforce.com/docs
 
 **Tercera observación real:** el [run #43491126597](https://github.com/Emmakex/prestashop-salesforce-marketing-cloud/actions/runs/43491126597) confirmó `SalesOrder=UNASSIGNED`, `Individual=PROFILE`, PK y Data Space `default` en ambos; 20 relaciones visibles en cada extremo, ninguna directa demostrada. La siguiente inspección acotada se limita a comprobar el [posible puente Account](G3_CUSTOMER_ORDER_RELATION_TOPOLOGY_DECISION.md) sin activarlo.
 
+## Corrección de completitud: la primera página NO era el catálogo completo
+
+La [referencia Connect REST de Salesforce](https://developer.salesforce.com/docs/data/connectapi/references/spec?meta=type%3AOutput+D360+Node+Input) indica que `GET …/{DMO}/relationships` devuelve **20 relaciones por defecto** y expone `limit`, `offset`, `totalSize` y enlaces de continuación. En los [runs #43490356308](https://github.com/Emmakex/prestashop-salesforce-marketing-cloud/actions/runs/43490356308) y [#43492920228](https://github.com/Emmakex/prestashop-salesforce-marketing-cloud/actions/runs/43492920228) se observaron **20 relaciones exactas en cada DMO**. El lector anterior solo descargaba la primera página; por ello **no es válido afirmar que no existen relaciones SalesOrder↔Account↔Individual en todo ABH**. Los resultados previos solo indican que no se detectaron en esa **primera página**.
+
+El nuevo preflight conserva los tres GET de esquema (`Individual`, `SalesOrder`, `Account`) y utiliza consultas de relaciones con **`limit=100` y `offset` local, entero y acotado**, sin usar `nextPageUrl` ni `pageToken` recibidos. Máximo **cinco páginas por DMO**, **500 metadatos de relación por objeto**, hasta **18 GET en total**. Si `totalSize` excede lo examinado, no se puede probar continuidad, Salesforce rechaza la paginación o repite páginas, el indicador `*_relationship_scan_complete` queda **false** y no puede interpretarse una ausencia. Se siguen emitiendo solo indicadores predefinidos y recuentos, nunca los cuerpos de respuesta.
+
+Ni siquiera un catálogo completo y una arista estándar visible autoriza por sí mismo `PSOrder→SalesOrder`: el arquitecto debe decidir mapeo, clave calificada y finalidad para ABH. Ninguna acción de escritura o permiso se añade.
+
 ## Seguridad y activación
 
 - El workflow usa `permissions: contents: read`, checkout del SHA exacto y `persist-credentials: false`.
@@ -55,6 +63,6 @@ Fuentes oficiales:
 
 ## Qué seguirá bloqueado
 
-Aunque los seis GET respondan, **G3-05/G3-06 seguirán pendientes** hasta que propietario y arquitecto Data 360 confirmen categoría, PK, Data Space, mapeo DLO→DMO por campo, DMO relación correcta, huéspedes/borrados y supresiones. G3-01/02/03/04/07/08 necesitan aprobaciones independientes; G4–G8 aún bloqueados.
+Aunque los catálogos consultados respondan, **G3-05/G3-06 seguirán pendientes** hasta que propietario y arquitecto Data 360 confirmen categoría, PK, Data Space, mapeo DLO→DMO por campo, DMO relación correcta, huéspedes/borrados y supresiones. G3-01/02/03/04/07/08 necesitan aprobaciones independientes; G4–G8 aún bloqueados.
 
 **Ningún cambio al módulo BC 0.7.1 Test, schemas YAML, SQL, cliente, pedido, importación, fuente PST, Data Stream, campañas ni permisos. Sin ZIP ni reinstalación.**

@@ -8,6 +8,8 @@ final class G3TenantDmoCatalogProbe
 {
     const API_VERSION = 'v68.0';
     const MAX_BODY_BYTES = 1048576;
+    const RELATION_PAGE_SIZE = 100;
+    const MAX_RELATION_PAGES = 5;
 
     private $origin;
     private $token;
@@ -78,14 +80,14 @@ final class G3TenantDmoCatalogProbe
         // Both directions are inspected. The documented endpoint can list a
         // DMO as either source or target. An unreported standard relationship
         // may simply be inactive until its fields are mapped.
-        $orderRelations = $this->fetch(
-            $api . 'ssot__SalesOrder__dlm/relationships', $transport, true
+        $orderRelations = $this->fetchAllRelations(
+            $api . 'ssot__SalesOrder__dlm/relationships', $transport
         );
-        $individualRelations = $this->fetch(
-            $api . 'ssot__Individual__dlm/relationships', $transport, true
+        $individualRelations = $this->fetchAllRelations(
+            $api . 'ssot__Individual__dlm/relationships', $transport
         );
-        $accountRelations = $this->fetch(
-            $api . 'ssot__Account__dlm/relationships', $transport, true
+        $accountRelations = $this->fetchAllRelations(
+            $api . 'ssot__Account__dlm/relationships', $transport
         );
         $relation = self::summarizeRelations(
             $orderRelations, $individualRelations, $accountRelations
@@ -131,6 +133,9 @@ final class G3TenantDmoCatalogProbe
             'account_relationship_metadata_accessible' =>
                 $accountRelations !== null,
             'account_relationship_count' => null,
+            'sales_order_relationship_scan_complete' => false,
+            'individual_relationship_scan_complete' => false,
+            'account_relationship_scan_complete' => false,
             'sales_order_to_account_bill_to_relation_seen' => false,
             'account_to_individual_relation_seen' => false,
             'active_sales_order_to_account_bill_to_relation_seen' => false,
@@ -145,11 +150,16 @@ final class G3TenantDmoCatalogProbe
             }
             if (!isset($listing['relationships'])
                 || !is_array($listing['relationships'])
-                || count($listing['relationships']) > 250) {
+                || count($listing['relationships']) >
+                    self::MAX_RELATION_PAGES * self::RELATION_PAGE_SIZE
+                || !isset($listing['_catalog_complete'])
+                || !is_bool($listing['_catalog_complete'])) {
                 throw new RuntimeException('g3_dmo_invalid_relationship_metadata');
             }
             $result[$which . '_relationship_count'] =
                 count($listing['relationships']);
+            $result[$which . '_relationship_scan_complete'] =
+                $listing['_catalog_complete'];
             foreach ($listing['relationships'] as $entry) {
                 if (!is_array($entry) || !isset(
                     $entry['sourceEntity']['name'], $entry['targetEntity']['name']
@@ -276,7 +286,72 @@ final class G3TenantDmoCatalogProbe
         ];
     }
 
-    private function fetch($path, $transport, $relationshipsOptional = false)
+    /**
+     * Salesforce Connect REST GET relationship endpoints default to 20 rows,
+     * so the former one-page checks could not establish ABSENCE of an edge.
+     * This bounded offset-only scan never follows Salesforce nextPageUrl.
+     *
+     * At most 5 x 100 metadata rows per DMO; incomplete scans never prove
+     * absence or become authority for DLO/DMO mapping or campaign sends.
+     */
+    private function fetchAllRelations($path, $transport)
+    {
+        $aggregate = [];
+        $seen = [];
+        $total = null;
+        $complete = false;
+        for ($page = 0; $page < self::MAX_RELATION_PAGES; ++$page) {
+            $offset = $page * self::RELATION_PAGE_SIZE;
+            $record = $this->fetch($path, $transport, true, $offset);
+            if ($record === null) {
+                return null;
+            }
+            if (!isset($record['relationships'])
+                || !is_array($record['relationships'])
+                || count($record['relationships']) > self::RELATION_PAGE_SIZE) {
+                throw new RuntimeException('g3_dmo_invalid_relationship_metadata');
+            }
+            if (isset($record['totalSize'])) {
+                if (!is_int($record['totalSize']) || $record['totalSize'] < 0
+                    || $record['totalSize'] > 1000000
+                    || ($total !== null && $record['totalSize'] !== $total)) {
+                    throw new RuntimeException('g3_dmo_invalid_relationship_total');
+                }
+                $total = $record['totalSize'];
+            }
+            foreach ($record['relationships'] as $row) {
+                // Duplicate rows across pages indicate an unstable/ignored
+                // offset, not an additional independent relationship.
+                $signature = hash('sha256', json_encode($row));
+                if (isset($seen[$signature])) {
+                    return [
+                        'relationships' => $aggregate,
+                        '_catalog_complete' => false,
+                    ];
+                }
+                $seen[$signature] = true;
+                $aggregate[] = $row;
+            }
+            if ($total !== null) {
+                if (count($aggregate) > $total) {
+                    throw new RuntimeException('g3_dmo_invalid_relationship_total');
+                }
+                $complete = count($aggregate) === $total;
+            } elseif (count($record['relationships']) < self::RELATION_PAGE_SIZE) {
+                $complete = true;
+            }
+            if ($complete || count($record['relationships']) === 0) {
+                break;
+            }
+        }
+        return [
+            'relationships' => $aggregate,
+            '_catalog_complete' => $complete,
+        ];
+    }
+
+    private function fetch($path, $transport, $relationshipsOptional = false,
+        $offset = null)
     {
         // All allowed paths are static and cannot contain query/record IDs.
         $allowed = [
@@ -295,6 +370,20 @@ final class G3TenantDmoCatalogProbe
         ];
         if (!in_array($path, $allowed, true)) {
             throw new RuntimeException('g3_dmo_path_not_allowlisted');
+        }
+        if ($offset !== null) {
+            if (!$relationshipsOptional || !is_int($offset) || $offset < 0
+                || $offset >= self::MAX_RELATION_PAGES * self::RELATION_PAGE_SIZE
+                || $offset % self::RELATION_PAGE_SIZE !== 0
+                || substr($path, -14) !== '/relationships') {
+                throw new RuntimeException('g3_dmo_offset_not_allowlisted');
+            }
+            // Construct parameter values ONLY from local constants; never
+            // take host, query, pageToken or nextPageUrl from an API response.
+            $path .= '?limit=' . self::RELATION_PAGE_SIZE;
+            if ($offset > 0) {
+                $path .= '&offset=' . $offset;
+            }
         }
         $response = $transport === null
             ? $this->httpGet($this->origin . $path)

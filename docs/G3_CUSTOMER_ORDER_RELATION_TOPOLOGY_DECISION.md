@@ -23,6 +23,8 @@ La referencia estándar de Salesforce identifica **`SalesOrder.BillToAccountId �
 - [B2C Commerce Sales Order: ejemplo de mapeo, no certificación para ABH](https://developer.salesforce.com/docs/data/data-cloud-dmo-mapping/guide/c360dm-b2ccommerce-salesorder.html).
 - [Requisitos de mapeo/PK y relaciones de fuentes personalizadas](https://help.salesforce.com/s/articleView?id=data.c360_a_required_data_mappings.htm&type=5).
 
+**Corrección de interpretación (13/11/2026):** las consultas de relaciones de los runs anteriores devolvieron exactamente **20**, que es el **límite por defecto** de Connect REST. Por tanto, el resultado “cero enlaces” solo describe **las primeras páginas**: no es evidencia de ausencia en el catálogo completo. [El preflight paginado](G3_ABH_DMO_TENANT_READONLY_DISCOVERY.md) repetirá la consulta con límite/offset acotados e indicador de completitud por DMO. No elegir A/B/C/D sin revisar el resultado completo y la semántica del modelo.
+
 ## Opciones pendientes de firma
 
 | Opción | Técnica | Lo que exige | Estado |
