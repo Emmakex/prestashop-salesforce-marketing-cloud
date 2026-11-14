@@ -19,11 +19,19 @@ chdir('/var/www/html');
 require_once '/var/www/html/config/config.inc.php';
 require_once '/var/www/html/modules/pssalesforcebridge/src/Provider/ExplicitProviderRouter.php';
 require_once '/var/www/html/modules/pssalesforcebridge/src/Growth/GrowthOutboxSchemaPlan.php';
+require_once '/var/www/html/modules/pssalesforcebridge/src/Compatibility/CustomerHookAdapter.php';
+require_once '/var/www/html/modules/pssalesforcebridge/src/Compatibility/OrderHookAdapter.php';
+require_once '/var/www/html/modules/pssalesforcebridge/src/DataCloud/LiveEventUtcObservation.php';
+require_once '/var/www/html/modules/pssalesforcebridge/src/DataCloud/StagedAtomicUtcAcceptance.php';
+require_once '/var/www/html/modules/pssalesforcebridge/src/Growth/BlockedOutboxCoordinator.php';
+require_once '/var/www/html/modules/pssalesforcebridge/src/Growth/GrowthBlockedHookAdapter.php';
 require_once '/var/www/html/modules/pssalesforcebridge/src/Growth/GrowthSqlEngineGate.php';
 require_once '/var/www/html/modules/pssalesforcebridge/src/Growth/PrestaShopDbBlockedOutboxStore.php';
 
 use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\PrestaShopDbBlockedOutboxStore;
 use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthSqlEngineGate;
+use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthBlockedHookAdapter;
+use Emmakex\PrestaShopSalesforceMarketingCloud\Provider\ExplicitProviderRouter;
 
 function growthDbRuntimeAssert($ok, $reason)
 {
@@ -174,6 +182,77 @@ function growthDbRuntimeRun()
             'SELECT COUNT(*) FROM ' . _DB_PREFIX_ . $suffix, false
         ) === $count, 'legacy_table_modified');
     }
+    // Three actual PrestaShop version runtimes must understand the existing
+    // hook object shapes. An in-memory atomic callback proves the bridge can
+    // call its Growth coordinator WITHOUT installing Growth tables or hooks.
+    $router = new ExplicitProviderRouter(
+        getenv('EXPECTED_PS_VERSION'), 'ABH',
+        ExplicitProviderRouter::GROWTH, 'growth_ci_runtime', 'test'
+    );
+    $memoryRows = [];
+    $nextSequence = 0;
+    $memoryStore = function (array $identity, $factory)
+        use (&$memoryRows, &$nextSequence) {
+        $key = $identity['source_namespace'] . ':'
+            . $identity['dedupe_fingerprint'];
+        if (isset($memoryRows[$key])) {
+            return ['row' => $memoryRows[$key], 'inserted' => false];
+        }
+        $row = $factory();
+        $row['accepted_sequence'] = ++$nextSequence;
+        $memoryRows[$key] = $row;
+        return ['row' => $row, 'inserted' => true];
+    };
+    $syntheticCustomer = (object) [
+        'id' => 701, 'id_shop' => 1,
+        'email' => 'not-for-export@example.invalid'
+    ];
+    $firstHook = GrowthBlockedHookAdapter::capture(
+        $router, 'actionCustomerAccountAdd',
+        ['newCustomer' => $syntheticCustomer],
+        'customer:1:701:' . str_repeat('a', 40), $memoryStore
+    );
+    $retryHook = GrowthBlockedHookAdapter::capture(
+        $router, 'actionCustomerAccountUpdate',
+        ['customer' => $syntheticCustomer],
+        'customer:1:701:' . str_repeat('a', 40), $memoryStore
+    );
+    $orderHook = GrowthBlockedHookAdapter::capture(
+        $router, 'actionValidateOrder',
+        ['order' => (object)['id' => 702, 'id_shop' => 1]],
+        'order:1:702:' . str_repeat('b', 40), $memoryStore
+    );
+    growthDbRuntimeAssert($firstHook['inserted'] === true
+        && $retryHook['inserted'] === false
+        && $orderHook['inserted'] === true
+        && $retryHook['captured_at_reused'] === true
+        && $nextSequence === 2
+        && count($memoryRows) === 2
+        && $firstHook['marketing_sends_authorized'] === false
+        && $orderHook['data_360_ingestion_authorized'] === false
+        && strpos(json_encode([$firstHook, $orderHook]),
+            'not-for-export@example.invalid') === false,
+        'native_hook_shapes_or_blocked_outbox_failed');
+
+    // Unscoped PrestaShop customer fallback to Context shop 1 must NOT
+    // be allowed to enter Growth, even with an otherwise valid dedupe key.
+    $unscopedRejected = false;
+    try {
+        GrowthBlockedHookAdapter::capture(
+            $router, 'actionCustomerAccountAdd',
+            ['customer' => (object)['id' => 703]],
+            'customer:1:703:' . str_repeat('c', 40), $memoryStore
+        );
+    } catch (RuntimeException $e) {
+        $unscopedRejected = $e->getMessage()
+            === 'growth_hook_explicit_scope_required';
+    }
+    growthDbRuntimeAssert($unscopedRejected
+        && count($memoryRows) === 2
+        && $nextSequence === 2
+        && (string) Configuration::get('PS_SFMC_MODE') === 'test',
+        'unscoped_hook_mutated_runtime');
+
     echo "Growth PrestaShop real Db contract passed (temporary table only).\n";
 }
 try {
