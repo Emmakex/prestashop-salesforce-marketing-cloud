@@ -158,6 +158,7 @@ jobs:
           php tests/growth-local-order-presence-contract.php
           php tests/growth-explicit-provider-routing-contract.php
           php tests/growth-provider-outbox-bridge-contract.php
+          php tests/growth-schema-plan-contract.php
           php tests/cart-segmentation-contract.php
           php tests/cart-consent-current-state-contract.php
           php tests/marketing-recovery-suppression-readiness-contract.php
@@ -257,6 +258,7 @@ jobs:
           php tests/integration/g3_prestashop_071_queue_mirror.php
           php tests/integration/g3_growth_outbox_v1.php
           php tests/integration/g3_growth_provider_outbox_bridge.php
+          php tests/integration/g3_growth_prefixed_schema_preview.php
           php tests/integration/g3_prestashop_adapter.php
           php tests/integration/g3_namespace_registry.php
           php tests/integration/g3_installation_proof.php
