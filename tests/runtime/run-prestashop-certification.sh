@@ -203,6 +203,16 @@ console prestashop:module install pssalesforcebridge --no-interaction
 docker cp "$ROOT/tests/runtime/prestashop-smoke.php" "$PS_CONTAINER:/tmp/prestashop-smoke.php"
 docker exec -u www-data -e EXPECTED_PS_VERSION="$PS_VERSION" -e PS_ROOT=/var/www/html -w /var/www/html "$PS_CONTAINER" php /tmp/prestashop-smoke.php
 
+echo "==> Growth Db core API: real PrestaShop, disposable temporary table only"
+docker cp "$ROOT/tests/runtime/prestashop-growth-db-api-contract.php" \
+  "$PS_CONTAINER:/tmp/prestashop-growth-db-api-contract.php"
+docker exec -u www-data \
+  -e GITHUB_ACTIONS=true \
+  -e G3_RUNTIME_CI_ONLY=yes_disposable_prestashop \
+  -e EXPECTED_PS_VERSION="$PS_VERSION" \
+  -e PS_ROOT=/var/www/html \
+  -w /var/www/html "$PS_CONTAINER" php /tmp/prestashop-growth-db-api-contract.php
+
 
 echo "==> G3 candidate: REAL PrestaShop CI-only lifecycle (no module update)"
 for fixture in \
