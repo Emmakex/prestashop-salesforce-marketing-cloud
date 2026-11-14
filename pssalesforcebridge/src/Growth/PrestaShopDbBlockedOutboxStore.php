@@ -1,6 +1,7 @@
 <?php
 namespace Emmakex\PrestaShopSalesforceMarketingCloud\Growth;
 
+use Db;
 use RuntimeException;
 use Throwable;
 
