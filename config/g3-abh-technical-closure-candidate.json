@@ -1,0 +1,69 @@
+{
+  "contract_version": 1,
+  "merchant": "ABH",
+  "product": "marketing_cloud_growth_data_360",
+  "source": "existing_g3_evidence_not_new_discovery",
+  "review_stage": "technical_closure_candidate_not_owner_approval",
+  "selected_for_technical_review": {
+    "version": "v0.2",
+    "file": "schemas/ABH_PST_SCHEMA_REVIEW.yaml",
+    "sha256": "8595c2f9acb5be388ba3b2ec156ec65379ab04bf5ebf3718e63231cb06b43e9d",
+    "field_count": 22,
+    "objects": ["PSCustomer", "PSOrder"],
+    "reason": "exclude_unverified_historical_utc_field; data_owner_may_request_a_new_version",
+    "final_schema_approved": false,
+    "schema_to_publish": null
+  },
+  "point_1_data_privacy": {
+    "technical_disposition": "deny_external_data_and_sends_until_field_approval",
+    "namespace_key_contract": "source_namespace:shop_id:entity_type:entity_id",
+    "namespace_registry_operator_approved": false,
+    "global_namespace_reserved_for_abh": false,
+    "customer_email_name_export": "withheld",
+    "raw_optins_are_marketing_consent": false,
+    "historical_customer_order_backfill": "excluded",
+    "raw_historical_datetime_as_record_modified": false,
+    "new_observation_timestamp_utc_is_source_modified": false,
+    "record_modified_field": null,
+    "refresh_mode": "not_enabled",
+    "retention_days": null,
+    "privacy_owner_signoff": "pending",
+    "approved_processing_purpose": null,
+    "erasure_and_suppression_signoff": "pending",
+    "export_to_data_360_authorized": false,
+    "growth_sends_authorized": false
+  },
+  "point_2_customer_order_relationship": {
+    "local_parent": "PSCustomer.source_key",
+    "local_child": "PSOrder.customer_source_key",
+    "match_dimensions": ["source_namespace", "shop_id"],
+    "invalid_relationship_action": "quarantine_without_export",
+    "join_by_email_authorized": false,
+    "dmo_relation_strategy": "no_person_stitching_until_tenant_mapping_confirmed",
+    "dmo_linked_target": null,
+    "dmo_relation_approved": false,
+    "data_360_architect_signoff": "pending",
+    "dlo_dmo_mapping_save_authorized": false
+  },
+  "point_3_schema_finalization": {
+    "technical_candidate_sha_verified_against_frozen_review": true,
+    "field_names_verified_against_existing_inventory": true,
+    "salesforce_pst_preview_confirmed_by_owner": false,
+    "data_owner_schema_signoff": "pending",
+    "data_360_architect_schema_signoff": "pending",
+    "schema_approved": false,
+    "g4_publication_authorized": false,
+    "data_360_ingestion_authorized": false,
+    "marketing_campaign_send_authorized": false
+  },
+  "only_remaining_owner_actions": [
+    "confirm_namespace_final_purposes_retention_and_privacy",
+    "approve_customer_order_tenant_relationship_and_refresh",
+    "approve_exact_schema_sha_and_PST_preview_without_publishing"
+  ],
+  "production_impact": "none",
+  "module_installed_version": "0.7.1",
+  "module_mode": "test",
+  "shop_sql_access_required": false,
+  "new_module_installation_required": false
+}
