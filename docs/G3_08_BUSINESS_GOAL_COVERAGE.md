@@ -38,3 +38,11 @@ La [inspección completa de ABH (run #43495007989)](https://github.com/Emmakex/p
 - No toca PrestaShop/SQL, no consulta API, no genera ZIP, no modifica esquemas o consentimientos, no crea mapeos, no autoriza campañas y **no sustituye las firmas humanas**.
 
 **Estado final de este corte:** preparación de una decisión útil para el negocio, no despliegue. `pssalesforcebridge` permanece **0.7.1 en Test**.
+
+## Corte de implementación Growth — comprobación doble de conversión, todavía inactiva
+
+El código de módulo `pssalesforcebridge/src/Growth/GrowthCartConversionHoldGate.php` compone el lector real `LocalOrderPresenceReader` con **dos comprobaciones consecutivas** de dos fuentes (pedidos nativos y ledger local). Cada comprobación ejecuta dos `SELECT` acotados por `shop_id/cart_id`, sin email, payload ni envío. Si aparece un pedido en cualquiera de las cuatro lecturas, devuelve `hold_for_review`. Un error, tabla ausente, fila malformada o referencia cruzada también bloquea. La ausencia en ambas comprobaciones es solo `local_cart_candidate_review_only`, nunca un permiso de contacto.
+
+Los doce indicadores adicionales (estado del carrito, actividad, cliente, consentimiento específico, supresión, frecuencia, etc.) son **aseveraciones externas no certificadas**; la clase no las interpreta como una verificación real de BC. Rechaza datos personales, modos distintos de Test y atributos arbitrarios; informa únicamente estados acotados. **No cierra la carrera entre última consulta y envío futuro:** esa garantía requiere un fence transaccional junto al despacho, que no existe todavía.
+
+Prueba reproducible: `php tests/growth-cart-conversion-hold-gate-contract.php`, ejecutada en CI con PHP 7.1 y 8.5. Incluye compra detectada en segunda lectura, ambas fuentes, fallo parcial, identidad cruzada, ausencia, invalidación de consentimiento y filtrado de datos sensibles. La clase no se conecta a hooks, workers, cron ni a Salesforce; por tanto G3/G4/G6/G7 siguen sin aprobación, BC permanece en 0.7.1 Test y ningún mensaje se emite.
