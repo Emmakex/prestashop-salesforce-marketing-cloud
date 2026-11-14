@@ -74,3 +74,22 @@ El responsable debe contestar en el [issue #45](https://github.com/Emmakex/prest
 - **Bloqueado:** publicar v0.2/v0.3, crear streams, Data 360 ingest, backfill, unir contactos por email, Flow, audiencias y envíos Growth.
 
 **Cerrar G3 no autoriza G4 ni G5–G8. No se necesita SQL de producción ni reinstalar el módulo 0.7.1.**
+
+
+## Cierre técnico acelerado de los tres bloques G3 — 14/11/2026
+
+**No repetir las comprobaciones del operador:** PrestaShop 0.7.1 Test, prefijo/tienda, `Europe/Madrid`, configuración `marketing_optin`, origen `DATETIME`, inventario de preferencias, OAuth Core, token Data 360, PST `Schema Required`, versiones de esquema 22/24 campos, catálogo DMO/relaciones y pruebas de aislamiento ya están documentados. No pedir nuevos SQL, accesos, capturas ni reinstalación para repetirlos.
+
+Se ha consolidado un **único perfil de resolución técnica conservadora**, comprobado por CI: [`config/g3-abh-technical-closure-candidate.json`](../config/g3-abh-technical-closure-candidate.json). Este perfil **no es la firma del responsable de datos ni del arquitecto**; se diseñó para pasar al siguiente desarrollo sin declarar aprobaciones inexistentes.
+
+| Bloque | Resolución técnica lista | Única validación que queda |
+| --- | --- | --- |
+| **1 · Datos y privacidad (G3-01/02/03/04/07)** | `source_namespace:shop_id:entity_type:entity_id`; observación UTC nueva separada de `DATETIME` históricos; excluir históricos sin procedencia; sin elegir Record Modified/refresh, exportar emails/nombres ni convertir flags en consentimiento; sin inventar retención ni conceder permisos | Responsable de datos y privacidad: identidad/registro del namespace, finalidades, base aplicable por campo, plazos de retención/supresión y política de modificaciones |
+| **2 · Relación cliente-pedido (G3-05/06)** | `PSOrder.customer_source_key` solo se referencia al `PSCustomer.source_key` del **mismo namespace y tienda**; huérfanos y cruces se ponen en cuarentena, sin joins por email. No se inventa FK a `Individual` ni `Account` a partir de metadatos; las rutas B2/B3 permanecen investigadas | Arquitecto Data 360: confirmar topología y mapeo exacto activo en ABH, categorías y modo de actualización; autorizar por separado cualquier escritura de mapping |
+| **3 · Esquema de revisión (G3-08)** | Se preselecciona **v0.2 de 22 campos solo como base de revisión**, con SHA-256 `8595c2f9acb5be388ba3b2ec156ec65379ab04bf5ebf3718e63231cb06b43e9d`. Evita imponer `source_updated_utc` como required en históricos no auditados. El borrador v0.3 permanece como alternativa, **sin publicación** | Responsable de datos + administrador/arquitecto: confirmar contenido y SHA del definitivo, revisar la vista previa del esquema en PST y firmar; si se necesitan cambios, volver a congelar un nuevo hash |
+
+**Importante:** la preselección técnica v0.2 no la convierte en `schema_to_publish`. Ambas alternativas siguen sin autorización de ingesta; el YAML v0.2 tiene propiedades opcionales de email/nombres, pero en esta fase **no se autoriza transmitirlas**, ni siquiera con valores de ejemplo reales. Aún no existe política de conservación aprobada, un DMO join certificado ni permiso para asignar destinatarios a campañas.
+
+`python scripts/ci/verify-g3-technical-closure.py` contrasta el JSON anterior con los contratos de consentimiento, esquema, freeze SHA-256, mapping y estado de ABH; `tests/test_g3_technical_closure.py` simula manipulaciones de hash, autorizaciones, plazos inventados, consentimiento y relaciones para confirmar que la verificación las rechaza. La salida ofrece **tres acciones humanas residuales**, no las presenta como ocho desarrollos técnicos pendientes.
+
+**Continuación permitida sin firma:** preparar y probar únicamente un **G4 preflight de lectura local/metadata**, con no-write/no-send. **Continuación no permitida sin firma:** subir PST schema, streams, Data 360 ingest, mapeo, tratamiento de datos reales, promoción a producción, contactos marketing o campañas. Barcelona Confort sigue en 0.7.1 Test.
