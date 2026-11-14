@@ -66,3 +66,22 @@ Fuentes oficiales:
 Aunque los catálogos consultados respondan, **G3-05/G3-06 seguirán pendientes** hasta que propietario y arquitecto Data 360 confirmen categoría, PK, Data Space, mapeo DLO→DMO por campo, DMO relación correcta, huéspedes/borrados y supresiones. G3-01/02/03/04/07/08 necesitan aprobaciones independientes; G4–G8 aún bloqueados.
 
 **Ningún cambio al módulo BC 0.7.1 Test, schemas YAML, SQL, cliente, pedido, importación, fuente PST, Data Stream, campañas ni permisos. Sin ZIP ni reinstalación.**
+
+
+## Inspección extendida de puentes comprador–pedido (14/11/2026, PR pendiente de CI)
+
+La documentación oficial de Salesforce describe **dos enlaces estándar adicionales** hacia `Individual`, sin construir una unión por el contenido del email:
+
+1. `SalesOrder.BillToContactId → AccountContact.Id`, después `AccountContact.IndividualId → Individual.Id`.
+2. `SalesOrder.BilltoEmailId → ContactPointEmail.Id`, después `ContactPointEmail.PartyId → Individual.Id`, **solo cuando PartyId esté tipado contra Individual**, porque el mismo campo puede referir a Account. El identificador de correo no es la dirección textual.
+
+Fuentes oficiales: [Sales Order DMO](https://developer.salesforce.com/docs/data/data-cloud-dmo-mapping/guide/c360dm-si-salesorderdmo-dmo.html), [Account Contact DMO](https://developer.salesforce.com/docs/data/data-cloud-dmo-mapping/guide/c360dm-si-accountcontactdmo-dmo.html) y [Contact Point Email DMO](https://developer.salesforce.com/docs/data/data-cloud-dmo-mapping/guide/c360dm-si-contactpointemaildmo-dmo.html). El **DMO estándar** AccountContact aparece como `UNASSIGNED` y ContactPointEmail como `RELATED` en las referencias actuales. Estas categorías **no** aprueban la categoría del stream PST ni acreditan el estado real ABH.
+
+Se amplía el inspector de **solo metadatos** con dos DMO opcionales: `ssot__AccountContact__dlm` y `ssot__ContactPointEmail__dlm`; añade solo sus `/relationships` paginados, sin leer registros. Los nombres de API son literales permitidos; no admite parámetros de origen, path ni query de Salesforce. El número de GET de metadata queda entre **5 y 30**, según la paginación (5 objetos y hasta 5×5 páginas de 100 relaciones). **Ningún GET de clientes, pedidos o emails.**
+
+El artifact mantiene **solo** categorías permitidas, campos fijos `ssot__Id__c`, `IndividualId`, `AccountId`, `ContactEmailId`, `PartyId` y `BilltoEmailId`, flags de relación exacta, acceso/completitud y recuentos. No expone emails, tokens, URL del tenant, nombres de campos custom ni cuerpos de respuesta. Un `403/404` sobre DMO opcional significa **no comprobado**, no inexistente. El límite de 500 relaciones por DMO impide inferir ausencia si el catálogo está truncado; incluso 500/500 sin arista visible **no prueba ausencia de relaciones estándar inactivas**, ni da permiso para mapear.
+
+**Lo que se espera del siguiente run protegido de `main`:** si son visibles los dos DMO opcionales, si aparecen sus PK/FK candidatas, los recuentos y la relación tipada observada. Aun si ambas aristas se observan, las salidas `account_contact_bridge_approved`, `contact_email_bridge_approved`, `tenant_mapping_approved` e ingesta/envío siguen **false**. El arquitecto debe verificar correspondencia real de claves, namespace, cardinalidad, huérfanos, finalidad y mapping en ABH; la edición de relación inactiva en UI sigue siendo revisión humana sin guardar.
+
+**Pruebas:** `tests/g3-tenant-dmo-catalog-contract.php` genera fixtures y relaciones sintéticas de los nuevos caminos, otros PartyId no Individual, paginación, datos confidenciales descartados y garantías GET-only. Compatible PHP 7.1/8.5. La ejecución en CI de PR no usa secretos; solo el workflow protegido de `main` puede leer catálogo real.
+
