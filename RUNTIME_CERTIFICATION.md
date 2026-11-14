@@ -89,3 +89,14 @@ El nuevo contrato `tests/runtime/prestashop-growth-db-api-contract.php` se ejecu
 El origen de esta prueba es un posible fallo de concurrencia: en PrestaShop, `Db::getValue()` puede cachear SELECT. El store Growth debe forzar `$use_cache=false` para **adquirir y liberar cada named lock** y revalidar el vínculo comercio/proveedor en cada evento. La prueba MySQL/MariaDB usa un doble que simula caché para fallar si una consulta crítica omite el segundo argumento `false`, e introduce una revocación del vínculo entre eventos en CI.
 
 **Límite de interpretación:** una CI runtime verde certifica *el comportamiento de la API Db y las garantías de no activación* en las tres versiones fijadas, pero **no certifica el almacenamiento Growth dentro de una instalación PrestaShop real**, porque la clase conserva su restricción sandbox ni habilita ingesta/emails Growth. La migración y conexión a hooks requieren aprobación del propietario de datos y del upgrade en un cambio separado. La nueva prueba no modifica la versión publicada ni debe usarse para solicitar instalación en Barcelona Confort.
+
+
+## Comprobación del motor SQL desde Db real de PrestaShop (14/11/2026)
+
+Además de la certificación de transacciones/locks, `GrowthSqlEngineGate::inspectPrestaShop(Db::getInstance())` emplea exclusivamente `getValue('SELECT VERSION()', false)` y, cuando es MariaDB, `getValue('SELECT @@check_constraint_checks', false)`. No guarda datos, no crea tablas y no habilita migraciones. Los valores se reducen a categorías fijas (`mysql`, `mariadb`, `unverified`) y flags booleanos, sin URLs o datos sensibles.
+
+Los **tres contenedores reales PrestaShop** del workflow corren por diseño con MySQL **5.7**. En los tres debe devolver `engine=mysql`, `status=blocked`, `check_constraints_enforced=false`, `schema_migration_authorized=false` y `growth_outbound_authorized=false`. La detección no es un error del módulo: demuestra que, aunque PrestaShop 1.7/8/9 instale la versión legada correctamente, **no** debe migrarse la cola Growth que depende de `CHECK(status='blocked')` a una base MySQL 5.7.
+
+Contratos independientes PHP 7.1/8.5 cubren MySQL 5.7, MySQL 8.0.15/8.0.44, MariaDB10.11 con CHECK ON/OFF, consultas fallidas y cacheo. La ejecución MySQL8/MariaDB10.11 existente sigue validando el DDL real en `g3_ci`.
+
+**Límites:** la comprobación SQL real no supone que se haya consultado el motor de producción de Barcelona Confort, no lo modifica y **no concede autorización G3/G4 ni habilita instalación Growth**. El operador no necesita acceso SQL ni instalar nada.
