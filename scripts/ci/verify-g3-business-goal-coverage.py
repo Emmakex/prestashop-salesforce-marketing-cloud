@@ -150,6 +150,31 @@ def review(packet, freeze, field_owner, mapping, contract, schema_docs, blobs):
         actual[version] = {"source_objects": sorted(objects), "field_count": count,
                            "sha256": digest, "cart_stream_defined": False}
 
+
+    # Field counts alone do not prove that every field has a privacy review.
+    # The 24 pending decisions must match the v0.3 candidate by exact name,
+    # without duplicates; v0.3 must extend v0.2 only with the UTC candidate.
+    if (len(actual) == len(SCHEMAS)
+        and isinstance(field_manifest, dict)
+        and set(field_manifest) == EXACT_OBJECTS
+        and all(isinstance(field_manifest.get(obj), list) for obj in EXACT_OBJECTS)):
+        base_objects = schema_docs["v0.2"]["components"]["schemas"]
+        utc_objects = schema_docs["v0.3"]["components"]["schemas"]
+        for obj in sorted(EXACT_OBJECTS):
+            reviewed_names = [
+                row.get("name") if isinstance(row, dict) else None
+                for row in field_manifest[obj]
+            ]
+            base_names = set(base_objects[obj]["properties"])
+            utc_names = set(utc_objects[obj]["properties"])
+            if (any(not isinstance(name, str) or not name for name in reviewed_names)
+                or len(set(reviewed_names)) != len(reviewed_names)
+                or set(reviewed_names) != utc_names):
+                errors.append("g3_goals_unreviewed_or_duplicate_field_" + obj)
+            if (not base_names.issubset(utc_names)
+                or utc_names - base_names != {"source_updated_utc"}):
+                errors.append("g3_goals_unreviewed_schema_delta_" + obj)
+
     if errors:
         return None, errors
 

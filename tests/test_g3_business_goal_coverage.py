@@ -109,5 +109,30 @@ class G3BusinessGoalReview(unittest.TestCase):
             f["artifacts"][checker.SCHEMAS["v0.2"]].__setitem__("sha256", "0" * 64))
 
 
+    def test_field_decisions_match_exact_24_schema_names(self):
+        # The count can still equal 12 while a real field is missing.
+        self.expect_block(lambda p,f,o,m,c,d,b:
+            o["field_decisions"]["PSCustomer"][4].__setitem__("name", "invented_field"))
+        self.expect_block(lambda p,f,o,m,c,d,b:
+            o["field_decisions"]["PSOrder"][4].__setitem__(
+                "name", o["field_decisions"]["PSOrder"][3]["name"]))
+        self.expect_block(lambda p,f,o,m,c,d,b:
+            o["field_decisions"]["PSCustomer"][4].__setitem__("name", None))
+        self.expect_block(lambda p,f,o,m,c,d,b:
+            o["field_decisions"]["PSCustomer"][4].__setitem__("name", ["email"]))
+
+    def test_v03_is_only_v02_plus_one_utc_field_per_object(self):
+        # Mutating the in-memory schema keeps each field count unchanged.
+        # Only the intended source_updated_utc addition is allowed.
+        self.expect_block(lambda p,f,o,m,c,d,b:
+            d["v0.3"]["components"]["schemas"]["PSCustomer"]["properties"].__setitem__(
+                "invented_field",
+                d["v0.3"]["components"]["schemas"]["PSCustomer"]["properties"].pop("source_updated_utc")))
+        self.expect_block(lambda p,f,o,m,c,d,b:
+            d["v0.2"]["components"]["schemas"]["PSOrder"]["properties"].__setitem__(
+                "source_updated_utc",
+                d["v0.2"]["components"]["schemas"]["PSOrder"]["properties"].pop("source_updated_local")))
+
+
 if __name__ == "__main__":
     unittest.main()
