@@ -1,112 +1,46 @@
 <?php
 
+/**
+ * PrestaShop -> Salesforce Marketing Cloud Growth + Data Cloud.
+ *
+ * v0.8.0: Growth-only boundary, no Engagement adapter or automatic migration.
+ * Existing 0.7.1 legacy tables, settings and customer data are preserved but
+ * NEVER read, sent or deleted by this new runtime.
+ */
 if (!defined('_PS_VERSION_')) {
     exit;
 }
 
 require_once __DIR__ . '/src/Compatibility/Platform.php';
-require_once __DIR__ . '/src/Compatibility/CustomerHookAdapter.php';
-require_once __DIR__ . '/src/Compatibility/OrderHookAdapter.php';
-require_once __DIR__ . '/src/Compatibility/CartHookAdapter.php';
 require_once __DIR__ . '/src/Compatibility/ShopResolver.php';
 require_once __DIR__ . '/src/DataCloud/ShopTimezoneResolver.php';
 require_once __DIR__ . '/src/DataCloud/InstallationReadinessInspector.php';
 require_once __DIR__ . '/src/DataCloud/PrestaShopReadinessProbe.php';
 require_once __DIR__ . '/src/DataCloud/InstallationReadinessDashboard.php';
-require_once __DIR__ . '/src/Salesforce/AuthClient.php';
-require_once __DIR__ . '/src/Salesforce/RestClient.php';
-require_once __DIR__ . '/src/Salesforce/JourneyClient.php';
-require_once __DIR__ . '/src/Queue/QueueRepository.php';
-require_once __DIR__ . '/src/Queue/CustomerQueueProcessor.php';
-require_once __DIR__ . '/src/Queue/OrderQueueProcessor.php';
-require_once __DIR__ . '/src/Queue/AbandonedCartJourneyProcessor.php';
-require_once __DIR__ . '/src/Customer/CustomerNormalizer.php';
-require_once __DIR__ . '/src/Customer/CustomerSyncLedger.php';
-require_once __DIR__ . '/src/Customer/CustomerEventService.php';
-require_once __DIR__ . '/src/Customer/CustomerDataExtensionWriter.php';
-require_once __DIR__ . '/src/Customer/CustomerBackfillRepository.php';
-require_once __DIR__ . '/src/Customer/CustomerBackfillService.php';
-require_once __DIR__ . '/src/Order/OrderNormalizer.php';
-require_once __DIR__ . '/src/Order/OrderSyncLedger.php';
-require_once __DIR__ . '/src/Order/OrderEventService.php';
-require_once __DIR__ . '/src/Order/OrderDataExtensionWriter.php';
-require_once __DIR__ . '/src/Cart/CartNormalizer.php';
-require_once __DIR__ . '/src/Cart/CartEligibilityPolicy.php';
-require_once __DIR__ . '/src/Cart/CartContactStateReader.php';
-require_once __DIR__ . '/src/Cart/CartRepository.php';
-require_once __DIR__ . '/src/Cart/CartCaptureService.php';
-require_once __DIR__ . '/src/Cart/CartAbandonmentDetector.php';
-require_once __DIR__ . '/src/Journey/JourneyEventAuditRepository.php';
-require_once __DIR__ . '/src/Recovery/RecoveryTokenRepository.php';
-require_once __DIR__ . '/src/Recovery/RecoveryLinkService.php';
-require_once __DIR__ . '/src/Operations/HealthService.php';
-require_once __DIR__ . '/src/Operations/BackOfficeHealthDashboard.php';
-require_once __DIR__ . '/src/Operations/ModuleHealthTrait.php';
-require_once __DIR__ . '/src/Operations/RetentionRepository.php';
-require_once __DIR__ . '/src/Operations/RetentionService.php';
-require_once __DIR__ . '/src/Operations/ModuleRetentionTrait.php';
+require_once __DIR__ . '/src/Growth/GrowthOnlyHookPreflight.php';
 
-use Emmakex\PrestaShopSalesforceMarketingCloud\Cart\CartAbandonmentDetector;
-use Emmakex\PrestaShopSalesforceMarketingCloud\Cart\CartCaptureService;
-use Emmakex\PrestaShopSalesforceMarketingCloud\Cart\CartEligibilityPolicy;
-use Emmakex\PrestaShopSalesforceMarketingCloud\Cart\CartRepository;
-use Emmakex\PrestaShopSalesforceMarketingCloud\Compatibility\CartHookAdapter;
-use Emmakex\PrestaShopSalesforceMarketingCloud\Compatibility\CustomerHookAdapter;
-use Emmakex\PrestaShopSalesforceMarketingCloud\Compatibility\OrderHookAdapter;
 use Emmakex\PrestaShopSalesforceMarketingCloud\Compatibility\Platform;
 use Emmakex\PrestaShopSalesforceMarketingCloud\Compatibility\ShopResolver;
-use Emmakex\PrestaShopSalesforceMarketingCloud\Customer\CustomerBackfillRepository;
-use Emmakex\PrestaShopSalesforceMarketingCloud\Customer\CustomerBackfillService;
-use Emmakex\PrestaShopSalesforceMarketingCloud\Customer\CustomerDataExtensionWriter;
-use Emmakex\PrestaShopSalesforceMarketingCloud\Customer\CustomerEventService;
-use Emmakex\PrestaShopSalesforceMarketingCloud\Customer\CustomerSyncLedger;
-use Emmakex\PrestaShopSalesforceMarketingCloud\Journey\JourneyEventAuditRepository;
-use Emmakex\PrestaShopSalesforceMarketingCloud\Order\OrderDataExtensionWriter;
-use Emmakex\PrestaShopSalesforceMarketingCloud\Order\OrderEventService;
-use Emmakex\PrestaShopSalesforceMarketingCloud\Order\OrderSyncLedger;
-use Emmakex\PrestaShopSalesforceMarketingCloud\Queue\AbandonedCartJourneyProcessor;
-use Emmakex\PrestaShopSalesforceMarketingCloud\Queue\CustomerQueueProcessor;
-use Emmakex\PrestaShopSalesforceMarketingCloud\Queue\OrderQueueProcessor;
-use Emmakex\PrestaShopSalesforceMarketingCloud\Queue\QueueRepository;
-use Emmakex\PrestaShopSalesforceMarketingCloud\Recovery\RecoveryLinkService;
-use Emmakex\PrestaShopSalesforceMarketingCloud\Recovery\RecoveryTokenRepository;
-use Emmakex\PrestaShopSalesforceMarketingCloud\Salesforce\AuthClient;
-use Emmakex\PrestaShopSalesforceMarketingCloud\Salesforce\JourneyClient;
-use Emmakex\PrestaShopSalesforceMarketingCloud\Salesforce\RestClient;
+use Emmakex\PrestaShopSalesforceMarketingCloud\DataCloud\PrestaShopReadinessProbe;
+use Emmakex\PrestaShopSalesforceMarketingCloud\DataCloud\InstallationReadinessDashboard;
+use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthOnlyHookPreflight;
 
 class PsSalesforceBridge extends Module
 {
-    use \Emmakex\PrestaShopSalesforceMarketingCloud\Operations\ModuleHealthTrait;
-    use \Emmakex\PrestaShopSalesforceMarketingCloud\Operations\ModuleRetentionTrait;
-
-    const CONFIG_AUTH_BASE_URI = 'PS_SFMC_AUTH_BASE_URI';
-    const CONFIG_REST_BASE_URI = 'PS_SFMC_REST_BASE_URI';
-    const CONFIG_CLIENT_ID = 'PS_SFMC_CLIENT_ID';
-    const CONFIG_CLIENT_SECRET = 'PS_SFMC_CLIENT_SECRET';
-    const CONFIG_ACCOUNT_ID = 'PS_SFMC_ACCOUNT_ID';
     const CONFIG_MODE = 'PS_SFMC_MODE';
-    const CONFIG_CART_ABANDON_MINUTES = 'PS_SFMC_CART_ABANDON_MINUTES';
-    const CONFIG_CART_CONSENT_MODE = 'PS_SFMC_CART_CONSENT_MODE';
-    const CONFIG_CUSTOMER_DE_KEY = 'PS_SFMC_CUSTOMER_DE_KEY';
-    const CONFIG_ORDER_DE_KEY = 'PS_SFMC_ORDER_DE_KEY';
-    const CONFIG_JOURNEY_EVENT_DEFINITION_KEY = 'PS_SFMC_JOURNEY_EVENT_DEFINITION_KEY';
-    const CONFIG_RECOVERY_TOKEN_TTL_HOURS = 'PS_SFMC_RECOVERY_TOKEN_TTL_HOURS';
     const CONFIG_CRON_TOKEN = 'PS_SFMC_CRON_TOKEN';
-    const CONFIG_CUSTOMER_BACKFILL_BATCH = 'PS_SFMC_CUSTOMER_BACKFILL_BATCH';
-    const CONFIG_RETENTION_QUEUE_DAYS = 'PS_SFMC_RETENTION_QUEUE_DAYS';
-    const CONFIG_RETENTION_LOG_DAYS = 'PS_SFMC_RETENTION_LOG_DAYS';
-    const CONFIG_RETENTION_JOURNEY_DAYS = 'PS_SFMC_RETENTION_JOURNEY_DAYS';
-    const CONFIG_RETENTION_CART_DAYS = 'PS_SFMC_RETENTION_CART_DAYS';
-    const CONFIG_RETENTION_RECOVERY_DAYS = 'PS_SFMC_RETENTION_RECOVERY_DAYS';
-    const CONFIG_RETENTION_LAST_RUN_AT = 'PS_SFMC_RETENTION_LAST_RUN_AT';
+    const CONFIG_MERCHANT = 'PS_GROWTH_MERCHANT';
+    const CONFIG_NAMESPACE = 'PS_GROWTH_NAMESPACE';
 
-    private $salesforceRestClientCache;
+    const PROVIDER = 'marketing_cloud_growth';
+    const DATA_PLATFORM = 'data_cloud';
+    const SCHEMA_SOURCE = 'ABH_PrestaShop_Data_Cloud';
 
     public function __construct()
     {
         $this->name = 'pssalesforcebridge';
         $this->tab = 'advertising_marketing';
-        $this->version = '0.7.1';
+        $this->version = '0.8.0';
         $this->author = 'Emmakex';
         $this->need_instance = 0;
         $this->bootstrap = true;
@@ -116,865 +50,207 @@ class PsSalesforceBridge extends Module
         ];
 
         parent::__construct();
-
-        $this->displayName = $this->l('Salesforce Marketing Cloud for PrestaShop');
-        $this->description = $this->l('Connects PrestaShop commerce events to Salesforce Marketing Cloud Engagement.');
-        $this->confirmUninstall = $this->l('Uninstall the connector? Local queue and logs will be removed.');
+        $this->displayName = $this->l('Salesforce Marketing Cloud Growth + Data Cloud');
+        $this->description = $this->l('Growth-only PrestaShop bridge. Data ingestion and campaign sends remain blocked pending approval.');
+        $this->confirmUninstall = $this->l('Uninstall the module? Existing historical tables and data will remain untouched.');
     }
 
     public function install()
     {
-        if (!Platform::isSupported()) {
+        if (!Platform::isSupported() || !parent::install()) {
+            return false;
+        }
+        // No additional tables, no credential provisioning and no external
+        // requests. Reuse the existing token only if already present.
+        if (Configuration::get(self::CONFIG_CRON_TOKEN) === false
+            && !Configuration::updateValue(
+                self::CONFIG_CRON_TOKEN, bin2hex(random_bytes(24))
+            )) {
+            return false;
+        }
+        if (!Configuration::updateValue(self::CONFIG_MODE, 'test')) {
             return false;
         }
 
-        return parent::install()
-            && $this->installConfiguration()
-            && $this->installDatabase()
-            && $this->registerHook('actionCustomerAccountAdd')
+        return $this->registerHook('actionCustomerAccountAdd')
             && $this->registerHook('actionCustomerAccountUpdate')
-            && $this->registerHook('actionValidateOrder')
-            && $this->registerHook('actionOrderStatusPostUpdate')
-            && $this->registerHook('actionCartSave');
+            && $this->registerHook('actionValidateOrder');
     }
 
     public function uninstall()
     {
-        return $this->uninstallDatabase()
-            && $this->uninstallConfiguration()
-            && parent::uninstall();
+        // Do not delete 0.7.1 historical queue, cart, recovery, ledger,
+        // identity or consent evidence. A separate owner-approved cleanup
+        // migration is required; an uninstall is NOT data-erasure consent.
+        if (!parent::uninstall()) {
+            return false;
+        }
+        Configuration::deleteByName(self::CONFIG_MERCHANT);
+        Configuration::deleteByName(self::CONFIG_NAMESPACE);
+        return true;
     }
 
+    /**
+     * Recognize new hook shapes without persisting, queueing, or exporting
+     * customer data. A true return only means the hook was safely handled;
+     * it NEVER means a customer was exported or a campaign was triggered.
+     */
     public function hookActionCustomerAccountAdd($params)
     {
-        return $this->captureCustomerEvent('CUSTOMER_CREATED', is_array($params) ? $params : []);
+        GrowthOnlyHookPreflight::inspect('CUSTOMER_CREATED', $params);
+        return true;
     }
 
     public function hookActionCustomerAccountUpdate($params)
     {
-        return $this->captureCustomerEvent('CUSTOMER_UPDATED', is_array($params) ? $params : []);
-    }
-
-    public function hookActionCartSave($params)
-    {
-        $cart = CartHookAdapter::cartFromParams(is_array($params) ? $params : []);
-        if (!$cart) {
-            return false;
-        }
-
-        return $this->cartCaptureService()->capture(
-            $cart,
-            isset($this->context) ? $this->context : null,
-            (int) Configuration::get(self::CONFIG_CART_ABANDON_MINUTES),
-            (string) Configuration::get(self::CONFIG_CART_CONSENT_MODE)
-        );
+        GrowthOnlyHookPreflight::inspect('CUSTOMER_UPDATED', $params);
+        return true;
     }
 
     public function hookActionValidateOrder($params)
     {
-        $params = is_array($params) ? $params : [];
-        $order = OrderHookAdapter::orderFromParams($params);
-        if (!$order) {
-            return false;
-        }
+        GrowthOnlyHookPreflight::inspect('ORDER_CREATED', $params);
+        return true;
+    }
 
-        $service = new OrderEventService(new QueueRepository(), new OrderSyncLedger());
-
-        return $service->enqueue(
-            'ORDER_CREATED',
-            $order,
-            OrderHookAdapter::customerFromParams($params),
-            OrderHookAdapter::cartFromParams($params),
-            OrderHookAdapter::currencyIso($params, $order),
-            OrderHookAdapter::shopId($order, isset($this->context) ? $this->context : null)
-        );
+    /**
+     * These two hooks can remain registered on upgraded 0.7.1 shops.
+     * Never call old cart/Journey writers or infer ORDER_PAID/ORDER_CANCELLED
+     * from an unreviewed status code; Growth processing is blocked.
+     */
+    public function hookActionCartSave($params)
+    {
+        return true;
     }
 
     public function hookActionOrderStatusPostUpdate($params)
     {
-        $params = is_array($params) ? $params : [];
-        $context = OrderHookAdapter::statusContext($params);
-        if (!is_array($context) || empty($context['order'])) {
-            return false;
-        }
-
-        $order = $context['order'];
-        $status = isset($context['status']) ? $context['status'] : null;
-        $service = new OrderEventService(new QueueRepository(), new OrderSyncLedger());
-
-        return $service->enqueue(
-            OrderHookAdapter::eventTypeForStatus($status),
-            $order,
-            isset($context['customer']) ? $context['customer'] : null,
-            isset($context['cart']) ? $context['cart'] : null,
-            OrderHookAdapter::currencyIso([], $order),
-            OrderHookAdapter::shopId($order, isset($this->context) ? $this->context : null),
-            is_object($status) && isset($status->id) ? (int) $status->id : null,
-            is_object($status) && isset($status->paid) ? (bool) $status->paid : null
-        );
-    }
-
-    public function processCustomerBackfill($batchSize = null)
-    {
-        if ($batchSize === null) {
-            $batchSize = (int) Configuration::get(self::CONFIG_CUSTOMER_BACKFILL_BATCH);
-        }
-
-        return $this->customerBackfillService()->process($batchSize > 0 ? $batchSize : 50);
-    }
-
-    public function processCartAbandonmentCandidates($limit = 100)
-    {
-        $detector = new CartAbandonmentDetector(
-            new CartRepository(),
-            new OrderSyncLedger(),
-            new QueueRepository()
-        );
-
-        return $detector->process($limit);
-    }
-
-    public function processCustomerQueue($limit = 50)
-    {
-        if ((string) Configuration::get(self::CONFIG_MODE) !== 'production') {
-            return ['skipped' => 'test_mode', 'claimed' => 0, 'processed' => 0, 'retry' => 0, 'failed' => 0];
-        }
-
-        $externalKey = trim((string) Configuration::get(self::CONFIG_CUSTOMER_DE_KEY));
-        if ($externalKey === '') {
-            throw new RuntimeException('Customer Data Extension external key is not configured.');
-        }
-
-        $processor = new CustomerQueueProcessor(
-            new QueueRepository(),
-            new CustomerDataExtensionWriter($this->salesforceRestClient(), $externalKey),
-            new CustomerSyncLedger()
-        );
-
-        return $processor->process($limit);
-    }
-
-    public function processOrderQueue($limit = 50)
-    {
-        if ((string) Configuration::get(self::CONFIG_MODE) !== 'production') {
-            return ['skipped' => 'test_mode', 'claimed' => 0, 'processed' => 0, 'retry' => 0, 'failed' => 0];
-        }
-
-        $externalKey = trim((string) Configuration::get(self::CONFIG_ORDER_DE_KEY));
-        if ($externalKey === '') {
-            throw new RuntimeException('Order Data Extension external key is not configured.');
-        }
-
-        $processor = new OrderQueueProcessor(
-            new QueueRepository(),
-            new OrderDataExtensionWriter($this->salesforceRestClient(), $externalKey),
-            new OrderSyncLedger()
-        );
-
-        return $processor->process($limit);
-    }
-
-    public function processAbandonedCartJourneyQueue($limit = 20)
-    {
-        if ((string) Configuration::get(self::CONFIG_MODE) !== 'production') {
-            return ['skipped' => 'test_mode', 'claimed' => 0, 'processed' => 0, 'suppressed' => 0, 'retry' => 0, 'failed' => 0];
-        }
-
-        $eventDefinitionKey = trim((string) Configuration::get(self::CONFIG_JOURNEY_EVENT_DEFINITION_KEY));
-        if ($eventDefinitionKey === '') {
-            throw new RuntimeException('Journey Event Definition Key is not configured.');
-        }
-
-        $ttlHours = max(1, min(720, (int) Configuration::get(self::CONFIG_RECOVERY_TOKEN_TTL_HOURS)));
-        $processor = new AbandonedCartJourneyProcessor(
-            new QueueRepository(),
-            new CartRepository(),
-            new OrderSyncLedger(),
-            new CartEligibilityPolicy(),
-            new JourneyClient($this->salesforceRestClient(), $eventDefinitionKey),
-            new JourneyEventAuditRepository(),
-            new RecoveryLinkService(
-                new RecoveryTokenRepository(),
-                isset($this->context->link) ? $this->context->link : null,
-                $ttlHours > 0 ? $ttlHours : 168,
-                $this->name
-            ),
-            (string) Configuration::get(self::CONFIG_CART_CONSENT_MODE),
-            $eventDefinitionKey
-        );
-
-        return $processor->process($limit);
-    }
-
-    private function salesforceRestClient()
-    {
-        if ($this->salesforceRestClientCache instanceof RestClient) {
-            return $this->salesforceRestClientCache;
-        }
-
-        $auth = new AuthClient(
-            (string) Configuration::get(self::CONFIG_AUTH_BASE_URI),
-            (string) Configuration::get(self::CONFIG_CLIENT_ID),
-            (string) Configuration::get(self::CONFIG_CLIENT_SECRET),
-            (string) Configuration::get(self::CONFIG_ACCOUNT_ID)
-        );
-        $token = $auth->requestAccessToken();
-
-        $this->salesforceRestClientCache = new RestClient(
-            (string) Configuration::get(self::CONFIG_REST_BASE_URI),
-            isset($token['access_token']) ? (string) $token['access_token'] : ''
-        );
-
-        return $this->salesforceRestClientCache;
-    }
-
-    private function captureCustomerEvent($eventType, array $params)
-    {
-        $customer = CustomerHookAdapter::customerFromParams($params);
-        if (!$customer) {
-            return false;
-        }
-
-        $shopId = CustomerHookAdapter::shopId($customer, isset($this->context) ? $this->context : null);
-        $service = new CustomerEventService(new QueueRepository(), new CustomerSyncLedger());
-
-        return $service->enqueue($eventType, $customer, $shopId);
-    }
-
-    private function customerBackfillService()
-    {
-        return new CustomerBackfillService(
-            new CustomerBackfillRepository(),
-            new CustomerEventService(new QueueRepository(), new CustomerSyncLedger())
-        );
-    }
-
-    private function cartCaptureService()
-    {
-        return new CartCaptureService(
-            new CartRepository(),
-            new OrderSyncLedger(),
-            new CartEligibilityPolicy()
-        );
-    }
-
-    private function installConfiguration()
-    {
-        return Configuration::updateValue(self::CONFIG_MODE, 'test')
-            && Configuration::updateValue(self::CONFIG_CART_ABANDON_MINUTES, 60)
-            && Configuration::updateValue(self::CONFIG_CART_CONSENT_MODE, CartEligibilityPolicy::MODE_MARKETING_OPTIN)
-            && Configuration::updateValue(self::CONFIG_CUSTOMER_DE_KEY, 'PS_CUSTOMERS')
-            && Configuration::updateValue(self::CONFIG_ORDER_DE_KEY, 'PS_ORDERS')
-            && Configuration::updateValue(self::CONFIG_JOURNEY_EVENT_DEFINITION_KEY, 'PRESTASHOP_ABANDONED_CART')
-            && Configuration::updateValue(self::CONFIG_RECOVERY_TOKEN_TTL_HOURS, 168)
-            && Configuration::updateValue(self::CONFIG_CUSTOMER_BACKFILL_BATCH, 50)
-            && Configuration::updateValue(self::CONFIG_RETENTION_QUEUE_DAYS, 30)
-            && Configuration::updateValue(self::CONFIG_RETENTION_LOG_DAYS, 30)
-            && Configuration::updateValue(self::CONFIG_RETENTION_JOURNEY_DAYS, 90)
-            && Configuration::updateValue(self::CONFIG_RETENTION_CART_DAYS, 30)
-            && Configuration::updateValue(self::CONFIG_RETENTION_RECOVERY_DAYS, 30)
-            && Configuration::updateValue(self::CONFIG_RETENTION_LAST_RUN_AT, '')
-            && Configuration::updateValue(self::CONFIG_CRON_TOKEN, bin2hex(random_bytes(24)));
-    }
-
-    private function uninstallConfiguration()
-    {
-        $keys = [
-            self::CONFIG_AUTH_BASE_URI,
-            self::CONFIG_REST_BASE_URI,
-            self::CONFIG_CLIENT_ID,
-            self::CONFIG_CLIENT_SECRET,
-            self::CONFIG_ACCOUNT_ID,
-            self::CONFIG_MODE,
-            self::CONFIG_CART_ABANDON_MINUTES,
-            self::CONFIG_CART_CONSENT_MODE,
-            self::CONFIG_CUSTOMER_DE_KEY,
-            self::CONFIG_ORDER_DE_KEY,
-            self::CONFIG_JOURNEY_EVENT_DEFINITION_KEY,
-            self::CONFIG_RECOVERY_TOKEN_TTL_HOURS,
-            self::CONFIG_CRON_TOKEN,
-            self::CONFIG_CUSTOMER_BACKFILL_BATCH,
-            self::CONFIG_RETENTION_QUEUE_DAYS,
-            self::CONFIG_RETENTION_LOG_DAYS,
-            self::CONFIG_RETENTION_JOURNEY_DAYS,
-            self::CONFIG_RETENTION_CART_DAYS,
-            self::CONFIG_RETENTION_RECOVERY_DAYS,
-            self::CONFIG_RETENTION_LAST_RUN_AT,
-        ];
-
-        foreach ($keys as $key) {
-            Configuration::deleteByName($key);
-        }
-
         return true;
-    }
-
-    private function installDatabase()
-    {
-        $engine = _MYSQL_ENGINE_;
-        $prefix = _DB_PREFIX_;
-
-        $queries = [
-            "CREATE TABLE IF NOT EXISTS `{$prefix}sfmc_queue` (
-                `id_sfmc_queue` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-                `event_type` VARCHAR(64) NOT NULL,
-                `entity_type` VARCHAR(32) NOT NULL,
-                `entity_id` VARCHAR(64) NOT NULL,
-                `dedupe_key` VARCHAR(191) NOT NULL,
-                `payload` LONGTEXT NOT NULL,
-                `status` VARCHAR(16) NOT NULL DEFAULT 'pending',
-                `attempts` SMALLINT UNSIGNED NOT NULL DEFAULT 0,
-                `available_at` DATETIME NOT NULL,
-                `created_at` DATETIME NOT NULL,
-                `processed_at` DATETIME NULL,
-                `last_error` TEXT NULL,
-                `lock_token` VARCHAR(64) NULL,
-                `locked_at` DATETIME NULL,
-                PRIMARY KEY (`id_sfmc_queue`),
-                UNIQUE KEY `uniq_sfmc_dedupe` (`dedupe_key`),
-                KEY `idx_sfmc_queue_ready` (`status`, `available_at`),
-                KEY `idx_sfmc_queue_lock` (`lock_token`)
-            ) ENGINE={$engine} DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
-            "CREATE TABLE IF NOT EXISTS `{$prefix}sfmc_log` (
-                `id_sfmc_log` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-                `level` VARCHAR(16) NOT NULL,
-                `event` VARCHAR(64) NOT NULL,
-                `context` LONGTEXT NULL,
-                `created_at` DATETIME NOT NULL,
-                PRIMARY KEY (`id_sfmc_log`),
-                KEY `idx_sfmc_log_created` (`created_at`)
-            ) ENGINE={$engine} DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
-            "CREATE TABLE IF NOT EXISTS `{$prefix}sfmc_customer_sync` (
-                `id_sfmc_customer_sync` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-                `id_shop` INT UNSIGNED NOT NULL,
-                `id_customer` INT UNSIGNED NOT NULL,
-                `contact_key` VARCHAR(191) NOT NULL,
-                `payload_hash` CHAR(40) NOT NULL,
-                `status` VARCHAR(16) NOT NULL DEFAULT 'pending',
-                `created_at` DATETIME NOT NULL,
-                `updated_at` DATETIME NOT NULL,
-                PRIMARY KEY (`id_sfmc_customer_sync`),
-                UNIQUE KEY `uniq_sfmc_customer_shop` (`id_shop`, `id_customer`),
-                UNIQUE KEY `uniq_sfmc_customer_contact` (`contact_key`)
-            ) ENGINE={$engine} DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
-            "CREATE TABLE IF NOT EXISTS `{$prefix}sfmc_order_sync` (
-                `id_sfmc_order_sync` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-                `id_shop` INT UNSIGNED NOT NULL,
-                `id_order` INT UNSIGNED NOT NULL,
-                `id_cart` INT UNSIGNED NOT NULL DEFAULT 0,
-                `contact_key` VARCHAR(191) NOT NULL DEFAULT '',
-                `payload_hash` CHAR(40) NOT NULL,
-                `status` VARCHAR(16) NOT NULL DEFAULT 'pending',
-                `created_at` DATETIME NOT NULL,
-                `updated_at` DATETIME NOT NULL,
-                PRIMARY KEY (`id_sfmc_order_sync`),
-                UNIQUE KEY `uniq_sfmc_order_shop` (`id_shop`, `id_order`),
-                KEY `idx_sfmc_order_cart` (`id_shop`, `id_cart`),
-                KEY `idx_sfmc_order_contact` (`contact_key`)
-            ) ENGINE={$engine} DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
-            "CREATE TABLE IF NOT EXISTS `{$prefix}sfmc_cart` (
-                `id_sfmc_cart` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-                `id_shop` INT UNSIGNED NOT NULL,
-                `id_cart` INT UNSIGNED NOT NULL,
-                `id_customer` INT UNSIGNED NOT NULL DEFAULT 0,
-                `contact_key` VARCHAR(191) NOT NULL DEFAULT '',
-                `email` VARCHAR(255) NOT NULL DEFAULT '',
-                `currency` VARCHAR(8) NOT NULL DEFAULT '',
-                `total` DECIMAL(20,6) NOT NULL DEFAULT 0,
-                `product_count` INT UNSIGNED NOT NULL DEFAULT 0,
-                `item_count` INT UNSIGNED NOT NULL DEFAULT 0,
-                `consent_mode` VARCHAR(32) NOT NULL DEFAULT 'marketing_optin',
-                `eligible` TINYINT(1) NOT NULL DEFAULT 0,
-                `eligibility_reason` VARCHAR(64) NOT NULL DEFAULT '',
-                `status` VARCHAR(16) NOT NULL DEFAULT 'active',
-                `last_activity` DATETIME NOT NULL,
-                `abandon_after` DATETIME NOT NULL,
-                `abandoned_at` DATETIME NULL,
-                `recovered_at` DATETIME NULL,
-                `snapshot_hash` CHAR(40) NOT NULL,
-                `payload` LONGTEXT NOT NULL,
-                `created_at` DATETIME NOT NULL,
-                `updated_at` DATETIME NOT NULL,
-                PRIMARY KEY (`id_sfmc_cart`),
-                UNIQUE KEY `uniq_sfmc_cart_shop` (`id_shop`, `id_cart`),
-                KEY `idx_sfmc_cart_candidate` (`status`, `eligible`, `abandon_after`),
-                KEY `idx_sfmc_cart_contact` (`contact_key`)
-            ) ENGINE={$engine} DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
-            "CREATE TABLE IF NOT EXISTS `{$prefix}sfmc_cart_item` (
-                `id_sfmc_cart_item` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-                `id_shop` INT UNSIGNED NOT NULL,
-                `id_cart` INT UNSIGNED NOT NULL,
-                `line_key` VARCHAR(160) NOT NULL,
-                `id_product` INT UNSIGNED NOT NULL DEFAULT 0,
-                `id_product_attribute` INT UNSIGNED NOT NULL DEFAULT 0,
-                `id_customization` INT UNSIGNED NOT NULL DEFAULT 0,
-                `sku` VARCHAR(128) NOT NULL DEFAULT '',
-                `name` VARCHAR(255) NOT NULL DEFAULT '',
-                `quantity` INT NOT NULL DEFAULT 0,
-                `unit_price` DECIMAL(20,6) NOT NULL DEFAULT 0,
-                `line_total` DECIMAL(20,6) NOT NULL DEFAULT 0,
-                `payload_hash` CHAR(40) NOT NULL,
-                `updated_at` DATETIME NOT NULL,
-                PRIMARY KEY (`id_sfmc_cart_item`),
-                UNIQUE KEY `uniq_sfmc_cart_item` (`id_shop`, `id_cart`, `line_key`),
-                KEY `idx_sfmc_cart_item_cart` (`id_shop`, `id_cart`)
-            ) ENGINE={$engine} DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
-            "CREATE TABLE IF NOT EXISTS `{$prefix}sfmc_journey_event` (
-                `id_sfmc_journey_event` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-                `id_sfmc_queue` BIGINT UNSIGNED NOT NULL,
-                `id_shop` INT UNSIGNED NOT NULL,
-                `id_cart` INT UNSIGNED NOT NULL,
-                `contact_key` VARCHAR(191) NOT NULL,
-                `event_definition_key` VARCHAR(191) NOT NULL,
-                `snapshot_hash` CHAR(40) NOT NULL,
-                `bridge_event_key` VARCHAR(191) NOT NULL,
-                `status` VARCHAR(16) NOT NULL DEFAULT 'processing',
-                `event_instance_id` VARCHAR(191) NULL,
-                `suppression_reason` VARCHAR(191) NULL,
-                `last_error` TEXT NULL,
-                `sent_at` DATETIME NULL,
-                `created_at` DATETIME NOT NULL,
-                `updated_at` DATETIME NOT NULL,
-                PRIMARY KEY (`id_sfmc_journey_event`),
-                UNIQUE KEY `uniq_sfmc_journey_queue` (`id_sfmc_queue`),
-                KEY `idx_sfmc_journey_cart` (`id_shop`, `id_cart`),
-                KEY `idx_sfmc_journey_status` (`status`),
-                KEY `idx_sfmc_journey_contact` (`contact_key`)
-            ) ENGINE={$engine} DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
-            "CREATE TABLE IF NOT EXISTS `{$prefix}sfmc_recovery_token` (
-                `id_sfmc_recovery_token` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-                `token_hash` CHAR(64) NOT NULL,
-                `id_shop` INT UNSIGNED NOT NULL,
-                `id_cart` INT UNSIGNED NOT NULL,
-                `id_customer` INT UNSIGNED NOT NULL DEFAULT 0,
-                `contact_key` VARCHAR(191) NOT NULL DEFAULT '',
-                `snapshot_hash` CHAR(40) NOT NULL,
-                `expires_at` DATETIME NOT NULL,
-                `used_at` DATETIME NULL,
-                `recovered_cart_id` INT UNSIGNED NOT NULL DEFAULT 0,
-                `created_at` DATETIME NOT NULL,
-                `updated_at` DATETIME NOT NULL,
-                PRIMARY KEY (`id_sfmc_recovery_token`),
-                UNIQUE KEY `uniq_sfmc_recovery_token_hash` (`token_hash`),
-                KEY `idx_sfmc_recovery_source` (`id_shop`, `id_cart`),
-                KEY `idx_sfmc_recovery_expiry` (`expires_at`, `used_at`),
-                KEY `idx_sfmc_recovery_cart` (`recovered_cart_id`)
-            ) ENGINE={$engine} DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
-            "CREATE TABLE IF NOT EXISTS `{$prefix}sfmc_recovery_order` (
-                `id_sfmc_recovery_order` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-                `id_sfmc_recovery_token` BIGINT UNSIGNED NOT NULL,
-                `id_shop` INT UNSIGNED NOT NULL,
-                `source_cart_id` INT UNSIGNED NOT NULL,
-                `recovered_cart_id` INT UNSIGNED NOT NULL,
-                `id_order` INT UNSIGNED NOT NULL,
-                `order_total` DECIMAL(20,6) NOT NULL DEFAULT 0,
-                `currency` VARCHAR(8) NOT NULL DEFAULT '',
-                `state_id` INT UNSIGNED NOT NULL DEFAULT 0,
-                `paid` TINYINT(1) NOT NULL DEFAULT 0,
-                `valid` TINYINT(1) NOT NULL DEFAULT 0,
-                `converted_at` DATETIME NOT NULL,
-                `created_at` DATETIME NOT NULL,
-                `updated_at` DATETIME NOT NULL,
-                PRIMARY KEY (`id_sfmc_recovery_order`),
-                UNIQUE KEY `uniq_sfmc_recovery_order` (`id_shop`, `id_order`),
-                KEY `idx_sfmc_recovery_order_token` (`id_sfmc_recovery_token`),
-                KEY `idx_sfmc_recovery_order_cart` (`id_shop`, `recovered_cart_id`),
-                KEY `idx_sfmc_recovery_order_paid` (`paid`, `currency`)
-            ) ENGINE={$engine} DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
-            "CREATE TABLE IF NOT EXISTS `{$prefix}sfmc_customer_backfill` (
-                `id_sfmc_customer_backfill` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-                `id_shop` INT UNSIGNED NOT NULL,
-                `cursor_customer_id` INT UNSIGNED NOT NULL DEFAULT 0,
-                `status` VARCHAR(16) NOT NULL DEFAULT 'pending',
-                `scanned_count` BIGINT UNSIGNED NOT NULL DEFAULT 0,
-                `queued_count` BIGINT UNSIGNED NOT NULL DEFAULT 0,
-                `started_at` DATETIME NULL,
-                `updated_at` DATETIME NOT NULL,
-                `completed_at` DATETIME NULL,
-                PRIMARY KEY (`id_sfmc_customer_backfill`),
-                UNIQUE KEY `uniq_sfmc_customer_backfill_shop` (`id_shop`),
-                KEY `idx_sfmc_customer_backfill_status` (`status`)
-            ) ENGINE={$engine} DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
-        ];
-
-        foreach ($queries as $query) {
-            if (!Db::getInstance()->execute($query)) {
-                return false;
-            }
-        }
-
-        return true;
-    }
-
-    private function uninstallDatabase()
-    {
-        $prefix = _DB_PREFIX_;
-
-        return Db::getInstance()->execute("DROP TABLE IF EXISTS `{$prefix}sfmc_recovery_order`")
-            && Db::getInstance()->execute("DROP TABLE IF EXISTS `{$prefix}sfmc_recovery_token`")
-            && Db::getInstance()->execute("DROP TABLE IF EXISTS `{$prefix}sfmc_journey_event`")
-            && Db::getInstance()->execute("DROP TABLE IF EXISTS `{$prefix}sfmc_cart_item`")
-            && Db::getInstance()->execute("DROP TABLE IF EXISTS `{$prefix}sfmc_cart`")
-            && Db::getInstance()->execute("DROP TABLE IF EXISTS `{$prefix}sfmc_customer_backfill`")
-            && Db::getInstance()->execute("DROP TABLE IF EXISTS `{$prefix}sfmc_order_sync`")
-            && Db::getInstance()->execute("DROP TABLE IF EXISTS `{$prefix}sfmc_customer_sync`")
-            && Db::getInstance()->execute("DROP TABLE IF EXISTS `{$prefix}sfmc_queue`")
-            && Db::getInstance()->execute("DROP TABLE IF EXISTS `{$prefix}sfmc_log`");
     }
 
     public function getContent()
     {
-        $output = '';
-
-        if (Tools::isSubmit('submitPsSalesforceBridge')) {
-            $output .= $this->saveConfiguration();
+        $message = '';
+        if (Tools::isSubmit('submitPsGrowthBridge')) {
+            $message = $this->saveGrowthSettings();
         }
 
-        if (Tools::isSubmit('testPsSalesforceBridgeConnection')) {
-            $output .= $this->testConnection();
-        }
-
-        if (Tools::isSubmit('startPsSalesforceBridgeCustomerBackfill')) {
-            $output .= $this->startCustomerBackfill();
-        }
-
-        if (Tools::isSubmit('runPsSalesforceBridgeRetention')) {
-            $output .= $this->runRetentionNowAction();
-        }
-
-        return $output
-            . $this->renderHealthDashboard()
-            . $this->renderDataCloudReadiness()
-            . $this->renderRetentionStatus()
-            . $this->renderForm();
-    }
-
-    private function startCustomerBackfill()
-    {
-        $shopIds = ShopResolver::activeShopIds(isset($this->context) ? $this->context : null);
-        if (empty($shopIds)) {
-            return $this->displayError($this->l('No active shops were found for customer backfill.'));
-        }
-
-        if (!$this->customerBackfillService()->start($shopIds)) {
-            return $this->displayError($this->l('Unable to start or resume customer backfill.'));
-        }
-
-        return $this->displayConfirmation($this->l('Customer backfill started or resumed. The cron will process it incrementally.'));
-    }
-
-    private function renderBackfillStatus()
-    {
-        $rows = (new CustomerBackfillRepository())->summary();
-        if (empty($rows)) {
-            return $this->displayInformation($this->l('Customer backfill has not been started.'));
-        }
-
-        $parts = [];
-        foreach ($rows as $row) {
-            $parts[] = sprintf(
-                'Shop %d: %s, scanned %d, queued %d, cursor %d',
-                isset($row['id_shop']) ? (int) $row['id_shop'] : 0,
-                isset($row['status']) ? (string) $row['status'] : 'unknown',
-                isset($row['scanned_count']) ? (int) $row['scanned_count'] : 0,
-                isset($row['queued_count']) ? (int) $row['queued_count'] : 0,
-                isset($row['cursor_customer_id']) ? (int) $row['cursor_customer_id'] : 0
-            );
-        }
-
-        return $this->displayInformation($this->l('Customer backfill status: ') . implode(' | ', $parts));
-    }
-
-    private function renderCartStatus()
-    {
-        $rows = (new CartRepository())->summary();
-        if (empty($rows)) {
-            return $this->displayInformation($this->l('No cart snapshots have been captured yet.'));
-        }
-
-        $parts = [];
-        foreach ($rows as $row) {
-            $parts[] = (isset($row['status']) ? (string) $row['status'] : 'unknown') . ': ' . (isset($row['total']) ? (int) $row['total'] : 0);
-        }
-
-        return $this->displayInformation($this->l('Cart snapshot status: ') . implode(' | ', $parts));
-    }
-
-    private function renderJourneyStatus()
-    {
-        $rows = (new JourneyEventAuditRepository())->summary();
-        if (empty($rows)) {
-            return $this->displayInformation($this->l('No Journey Builder delivery attempts have been recorded yet.'));
-        }
-
-        $parts = [];
-        foreach ($rows as $row) {
-            $parts[] = (isset($row['status']) ? (string) $row['status'] : 'unknown') . ': ' . (isset($row['total']) ? (int) $row['total'] : 0);
-        }
-
-        return $this->displayInformation($this->l('Journey delivery status: ') . implode(' | ', $parts));
-    }
-
-    private function renderRecoveryStatus()
-    {
-        $repository = new RecoveryTokenRepository();
-        $row = $repository->summary();
-        if (empty($row)) {
-            return $this->displayInformation($this->l('No cart recovery links have been generated yet.'));
-        }
-
-        $message = sprintf(
-            $this->l('Recovery: active links %d, used links %d, expired links %d, recovered carts %d, attributed orders %d, paid recovered orders %d.'),
-            isset($row['active_tokens']) ? (int) $row['active_tokens'] : 0,
-            isset($row['used_tokens']) ? (int) $row['used_tokens'] : 0,
-            isset($row['expired_tokens']) ? (int) $row['expired_tokens'] : 0,
-            isset($row['recovered_carts']) ? (int) $row['recovered_carts'] : 0,
-            isset($row['recovered_orders']) ? (int) $row['recovered_orders'] : 0,
-            isset($row['paid_recovered_orders']) ? (int) $row['paid_recovered_orders'] : 0
+        $html = $message;
+        $html .= $this->displayInformation(
+            $this->l('Provider: Marketing Cloud Growth + Data Cloud only. Mode: Test. The existing Salesforce Core OAuth and Data Cloud token exchange have already been certified; this panel does not repeat them.')
         );
-
-        $revenueParts = [];
-        foreach ($repository->revenueByCurrency() as $revenue) {
-            $currency = isset($revenue['currency']) && (string) $revenue['currency'] !== ''
-                ? (string) $revenue['currency']
-                : $this->l('unknown currency');
-            $revenueParts[] = sprintf(
-                '%s %.2f (%d)',
-                $currency,
-                isset($revenue['revenue']) ? (float) $revenue['revenue'] : 0.0,
-                isset($revenue['paid_orders']) ? (int) $revenue['paid_orders'] : 0
-            );
-        }
-
-        if (!empty($revenueParts)) {
-            $message .= ' ' . $this->l('Paid recovered revenue by currency: ') . implode(' | ', $revenueParts);
-        }
-
-        return $this->displayInformation($message);
-    }
-
-    private function saveConfiguration()
-    {
-        $authBaseUri = rtrim(trim((string) Tools::getValue(self::CONFIG_AUTH_BASE_URI)), '/');
-        $restBaseUri = rtrim(trim((string) Tools::getValue(self::CONFIG_REST_BASE_URI)), '/');
-        $clientId = trim((string) Tools::getValue(self::CONFIG_CLIENT_ID));
-        $clientSecret = (string) Tools::getValue(self::CONFIG_CLIENT_SECRET);
-        $accountId = trim((string) Tools::getValue(self::CONFIG_ACCOUNT_ID));
-        $mode = Tools::getValue(self::CONFIG_MODE) === 'production' ? 'production' : 'test';
-        $abandonMinutes = max(15, (int) Tools::getValue(self::CONFIG_CART_ABANDON_MINUTES));
-        $consentMode = Tools::getValue(self::CONFIG_CART_CONSENT_MODE) === CartEligibilityPolicy::MODE_KNOWN_CONTACT
-            ? CartEligibilityPolicy::MODE_KNOWN_CONTACT
-            : CartEligibilityPolicy::MODE_MARKETING_OPTIN;
-        $customerDeKey = trim((string) Tools::getValue(self::CONFIG_CUSTOMER_DE_KEY));
-        $orderDeKey = trim((string) Tools::getValue(self::CONFIG_ORDER_DE_KEY));
-        $journeyEventDefinitionKey = trim((string) Tools::getValue(self::CONFIG_JOURNEY_EVENT_DEFINITION_KEY));
-        $recoveryTtlHours = max(1, min(720, (int) Tools::getValue(self::CONFIG_RECOVERY_TOKEN_TTL_HOURS)));
-        $backfillBatch = max(10, min(500, (int) Tools::getValue(self::CONFIG_CUSTOMER_BACKFILL_BATCH)));
-        $retentionQueueDays = max(1, min(3650, (int) Tools::getValue(self::CONFIG_RETENTION_QUEUE_DAYS)));
-        $retentionLogDays = max(1, min(3650, (int) Tools::getValue(self::CONFIG_RETENTION_LOG_DAYS)));
-        $retentionJourneyDays = max(1, min(3650, (int) Tools::getValue(self::CONFIG_RETENTION_JOURNEY_DAYS)));
-        $retentionCartDays = max(1, min(3650, (int) Tools::getValue(self::CONFIG_RETENTION_CART_DAYS)));
-        $retentionRecoveryDays = max(1, min(3650, (int) Tools::getValue(self::CONFIG_RETENTION_RECOVERY_DAYS)));
-
-        if (!$this->isHttpsUri($authBaseUri) || !$this->isHttpsUri($restBaseUri)) {
-            return $this->displayError($this->l('Authentication and REST Base URIs must be valid HTTPS URLs.'));
-        }
-
-        if ($clientId === '') {
-            return $this->displayError($this->l('Client ID is required.'));
-        }
-
-        if ($customerDeKey === '') {
-            return $this->displayError($this->l('Customer Data Extension External Key is required.'));
-        }
-
-        if ($orderDeKey === '') {
-            return $this->displayError($this->l('Order Data Extension External Key is required.'));
-        }
-
-        if ($journeyEventDefinitionKey === '' || !preg_match('/^[A-Za-z0-9_-]+$/', $journeyEventDefinitionKey)) {
-            return $this->displayError($this->l('Journey Event Definition Key is required and may contain only letters, numbers, underscores and hyphens.'));
-        }
-
-        Configuration::updateValue(self::CONFIG_AUTH_BASE_URI, $authBaseUri);
-        Configuration::updateValue(self::CONFIG_REST_BASE_URI, $restBaseUri);
-        Configuration::updateValue(self::CONFIG_CLIENT_ID, $clientId);
-        Configuration::updateValue(self::CONFIG_ACCOUNT_ID, $accountId);
-        Configuration::updateValue(self::CONFIG_MODE, $mode);
-        Configuration::updateValue(self::CONFIG_CART_ABANDON_MINUTES, $abandonMinutes);
-        Configuration::updateValue(self::CONFIG_CART_CONSENT_MODE, $consentMode);
-        Configuration::updateValue(self::CONFIG_CUSTOMER_DE_KEY, $customerDeKey);
-        Configuration::updateValue(self::CONFIG_ORDER_DE_KEY, $orderDeKey);
-        Configuration::updateValue(self::CONFIG_JOURNEY_EVENT_DEFINITION_KEY, $journeyEventDefinitionKey);
-        Configuration::updateValue(self::CONFIG_RECOVERY_TOKEN_TTL_HOURS, $recoveryTtlHours);
-        Configuration::updateValue(self::CONFIG_CUSTOMER_BACKFILL_BATCH, $backfillBatch);
-        Configuration::updateValue(self::CONFIG_RETENTION_QUEUE_DAYS, $retentionQueueDays);
-        Configuration::updateValue(self::CONFIG_RETENTION_LOG_DAYS, $retentionLogDays);
-        Configuration::updateValue(self::CONFIG_RETENTION_JOURNEY_DAYS, $retentionJourneyDays);
-        Configuration::updateValue(self::CONFIG_RETENTION_CART_DAYS, $retentionCartDays);
-        Configuration::updateValue(self::CONFIG_RETENTION_RECOVERY_DAYS, $retentionRecoveryDays);
-
-        if ($clientSecret !== '') {
-            Configuration::updateValue(self::CONFIG_CLIENT_SECRET, $clientSecret);
-        }
-
-        $this->salesforceRestClientCache = null;
-
-        return $this->displayConfirmation($this->l('Configuration saved.'));
-    }
-
-    private function testConnection()
-    {
+        $html .= $this->displayInformation(
+            $this->l('No Data Cloud ingestion, schema upload, Data Streams, identity matching, historic backfill, campaign sends or cart recovery is enabled.')
+        );
         try {
-            $client = new AuthClient(
-                (string) Configuration::get(self::CONFIG_AUTH_BASE_URI),
-                (string) Configuration::get(self::CONFIG_CLIENT_ID),
-                (string) Configuration::get(self::CONFIG_CLIENT_SECRET),
-                (string) Configuration::get(self::CONFIG_ACCOUNT_ID)
+            $shops = ShopResolver::activeShopIds(isset($this->context) ? $this->context : null);
+            $review = PrestaShopReadinessProbe::inspect($shops);
+            $html .= (new InstallationReadinessDashboard())->render($review);
+        } catch (\Throwable $e) {
+            $html .= $this->displayError(
+                $this->l('The read-only Data Cloud installation checks are unavailable; exports remain blocked.')
             );
-
-            $token = $client->requestAccessToken();
-
-            if (empty($token['access_token'])) {
-                throw new RuntimeException('Salesforce did not return an access token.');
-            }
-
-            return $this->displayConfirmation($this->l('Connection successful. Salesforce returned a valid access token.'));
-        } catch (Exception $e) {
-            return $this->displayError($this->l('Connection failed: ') . $e->getMessage());
         }
+        return $html . $this->renderGrowthForm();
     }
 
-    private function renderForm()
+    private function saveGrowthSettings()
+    {
+        $merchant = Tools::getValue(self::CONFIG_MERCHANT);
+        $namespace = Tools::getValue(self::CONFIG_NAMESPACE);
+        if (!is_string($merchant) ||
+            !preg_match('/^[A-Z][A-Z0-9_]{1,31}$/D', $merchant) ||
+            !is_string($namespace) ||
+            !preg_match('/^[a-z][a-z0-9_]{5,31}$/D', $namespace)) {
+            return $this->displayError(
+                $this->l('Merchant and installation namespace are required. Use uppercase merchant and lowercase namespace identifiers.')
+            );
+        }
+        // These are CANDIDATES. Saving them does not certify global uniqueness
+        // nor authorize shipping records to the connected PST source.
+        $oldMerchant = Configuration::get(self::CONFIG_MERCHANT);
+        $oldNamespace = Configuration::get(self::CONFIG_NAMESPACE);
+        if ((is_string($oldMerchant) && $oldMerchant !== '' && $oldMerchant !== $merchant)
+            || (is_string($oldNamespace) && $oldNamespace !== '' && $oldNamespace !== $namespace)) {
+            return $this->displayError(
+                $this->l('Installation identity cannot be changed in place. Review namespace ownership before migration.')
+            );
+        }
+        if (!Configuration::updateValue(self::CONFIG_MODE, 'test')
+            || !Configuration::updateValue(self::CONFIG_MERCHANT, $merchant)
+            || !Configuration::updateValue(self::CONFIG_NAMESPACE, $namespace)) {
+            return $this->displayError($this->l('Unable to save Growth configuration.'));
+        }
+        return $this->displayConfirmation(
+            $this->l('Growth identity candidate saved in Test. No external requests were made.')
+        );
+    }
+
+    private function renderGrowthForm()
     {
         $helper = new HelperForm();
         $helper->module = $this;
         $helper->name_controller = $this->name;
         $helper->token = Tools::getAdminTokenLite('AdminModules');
         $helper->currentIndex = AdminController::$currentIndex . '&configure=' . $this->name;
-        $helper->submit_action = 'submitPsSalesforceBridge';
+        $helper->submit_action = 'submitPsGrowthBridge';
         $helper->default_form_language = (int) Configuration::get('PS_LANG_DEFAULT');
         $helper->allow_employee_form_lang = (int) Configuration::get('PS_BO_ALLOW_EMPLOYEE_FORM_LANG');
-
-        $cronToken = (string) Configuration::get(self::CONFIG_CRON_TOKEN);
-        $cronUrl = '';
-        if (isset($this->context->link)) {
-            $cronUrl = $this->context->link->getModuleLink($this->name, 'cron', ['token' => $cronToken], true);
-        }
-        $retention = $this->retentionConfiguration();
-
         $helper->fields_value = [
-            self::CONFIG_AUTH_BASE_URI => (string) Configuration::get(self::CONFIG_AUTH_BASE_URI),
-            self::CONFIG_REST_BASE_URI => (string) Configuration::get(self::CONFIG_REST_BASE_URI),
-            self::CONFIG_CLIENT_ID => (string) Configuration::get(self::CONFIG_CLIENT_ID),
-            self::CONFIG_CLIENT_SECRET => '',
-            self::CONFIG_ACCOUNT_ID => (string) Configuration::get(self::CONFIG_ACCOUNT_ID),
-            self::CONFIG_MODE => (string) Configuration::get(self::CONFIG_MODE),
-            self::CONFIG_CART_ABANDON_MINUTES => (int) Configuration::get(self::CONFIG_CART_ABANDON_MINUTES),
-            self::CONFIG_CART_CONSENT_MODE => (string) Configuration::get(self::CONFIG_CART_CONSENT_MODE),
-            self::CONFIG_CUSTOMER_DE_KEY => (string) Configuration::get(self::CONFIG_CUSTOMER_DE_KEY),
-            self::CONFIG_ORDER_DE_KEY => (string) Configuration::get(self::CONFIG_ORDER_DE_KEY),
-            self::CONFIG_JOURNEY_EVENT_DEFINITION_KEY => (string) Configuration::get(self::CONFIG_JOURNEY_EVENT_DEFINITION_KEY),
-            self::CONFIG_RECOVERY_TOKEN_TTL_HOURS => (int) Configuration::get(self::CONFIG_RECOVERY_TOKEN_TTL_HOURS),
-            self::CONFIG_CRON_TOKEN => $cronToken,
-            self::CONFIG_CUSTOMER_BACKFILL_BATCH => (int) Configuration::get(self::CONFIG_CUSTOMER_BACKFILL_BATCH),
-            self::CONFIG_RETENTION_QUEUE_DAYS => $retention['queue_days'],
-            self::CONFIG_RETENTION_LOG_DAYS => $retention['log_days'],
-            self::CONFIG_RETENTION_JOURNEY_DAYS => $retention['journey_days'],
-            self::CONFIG_RETENTION_CART_DAYS => $retention['cart_days'],
-            self::CONFIG_RETENTION_RECOVERY_DAYS => $retention['recovery_days'],
-            'PS_SFMC_CRON_URL' => $cronUrl,
+            self::CONFIG_MERCHANT => (string) Configuration::get(self::CONFIG_MERCHANT),
+            self::CONFIG_NAMESPACE => (string) Configuration::get(self::CONFIG_NAMESPACE),
         ];
 
-        $form = [
-            'form' => [
-                'legend' => [
-                    'title' => $this->l('Salesforce Marketing Cloud connection'),
-                    'icon' => 'icon-cloud',
-                ],
-                'input' => [
-                    ['type' => 'text', 'label' => $this->l('Authentication Base URI'), 'name' => self::CONFIG_AUTH_BASE_URI, 'required' => true],
-                    ['type' => 'text', 'label' => $this->l('REST Base URI'), 'name' => self::CONFIG_REST_BASE_URI, 'required' => true],
-                    ['type' => 'text', 'label' => $this->l('Client ID'), 'name' => self::CONFIG_CLIENT_ID, 'required' => true],
-                    ['type' => 'password', 'label' => $this->l('Client Secret'), 'name' => self::CONFIG_CLIENT_SECRET, 'desc' => $this->l('Leave blank to keep the existing secret.')],
-                    ['type' => 'text', 'label' => $this->l('Business Unit MID / Account ID'), 'name' => self::CONFIG_ACCOUNT_ID],
-                    ['type' => 'text', 'label' => $this->l('Customer Data Extension External Key'), 'name' => self::CONFIG_CUSTOMER_DE_KEY, 'required' => true],
-                    ['type' => 'text', 'label' => $this->l('Order Data Extension External Key'), 'name' => self::CONFIG_ORDER_DE_KEY, 'required' => true],
-                    ['type' => 'text', 'label' => $this->l('Journey Event Definition Key'), 'name' => self::CONFIG_JOURNEY_EVENT_DEFINITION_KEY, 'required' => true, 'desc' => $this->l('Default: PRESTASHOP_ABANDONED_CART. Create and activate the matching API Entry Event in Journey Builder before enabling Production.')],
-                    ['type' => 'text', 'label' => $this->l('Recovery link lifetime'), 'name' => self::CONFIG_RECOVERY_TOKEN_TTL_HOURS, 'suffix' => $this->l('hours'), 'desc' => $this->l('Allowed range: 1–720 hours. Default: 168 hours (7 days).')],
-                    [
-                        'type' => 'select',
-                        'label' => $this->l('Mode'),
-                        'name' => self::CONFIG_MODE,
-                        'options' => [
-                            'query' => [
-                                ['id' => 'test', 'name' => $this->l('Test (no outbound Salesforce writes)')],
-                                ['id' => 'production', 'name' => $this->l('Production')],
-                            ],
-                            'id' => 'id',
-                            'name' => 'name',
-                        ],
-                    ],
-                    ['type' => 'text', 'label' => $this->l('Customer backfill batch size'), 'name' => self::CONFIG_CUSTOMER_BACKFILL_BATCH, 'desc' => $this->l('Customers scanned per active shop and cron run. Allowed range: 10–500.')],
-                    ['type' => 'text', 'label' => $this->l('Cron URL'), 'name' => 'PS_SFMC_CRON_URL', 'readonly' => true, 'desc' => $this->l('Call this protected URL from the server cron every 5 minutes.')],
-                    ['type' => 'text', 'label' => $this->l('Cron token'), 'name' => self::CONFIG_CRON_TOKEN, 'readonly' => true],
-                    ['type' => 'text', 'label' => $this->l('Abandoned cart threshold (minutes)'), 'name' => self::CONFIG_CART_ABANDON_MINUTES, 'suffix' => $this->l('minutes')],
-                    [
-                        'type' => 'select',
-                        'label' => $this->l('Abandoned cart eligibility'),
-                        'name' => self::CONFIG_CART_CONSENT_MODE,
-                        'desc' => $this->l('Marketing opt-in is the strict default. Use known contact only when your documented legal basis permits it.'),
-                        'options' => [
-                            'query' => [
-                                ['id' => CartEligibilityPolicy::MODE_MARKETING_OPTIN, 'name' => $this->l('Require newsletter or marketing opt-in')],
-                                ['id' => CartEligibilityPolicy::MODE_KNOWN_CONTACT, 'name' => $this->l('Known active contact with valid email')],
-                            ],
-                            'id' => 'id',
-                            'name' => 'name',
-                        ],
-                    ],
-                    ['type' => 'text', 'label' => $this->l('Processed queue retention'), 'name' => self::CONFIG_RETENTION_QUEUE_DAYS, 'suffix' => $this->l('days'), 'desc' => $this->l('Only processed queue rows are deleted. Pending, processing, retry and failed rows are never auto-purged.')],
-                    ['type' => 'text', 'label' => $this->l('Local log retention'), 'name' => self::CONFIG_RETENTION_LOG_DAYS, 'suffix' => $this->l('days')],
-                    ['type' => 'text', 'label' => $this->l('Journey audit retention'), 'name' => self::CONFIG_RETENTION_JOURNEY_DAYS, 'suffix' => $this->l('days'), 'desc' => $this->l('Only sent and suppressed Journey audit rows are deleted automatically.')],
-                    ['type' => 'text', 'label' => $this->l('Terminal cart snapshot retention'), 'name' => self::CONFIG_RETENTION_CART_DAYS, 'suffix' => $this->l('days'), 'desc' => $this->l('Only empty, ineligible, converted and recovered snapshots are deleted. Active and abandoned snapshots are retained.')],
-                    ['type' => 'text', 'label' => $this->l('Recovery token retention'), 'name' => self::CONFIG_RETENTION_RECOVERY_DAYS, 'suffix' => $this->l('days'), 'desc' => $this->l('Recovered tokens are anonymized to preserve attribution. Expired or unusable tokens without recovery are deleted.')],
-                ],
-                'submit' => ['title' => $this->l('Save')],
-                'buttons' => [
-                    [
-                        'title' => $this->l('Test connection'),
-                        'name' => 'testPsSalesforceBridgeConnection',
-                        'type' => 'submit',
-                        'class' => 'btn btn-default pull-right',
-                        'icon' => 'process-icon-refresh',
-                    ],
-                    [
-                        'title' => $this->l('Start / resume customer backfill'),
-                        'name' => 'startPsSalesforceBridgeCustomerBackfill',
-                        'type' => 'submit',
-                        'class' => 'btn btn-default pull-right',
-                        'icon' => 'process-icon-database',
-                    ],
-                    [
-                        'title' => $this->l('Run privacy retention now'),
-                        'name' => 'runPsSalesforceBridgeRetention',
-                        'type' => 'submit',
-                        'class' => 'btn btn-default pull-right',
-                        'icon' => 'process-icon-eraser',
-                    ],
-                ],
+        return $helper->generateForm([['form' => [
+            'legend' => [
+                'title' => $this->l('Marketing Cloud Growth + Data Cloud (Test)'),
+                'icon' => 'icon-cloud',
             ],
-        ];
-
-        return $helper->generateForm([$form]);
+            'input' => [
+                ['type' => 'text', 'label' => $this->l('Merchant code'),
+                    'name' => self::CONFIG_MERCHANT, 'required' => true],
+                ['type' => 'text', 'label' => $this->l('Installation namespace candidate'),
+                    'name' => self::CONFIG_NAMESPACE, 'required' => true],
+            ],
+            'submit' => ['title' => $this->l('Save Test identity')],
+        ]]]);
     }
 
-    private function isHttpsUri($uri)
+    public function healthReport()
     {
-        if (!filter_var($uri, FILTER_VALIDATE_URL)) {
-            return false;
-        }
+        // A healthy local module is not a Data Cloud export authorization.
+        return [
+            'ok' => true,
+            'status' => 'blocked_test',
+            'mode' => 'test',
+            'module_version' => $this->version,
+            'prestashop_version' => defined('_PS_VERSION_') ? (string) _PS_VERSION_ : 'unknown',
+            'provider' => self::PROVIDER,
+            'data_platform' => self::DATA_PLATFORM,
+            'source' => self::SCHEMA_SOURCE,
+            'identity_candidate_present' =>
+                (string) Configuration::get(self::CONFIG_MERCHANT) !== ''
+                && (string) Configuration::get(self::CONFIG_NAMESPACE) !== '',
+            'schema_upload_allowed' => false,
+            'data_streams_allowed' => false,
+            'record_ingestion_allowed' => false,
+            'historical_backfill_allowed' => false,
+            'marketing_sends_allowed' => false,
+            'recovery_allowed' => false,
+        ];
+    }
 
-        return strtolower((string) parse_url($uri, PHP_URL_SCHEME)) === 'https';
+    public function cronReport()
+    {
+        // Pure status endpoint. No legacy queue, retry, backfill, scheduler,
+        // retention or Journey processor is called.
+        return [
+            'ok' => true,
+            'status' => 'blocked_test',
+            'provider' => self::PROVIDER,
+            'growth_delivery' => ['skipped' => 'approval_required'],
+            'data_cloud_ingestion' => ['skipped' => 'schema_required'],
+            'marketing_sends' => ['skipped' => 'approval_required'],
+        ];
     }
 }
