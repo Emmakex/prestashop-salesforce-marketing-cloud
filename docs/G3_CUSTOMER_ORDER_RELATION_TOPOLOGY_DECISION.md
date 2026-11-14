@@ -80,3 +80,18 @@ La [inspección con paginación verificada #43495007989](https://github.com/Emma
 Arquitecto Data 360: seleccionar **A/B/C/D**, categoría del futuro Data Stream, DMO(s) destino, campos PK/FK y relaciones, semántica por `source_namespace` y `shop_id`; comprobar entidades necesarias en ABH y cómo manejar invitados, pedidos históricos y borrados. Responsable de datos: finalidad y necesidad de cada campo, consentimientos distintos, retención/supresión; resolver **G3-02/G3-07**. Responsable de implementación: fuente de fecha real de modificación **G3-03/G3-04**, identidad G3-01 y reversibilidad.
 
 Solo tras firmar esas decisiones se fija `v0.2/v0.3` y SHA-256 en **G3-08**. **G4+** requiere aprobación independiente para subir esquema, crear streams, mapear, ingerir o enviar. Barcelona Confort permanece `pssalesforcebridge 0.7.1` **Test**; ninguna reinstalación.
+
+
+## Dos puentes estándar adicionales investigables sin crear Accounts ni unir por email (14/11/2026)
+
+A partir de las referencias oficiales de [Sales Order](https://developer.salesforce.com/docs/data/data-cloud-dmo-mapping/guide/c360dm-si-salesorderdmo-dmo.html), [Account Contact](https://developer.salesforce.com/docs/data/data-cloud-dmo-mapping/guide/c360dm-si-accountcontactdmo-dmo.html) y [Contact Point Email](https://developer.salesforce.com/docs/data/data-cloud-dmo-mapping/guide/c360dm-si-contactpointemaildmo-dmo.html), el arquitecto debe considerar, **sin selección automática**, estas variantes de la topología con DMO intermedio:
+
+| Ruta | Relación estándar indicada por Salesforce | Riesgo que impide aprobarla aún |
+| --- | --- | --- |
+| **B2 — AccountContact** | `SalesOrder.BillToContactId → AccountContact.Id → AccountContact.IndividualId → Individual.Id` | `AccountContact` es una entidad distinta de PrestaShop Customer. Hay que demostrar IDs, origen, cardinalidad y mapeo del contacto; no crear uno ficticio por pedido |
+| **B3 — ContactPointEmail** | `SalesOrder.BilltoEmailId → ContactPointEmail.Id → ContactPointEmail.PartyId → Individual.Id` | `PartyId` puede referirse **a Individual o a Account**. La ruta solo sirve si está tipada contra Individual y se demuestran **IDs reales**, nunca coincidencia de texto de email. Es un dato relacionado con contacto y requiere minimización/finalidad |
+
+El inspector G3 ahora puede observar, mediante metadatos limitados, `AccountContact` y `ContactPointEmail`, sus campos fijos y las relaciones visibles (ambos extremos; hasta 500 por DMO). **No lee direcciones de correo, pedidos ni personas**, no crea un DMO, no guarda mapeos y no asigna finalidades. `403/404` o ausencia de arista equivale a **no demostrado**, especialmente para relaciones inactivas.
+
+Se conserva el expediente A/B/C/D: **B2/B3 son rutas candidatas dentro del análisis de intermediación estándar**, no nuevas opciones decididas. Ninguna equivale a autorización comercial, unión de identidades o prueba de que ABH tenga ya una configuración operativa.
+
