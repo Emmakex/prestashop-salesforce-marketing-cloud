@@ -41,7 +41,7 @@ function growthOrderReview($native, $ledger)
     foreach ($queries as $sql) {
         growthOrderCheck(strpos($sql, 'SELECT `id_shop`, `id_cart`, `id_order`') === 0
             && strpos($sql, ' WHERE `id_shop` = 1 AND `id_cart` = 33 ') !== false
-            && substr($sql, -30) === 'ORDER BY `id_order` ASC LIMIT 1',
+            && substr($sql, -31) === 'ORDER BY `id_order` ASC LIMIT 1',
             'query_not_exact_shop_cart_limited');
         foreach (['email', 'customer', 'SELECT *', 'INSERT', 'UPDATE', 'DELETE',
             ' JOIN ', '/api/v1/ingest', 'RecoveryUrl'] as $unsafe) {
