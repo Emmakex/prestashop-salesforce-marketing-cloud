@@ -21,12 +21,14 @@ class G3HandoffTests(unittest.TestCase):
         cls.closure = json.loads(
             (ROOT / "config/g3-abh-technical-closure-candidate.json").read_text("utf-8"))
         cls.schema = (ROOT / mod.SCHEMA).read_bytes()
+        cls.typed_schema = (ROOT / mod.TYPED_SCHEMA).read_bytes()
 
-    def verify(self, record=None, closure=None, schema=None):
+    def verify(self, record=None, closure=None, schema=None, typed_schema=None):
         return mod.validate(
             copy.deepcopy(record if record is not None else self.receipt),
             copy.deepcopy(closure if closure is not None else self.closure),
             schema if schema is not None else self.schema,
+            typed_schema if typed_schema is not None else self.typed_schema,
         )
 
     def test_pending_review_only_passes(self):
@@ -83,6 +85,28 @@ class G3HandoffTests(unittest.TestCase):
         closure["point_1_data_privacy"]["export_to_data_360_authorized"] = True
         self.assertIn("g3_handoff_prior_gate_changed",
                       self.verify(closure=closure))
+
+    def test_typed_identity_option_is_hash_locked_and_never_signed(self):
+        option = self.receipt["schema_identity_alternative"]
+        self.assertEqual(option["sha256"], mod.TYPED_SHA)
+        self.assertEqual(option["field_count"], 22)
+        self.assertEqual(option["architect_review_status"], "pending")
+        self.assertIs(option["selection_formally_approved"], False)
+        self.assertIs(option["schema_upload_authorized"], False)
+        self.assertEqual(self.verify(), [])
+        self.assertIn("g3_handoff_typed_schema_mismatch",
+                      self.verify(typed_schema=self.typed_schema + b"\\n"))
+        for key, value in [
+            ("sha256", "0" * 64),
+            ("architect_review_status", "approved"),
+            ("selection_formally_approved", True),
+            ("schema_upload_authorized", True),
+            ("identity_pattern", "email"),
+        ]:
+            changed = copy.deepcopy(self.receipt)
+            changed["schema_identity_alternative"][key] = value
+            self.assertIn("g3_handoff_typed_alternative_not_review_only",
+                          self.verify(record=changed))
 
     def test_no_owner_identity_or_retention_was_invented(self):
         text = json.dumps(self.receipt)
