@@ -300,6 +300,28 @@ assertDmo($bothBridges['relationship']['contact_email_to_individual_party_relati
     && !$bothBridges['relationship']['contact_email_bridge_approved']
     && !$bothBridges['tenant_mapping_approved'], 'both_paths_falsely_certified');
 
+// Optional DMOs can be unavailable to this metadata-only OAuth context.
+// A 403/404 must never become proof that a standard buyer link is absent.
+$optionalUrls = [];
+$syntheticGet = fakeGet(fixtures(), $optionalUrls);
+$missingOptionals = $probe->inspect(function ($url, $token) use ($syntheticGet) {
+    if (strpos($url, '/ssot__AccountContact__dlm') !== false
+        || strpos($url, '/ssot__ContactPointEmail__dlm') !== false) {
+        return ['status' => 404, 'body' => '{"secret":"not-published"}'];
+    }
+    return $syntheticGet($url, $token);
+});
+assertDmo(!$missingOptionals['objects']['AccountContact']['metadata_readable']
+    && !$missingOptionals['objects']['ContactPointEmail']['metadata_readable']
+    && !$missingOptionals['relationship']['account_contact_relationship_metadata_accessible']
+    && !$missingOptionals['relationship']['contact_email_relationship_metadata_accessible']
+    && !$missingOptionals['relationship']['account_contact_relationship_scan_complete']
+    && !$missingOptionals['relationship']['contact_email_relationship_scan_complete']
+    && !$missingOptionals['relationship']['account_contact_bridge_approved']
+    && !$missingOptionals['relationship']['contact_email_bridge_approved']
+    && strpos(json_encode($missingOptionals), 'not-published') === false,
+    'optional_buyer_dmos_404_falsely_authorized');
+
 // A missing/forbidden Account DMO cannot be treated as a verified bridge.
 // The two original DMOs remain queryable and are not silently merged.
 $missingAccount = $probe->inspect(function ($url, $token) use ($fixture) {
