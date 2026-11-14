@@ -16,6 +16,11 @@ TOKENS = [
     "exact" + "target",
     "so" + "ap",
     "data" + "_extension",
+    "all" + " subscribers",
+    "all" + "subscribers",
+    "publication" + " list",
+    "subscriber" + "key",
+    "installed" + " package",
 ]
 PATTERNS = [re.compile(re.escape(token), re.I) for token in TOKENS]
 PATTERNS.append(re.compile(r"data[ _-]*exten" + "sion", re.I))
