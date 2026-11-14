@@ -15,6 +15,8 @@ require_once dirname(__DIR__, 2)
 require_once dirname(__DIR__, 2)
     . '/pssalesforcebridge/src/Growth/GrowthOutboxSchemaPlan.php';
 require_once dirname(__DIR__, 2)
+    . '/pssalesforcebridge/src/Growth/GrowthSqlEngineGate.php';
+require_once dirname(__DIR__, 2)
     . '/pssalesforcebridge/src/Growth/GrowthSandboxMigrationExecutor.php';
 require_once dirname(__DIR__, 2)
     . '/pssalesforcebridge/src/Growth/PrestaShopDbBlockedOutboxStore.php';
