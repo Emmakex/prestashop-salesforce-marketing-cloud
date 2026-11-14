@@ -235,26 +235,8 @@ jobs:
             -x '*/vendor/*' '*.DS_Store'
           unzip -Z1 "$ZIP" | grep -qx 'pssalesforcebridge/pssalesforcebridge.php'
           unzip -Z1 "$ZIP" | grep -qx 'pssalesforcebridge/upgrade/upgrade-0.8.0.php'
-          if unzip -Z1 "$ZIP" | awk -F/ '$1=="pssalesforcebridge" && $2=="src" && NF>=4 {print $3}' | sort -u | grep -Ev '^(Compatibility|DataCloud|Growth|Provider)
-            echo 'Legacy adapter or old upgrade logic must not ship in the Growth-only ZIP'
-            exit 1
-          fi
-          if unzip -Z1 "$ZIP" | grep -q '^pssalesforcebridge/vendor/'; then
-            echo 'vendor directory must not be packaged'
-            exit 1
-          fi
-          unzip -p "$ZIP" pssalesforcebridge/pssalesforcebridge.php | grep -Fq "\$this->version = '0.8.0';"
-          unzip -p "$ZIP" pssalesforcebridge/composer.json | grep -Fq '"php": ">=7.1"'
-          sha256sum "$ZIP" > "${ZIP}.sha256"
-      - uses: actions/upload-artifact@v4
-        with:
-          name: pssalesforcebridge-0.8.0
-          path: |
-            build/pssalesforcebridge-0.8.0.zip
-            build/pssalesforcebridge-0.8.0.zip.sha256
-          if-no-files-found: error
-; then
-            echo 'Unexpected source directory in Growth-only ZIP'
+          if unzip -Z1 "$ZIP" | awk -F/ '$1=="pssalesforcebridge" && $2=="src" && NF>=4 {print $3}' | sort -u | grep -Ev '^(Compatibility|DataCloud|Growth|Provider)$'; then
+            echo 'Unrecognized package source directory'
             exit 1
           fi
           if unzip -Z1 "$ZIP" | grep -Eiq '(^pssalesforcebridge/controllers/front/recover.php|^pssalesforcebridge/upgrade/upgrade-0\.7\.)'; then
