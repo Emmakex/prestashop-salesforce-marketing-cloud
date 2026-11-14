@@ -1,0 +1,93 @@
+{
+  "contract_version": 1,
+  "merchant": "ABH",
+  "provider": "marketing_cloud_growth",
+  "data_platform": "data_cloud_data_360",
+  "status": "pending_formal_signoff",
+  "source": "existing_G3_contracts_and_research_not_new_approval",
+  "schema_technical_recommendation": {
+    "version": "v0.2",
+    "path": "schemas/ABH_PST_SCHEMA_REVIEW.yaml",
+    "sha256": "8595c2f9acb5be388ba3b2ec156ec65379ab04bf5ebf3718e63231cb06b43e9d",
+    "object_count": 2,
+    "field_count": 22,
+    "selection_formally_approved": false
+  },
+  "technical_recommendations": {
+    "namespace": "registry_assigned_unique_per_installation_not_domain_or_db",
+    "source_key": "source_namespace:shop_id:entity_type:entity_id",
+    "invalid_scope": "quarantine",
+    "destination_personal_data": "withheld",
+    "newsletter_flags": "source_signals_not_send_consent",
+    "historical_datetime": "withheld_until_provenance",
+    "record_modified_field": null,
+    "refresh_mode": "full_candidate_no_record_modified_not_authorized",
+    "customer_order_source_relation": "same_namespace_and_shop_only",
+    "salesforce_dmo_relation": "unmapped_until_architect_verifies_typed_keys",
+    "temporary_topology": "C_containment_candidate_only",
+    "order_person_segmentation_ready": false,
+    "data_360_ingestion_ready": false,
+    "cart_recovery_ready": false
+  },
+  "decisions_to_sign": [
+    {
+      "id": "DATA_AND_PRIVACY",
+      "status": "pending",
+      "approver_role": "data_owner_and_privacy",
+      "record": {
+        "namespace_allocation_confirmed": false,
+        "data_processing_purpose_approved": false,
+        "lawful_basis_per_field_reviewed": false,
+        "retention_policy_approved": false,
+        "suppression_erasure_approved": false,
+        "approver_identity": null,
+        "signed_at_utc": null,
+        "evidence_reference": null
+      }
+    },
+    {
+      "id": "DATA_360_RELATIONSHIP",
+      "status": "pending",
+      "approver_role": "data_360_architect",
+      "record": {
+        "proposed_refresh_mode_approved": false,
+        "source_revision_strategy_approved": false,
+        "data_stream_categories_approved": false,
+        "data_space_approved": false,
+        "dmo_pk_fk_mapping_approved": false,
+        "inactive_relationships_reviewed": false,
+        "approver_identity": null,
+        "signed_at_utc": null,
+        "evidence_reference": null
+      }
+    },
+    {
+      "id": "SCHEMA_AND_PREVIEW",
+      "status": "pending",
+      "approver_role": "data_owner_and_data_360_administrator",
+      "record": {
+        "schema_exact_sha_confirmed": false,
+        "preview_in_pst_reviewed": false,
+        "approved_schema_path": null,
+        "approved_schema_sha256": null,
+        "approver_identity": null,
+        "signed_at_utc": null,
+        "evidence_reference": null
+      }
+    }
+  ],
+  "authorizations": {
+    "schema_upload": false,
+    "create_data_streams": false,
+    "save_dlo_dmo_mapping": false,
+    "data_360_ingestion": false,
+    "historical_backfill": false,
+    "identity_stitching": false,
+    "marketing_sends": false,
+    "outbound_worker": false,
+    "prestashop_production_mode": false
+  },
+  "installed_bc_module": "0.7.1",
+  "installed_bc_mode": "test",
+  "no_sql_access_or_reinstall_required": true
+}
