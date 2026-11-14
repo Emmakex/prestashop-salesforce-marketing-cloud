@@ -114,7 +114,7 @@ function g3ProofTest()
     }, 'g3_namespace_attestation_mismatch');
 
     g3ProofReject(function () use ($proof, $ns, $id, $challenge, $signature) {
-        $proof->verifyOnce($ns, $id, 'ABH', 'marketing_cloud_engagement',
+        $proof->verifyOnce($ns, $id, 'ABH', 'unsupported_external_product',
             $challenge['nonce'], $challenge['expires_epoch'], $signature);
     }, 'g3_namespace_invalid_or_provider_mismatch');
 

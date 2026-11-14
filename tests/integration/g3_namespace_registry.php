@@ -81,7 +81,7 @@ function g3NamespaceTest()
         $registry->reserve('growth_ci_abhtest', $a, 'OTHER', 'marketing_cloud_growth');
     }, 'g3_namespace_collision_manual_review');
     g3NamespaceReject(function () use ($registry, $a) {
-        $registry->reserve('growth_ci_abhtest', $a, 'ABH', 'marketing_cloud_engagement');
+        $registry->reserve('growth_ci_abhtest', $a, 'ABH', 'unsupported_external_product');
     }, 'g3_namespace_invalid_or_provider_mismatch');
     g3NamespaceReject(function () use ($registry, $a) {
         $registry->reserve('growth_ci_abhtest', $a, 'ABH', 'wrong_product');
@@ -104,13 +104,13 @@ function g3NamespaceTest()
     // This registry is *global* to simulated installations rather than
     // a single shop: one namespace and one externally issued ID each.
     $otherRow = $registry->reserve('other_ci_install', $other,
-        'OTHER', 'marketing_cloud_engagement');
+        'OTHER', 'unsupported_external_product');
     g3NamespaceAssert($otherRow['created'] === true
         && $registry->countReservations() === 2, 'separate_tenants_not_isolated');
 
     foreach ([
         ['growth_ci_abhtest', $a, 'ABH', 'marketing_cloud_growth'],
-        ['other_ci_install', $other, 'OTHER', 'marketing_cloud_engagement'],
+        ['other_ci_install', $other, 'OTHER', 'unsupported_external_product'],
     ] as $args) {
         $result = call_user_func_array([$registry, 'inspect'], $args);
         g3NamespaceAssert($result === [

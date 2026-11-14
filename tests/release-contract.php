@@ -51,7 +51,7 @@ releaseAssert(strpos($patchUpgrade, 'CREATE TABLE') === false && strpos($patchUp
 $defaults = [
     'PS_SFMC_RETENTION_QUEUE_DAYS' => 30,
     'PS_SFMC_RETENTION_LOG_DAYS' => 30,
-    'PS_SFMC_RETENTION_JOURNEY_DAYS' => 90,
+    'PS_SFMC_RETENTION_RETIRED_FLOW_DAYS' => 90,
     'PS_SFMC_RETENTION_CART_DAYS' => 30,
     'PS_SFMC_RETENTION_RECOVERY_DAYS' => 30,
     'PS_SFMC_RETENTION_LAST_RUN_AT' => '',

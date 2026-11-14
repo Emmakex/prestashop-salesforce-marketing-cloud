@@ -153,7 +153,7 @@ function g3BridgeTest(PDO $db)
     $before = g3BridgeCount($db, 'g3_growth_outbox_v1');
     g3BridgeRejected(function () {
         new ExplicitProviderRouter('8.2.8', 'OTHER_MERCHANT',
-            'marketing_cloud_engagement', 'growth_ci_other', 'test');
+            'unsupported_external_product', 'growth_ci_other', 'test');
     }, 'non_growth_provider_was_accepted');
     g3BridgeRejected(function () use ($router, $store) {
         g3BridgeCapture($router, $store, 1, 'cart', 44,

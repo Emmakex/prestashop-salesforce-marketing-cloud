@@ -98,7 +98,7 @@ function g3LifeTest()
             $oldHash, $oldPublic);
     }, 'g3_proof_rotation_conflict_manual_review');
     g3LifeReject(function () use ($proof, $ns, $id, $provider, $oldHash, $newPublic) {
-        $proof->rotateByExternalOperator($ns, $id, 'ABH', 'marketing_cloud_engagement',
+        $proof->rotateByExternalOperator($ns, $id, 'ABH', 'unsupported_external_product',
             $oldHash, $newPublic);
     }, 'g3_namespace_invalid_or_provider_mismatch');
 
