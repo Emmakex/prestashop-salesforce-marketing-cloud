@@ -29,12 +29,12 @@ class GrowthOnlyProjectFocusTests(unittest.TestCase):
 
     def test_extra_provider_cannot_be_added(self):
         self.fails(lambda x: x["provider_registry"].update({
-            "marketing_cloud_engagement": {"enable_production": False}
+            "unsupported_external_product": {"enable_production": False}
         }))
         self.fails(lambda x: x["provider_registry"]["marketing_cloud_growth"].update({
             "enable_production": True
         }))
-        self.fails(lambda x: x["pilot"].update(provider="marketing_cloud_engagement"))
+        self.fails(lambda x: x["pilot"].update(provider="unsupported_external_product"))
         self.fails(lambda x: x.update(architecture="dual_provider"))
         self.fails(lambda x: x.update(delivery_policy="allow_any_provider"))
 

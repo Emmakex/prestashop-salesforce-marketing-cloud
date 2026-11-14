@@ -1,6 +1,6 @@
 # AGENTS — PrestaShop ↔ Marketing Cloud Growth + Data Cloud (único producto)
 
-**Decisión del propietario 14/11/2026:** se elimina la arquitectura multiproveedor. Este proyecto conecta tiendas PrestaShop **1.7.8.x, 8.x y 9.x exclusivamente** con Salesforce **Marketing Cloud Growth sobre Salesforce Core + Data Cloud**. No ofrecer otro destino, selector de proveedores, clientes SOAP, Data Extensions, Journey API ni rutas de fallback.
+**Decisión del propietario 14/11/2026:** se elimina la arquitectura multiproveedor. Este proyecto conecta tiendas PrestaShop **1.7.8.x, 8.x y 9.x exclusivamente** con Salesforce **Marketing Cloud Growth sobre Salesforce Core + Data Cloud**. No ofrecer otros destinos Salesforce, selector de proveedores, transportes alternativos ni rutas de fallback.
 
 ## 1. Fuente de verdad
 

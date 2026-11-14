@@ -3,7 +3,7 @@ namespace Emmakex\PrestaShopSalesforceMarketingCloud\Growth;
 
 use RuntimeException;
 
-/** Marketing Cloud Growth / Salesforce Core OAuth. NOT Engagement /v2/token. */
+/** Marketing Cloud Growth / Salesforce Core OAuth. Core OAuth only; no alternate token transport. */
 class AuthClient
 {
     private $orgUrl;

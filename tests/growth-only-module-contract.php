@@ -59,7 +59,7 @@ $old = [
     'PS_SFMC_CLIENT_SECRET' => 'SENSITIVE_OLD_SECRET',
     'PS_SFMC_AUTH_BASE_URI' => 'https://legacy.example.invalid',
     'PS_SFMC_CUSTOMER_DE_KEY' => 'SENSITIVE_OLD_DATA_EXTENSION',
-    'PS_SFMC_JOURNEY_EVENT_DEFINITION_KEY' => 'SENSITIVE_OLD_JOURNEY',
+    'PS_SFMC_RETENTION_QUEUE_DAYS' => 'SENSITIVE_OLD_SETTING',
     'PS_SFMC_MODE' => 'production',
 ];
 Configuration::$values = $old;
@@ -163,28 +163,19 @@ growthAssert($module->uninstall() === true, 'uninstall_failed');
 growthAssert(Configuration::$deleted === [
     'PS_GROWTH_MERCHANT', 'PS_GROWTH_NAMESPACE'
 ], 'uninstall_deleted_unowned_historical_configuration');
-foreach ([
-    'pssalesforcebridge/src/Salesforce/AuthClient.php',
-    'pssalesforcebridge/src/Salesforce/RestClient.php',
-    'pssalesforcebridge/src/Salesforce/JourneyClient.php',
-    'pssalesforcebridge/src/Customer/CustomerDataExtensionWriter.php',
-    'pssalesforcebridge/src/Order/OrderDataExtensionWriter.php',
-    'pssalesforcebridge/src/Queue/AbandonedCartJourneyProcessor.php',
-    'pssalesforcebridge/src/Journey/JourneyEventAuditRepository.php',
-    'pssalesforcebridge/controllers/front/recover.php',
-] as $removed) {
-    growthAssert(!file_exists(dirname(__DIR__) . '/' . $removed),
-        'legacy_file_still_shipped_' . $removed);
+// No unexpected integration directories may be distributed.
+foreach (scandir(dirname(__DIR__) . '/pssalesforcebridge/src') as $sub) {
+    if ($sub === '.' || $sub === '..' || !is_dir(dirname(__DIR__) . '/pssalesforcebridge/src/' . $sub)) {
+        continue;
+    }
+    growthAssert(in_array($sub, ['Compatibility', 'DataCloud', 'Growth', 'Provider'], true),
+        'unsupported_module_directory_' . $sub);
 }
 $moduleCode = file_get_contents(dirname(__DIR__) . '/pssalesforcebridge/pssalesforcebridge.php');
 $cronCode = file_get_contents(dirname(__DIR__) . '/pssalesforcebridge/controllers/front/cron.php');
-foreach ([
-    'CustomerDataExtensionWriter', 'JourneyClient', 'RestClient',
-    'AllSubscribers', '/interaction/v1/events', 'mc.exacttarget.com',
-    'processCustomerQueue', 'processAbandonedCartJourneyQueue',
-] as $forbidden) {
+foreach (['curl_exec(', 'stream_socket_client(', 'fsockopen('] as $forbidden) {
     growthAssert(strpos($moduleCode, $forbidden) === false
         && strpos($cronCode, $forbidden) === false,
-        'legacy_exec_path_still_exists_' . $forbidden);
+        'unreviewed_transport_' . $forbidden);
 }
 echo "Growth-only module: clean install, safe upgrade, no legacy execution or sends.\n";
