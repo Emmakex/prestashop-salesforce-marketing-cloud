@@ -80,3 +80,12 @@ bash tests/runtime/run-prestashop-certification.sh 9.1.5
 ```
 
 The GitHub Actions workflow is the release authority because it executes the full pinned matrix and exact-head checkout policy consistently.
+
+
+## Growth Db API runtime verification (14/11/2026, after 0.7.1)
+
+El nuevo contrato `tests/runtime/prestashop-growth-db-api-contract.php` se ejecuta dentro de los **tres contenedores PrestaShop reales**, no un mock, después de instalar `pssalesforcebridge` 0.7.1. Verifica `Db::getInstance()` con inserción, `Insert_ID()`, `getValue($sql, false)`, `executeS($sql, true, false)`, SELECT FOR UPDATE, `START TRANSACTION/COMMIT/ROLLBACK`, bloqueo nombrado `GET_LOCK/RELEASE_LOCK` y liberación al repetir. **Únicamente crea una tabla `TEMPORARY` InnoDB** en el contenedor descartable; la retira al terminar, no modifica esquema PST, colas Growth, eventos reales, hooks ni `sfmc_*`. El test exige `GITHUB_ACTIONS=true`, entorno de runtime desechable, versión concreta, módulo 0.7.1 en `test` y BD exacta `prestashop`. Además comprueba que `PrestaShopDbBlockedOutboxStore` rechaza la conexión real de PrestaShop, porque el adaptador sigue limitado a `g3_ci` hasta que G3 y la instalación se autoricen.
+
+El origen de esta prueba es un posible fallo de concurrencia: en PrestaShop, `Db::getValue()` puede cachear SELECT. El store Growth debe forzar `$use_cache=false` para **adquirir y liberar cada named lock** y revalidar el vínculo comercio/proveedor en cada evento. La prueba MySQL/MariaDB usa un doble que simula caché para fallar si una consulta crítica omite el segundo argumento `false`, e introduce una revocación del vínculo entre eventos en CI.
+
+**Límite de interpretación:** una CI runtime verde certifica *el comportamiento de la API Db y las garantías de no activación* en las tres versiones fijadas, pero **no certifica el almacenamiento Growth dentro de una instalación PrestaShop real**, porque la clase conserva su restricción sandbox ni habilita ingesta/emails Growth. La migración y conexión a hooks requieren aprobación del propietario de datos y del upgrade en un cambio separado. La nueva prueba no modifica la versión publicada ni debe usarse para solicitar instalación en Barcelona Confort.

@@ -73,8 +73,10 @@ final class PrestaShopDbBlockedOutboxStore
             . $identity['shop_id'] . ':' . $identity['entity_type']
             . ':' . $identity['entity_id']
         );
+        // Never cache advisory-lock acquisition; stale lock state breaks
+        // cross-request exclusion in real PrestaShop Db implementations.
         if ((string) $this->db->getValue(
-            "SELECT GET_LOCK('" . $lockName . "', 10)"
+            "SELECT GET_LOCK('" . $lockName . "', 10)", false
         ) !== '1') {
             throw new RuntimeException('growth_db_store_lock_unavailable');
         }
@@ -163,8 +165,9 @@ final class PrestaShopDbBlockedOutboxStore
             }
             throw $e;
         } finally {
+            // RELEASE_LOCK must execute on every attempt (no SELECT cache).
             // Do not leak source keys or query contents into logs on failure.
-            $this->db->getValue("SELECT RELEASE_LOCK('" . $lockName . "')");
+            $this->db->getValue("SELECT RELEASE_LOCK('" . $lockName . "')", false);
         }
     }
 
@@ -187,13 +190,15 @@ final class PrestaShopDbBlockedOutboxStore
 
     private function checkBinding()
     {
+        // Consent and route gates may be revoked between events. A cached
+        // COUNT(*) could incorrectly validate an obsolete provider binding.
         $sql = 'SELECT COUNT(*) FROM ' . self::quote($this->tables['binding'])
             . " WHERE source_namespace = '" . $this->namespace . "'"
             . " AND merchant = '" . $this->merchant . "'"
             . " AND prestashop_version = '" . $this->version . "'"
             . " AND provider = 'marketing_cloud_growth'"
             . " AND mode = 'test' AND status = 'blocked'";
-        if ((string) $this->db->getValue($sql) !== '1') {
+        if ((string) $this->db->getValue($sql, false) !== '1') {
             throw new RuntimeException('growth_db_store_binding_unverified');
         }
     }
@@ -304,8 +309,8 @@ final class PrestaShopDbBlockedOutboxStore
             || getenv('G3_CI_PASSWORD') !== 'g3_ci_pass_only') {
             throw new RuntimeException('growth_db_store_sandbox_only');
         }
-        if ($db->getValue('SELECT DATABASE()') !== 'g3_ci'
-            || strpos((string) $db->getValue('SELECT CURRENT_USER()'), 'g3_ci_user@') !== 0) {
+        if ($db->getValue('SELECT DATABASE()', false) !== 'g3_ci'
+            || strpos((string) $db->getValue('SELECT CURRENT_USER()', false), 'g3_ci_user@') !== 0) {
             throw new RuntimeException('growth_db_store_sandbox_only');
         }
     }
