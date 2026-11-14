@@ -442,6 +442,8 @@ class PsSalesforceBridge extends Module
             self::CONFIG_CLIENT_SECRET,
             self::CONFIG_ACCOUNT_ID,
             self::CONFIG_MODE,
+            self::CONFIG_PROVIDER,
+            self::CONFIG_MERCHANT,
             self::CONFIG_CART_ABANDON_MINUTES,
             self::CONFIG_CART_CONSENT_MODE,
             self::CONFIG_CUSTOMER_DE_KEY,
