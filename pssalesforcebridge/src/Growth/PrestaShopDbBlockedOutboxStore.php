@@ -21,6 +21,8 @@ final class PrestaShopDbBlockedOutboxStore
     private $db;
     private $tables;
     private $namespace;
+    private $merchant;
+    private $version;
     private $failureStage;
 
     public function __construct(
@@ -44,6 +46,8 @@ final class PrestaShopDbBlockedOutboxStore
         $this->db = $db;
         $this->tables = $plan['tables'];
         $this->namespace = $namespace;
+        $this->merchant = $merchant;
+        $this->version = $version;
         $this->failureStage = $failureStage;
         $this->checkBinding();
     }
@@ -184,6 +188,8 @@ final class PrestaShopDbBlockedOutboxStore
     {
         $sql = 'SELECT COUNT(*) FROM ' . self::quote($this->tables['binding'])
             . " WHERE source_namespace = '" . $this->namespace . "'"
+            . " AND merchant = '" . $this->merchant . "'"
+            . " AND prestashop_version = '" . $this->version . "'"
             . " AND provider = 'marketing_cloud_growth'"
             . " AND mode = 'test' AND status = 'blocked'";
         if ((string) $this->db->getValue($sql) !== '1') {
