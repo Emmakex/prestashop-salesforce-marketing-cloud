@@ -14,6 +14,8 @@ import sys
 
 ROOT = Path(__file__).resolve().parents[2]
 SOURCE_SCHEMA = "schemas/ABH_PST_SCHEMA_REVIEW.yaml"
+TYPED_SCHEMA = "schemas/ABH_PST_TYPED_IDENTITY_CANDIDATE.yaml"
+TYPED_SHA = "2a0eb79ebb664c9465374584a033b75828f0b180e2a28af5558e7cbb1ba8dd0f"
 SOURCE_HASH = "8595c2f9acb5be388ba3b2ec156ec65379ab04bf5ebf3718e63231cb06b43e9d"
 SOURCE_METADATA = "g3-abh-dmo-catalog-sanitized.json"
 DEST_REPORT = "g4-abh-readiness-sanitized.json"
@@ -294,12 +296,51 @@ def metadata_summary(evidence):
     return result
 
 
+def typed_alternative_verified(handoff, data):
+    """Source-only candidate check; a readable schema is not a signoff."""
+    if not isinstance(handoff, dict) or not isinstance(data, bytes) \
+            or hashlib.sha256(data).hexdigest() != TYPED_SHA:
+        return False
+    expected = {
+        "version": "v0.4",
+        "path": TYPED_SCHEMA,
+        "sha256": TYPED_SHA,
+        "object_count": 2,
+        "field_count": 22,
+        "identity_pattern": "source_namespace:shop_id:entity_type:entity_id",
+        "architect_review_status": "pending",
+        "selection_formally_approved": False,
+        "schema_upload_authorized": False,
+    }
+    if handoff.get("schema_identity_alternative") != expected \
+            or handoff.get("status") != "pending_formal_signoff" \
+            or handoff.get("installed_bc_module") != "0.7.1" \
+            or handoff.get("installed_bc_mode") != "test":
+        return False
+    decisions = handoff.get("decisions_to_sign")
+    if not isinstance(decisions, list) or len(decisions) != 3 \
+            or any(not isinstance(d, dict) or d.get("status") != "pending"
+                   for d in decisions):
+        return False
+    denied = handoff.get("authorizations")
+    if not isinstance(denied, dict) or set(denied) != {
+        "schema_upload", "create_data_streams", "save_dlo_dmo_mapping",
+        "data_360_ingestion", "historical_backfill", "identity_stitching",
+        "marketing_sends", "outbound_worker", "prestashop_production_mode",
+    } or any(v is not False for v in denied.values()):
+        return False
+    return True
+
+
 def build_report(sources, metadata=None):
     required = ("closure", "freeze", "packet", "privacy", "mapping", "project", "schema")
+    typed_valid = isinstance(sources, dict) and typed_alternative_verified(
+        sources.get("handoff"), sources.get("typed_schema")
+    )
     if not isinstance(sources, dict) or any(k not in sources for k in required):
         good = False
     else:
-        good = local_contract_verified(*(sources[k] for k in required))
+        good = typed_valid and local_contract_verified(*(sources[k] for k in required))
     return {
         "report_version": 1,
         "merchant": "ABH",
@@ -307,6 +348,14 @@ def build_report(sources, metadata=None):
         "stage": "g4_offline_and_metadata_readonly_preflight",
         "local_contract": "verified_pending_owner_approval" if good
                           else "blocked_invalid_local_contract",
+        "schema_identity_alternative": {
+            "version": "v0.4", "objects": ["PSCustomer", "PSOrder"],
+            "field_count": 22, "sha256": TYPED_SHA,
+            "hash_verified": bool(good),
+            "identity": "source_namespace:shop_id:entity_type:entity_id",
+            "selection_formally_approved": False,
+            "status": "pending_architect_review_not_publishable",
+        },
         "schema_candidate": {
             "version": "v0.2", "objects": ["PSCustomer", "PSOrder"],
             "field_count": 22,
@@ -354,6 +403,8 @@ def load_sources(root=ROOT):
             "mapping": read("config/g3-pst-dlo-dmo-mapping-candidate.json"),
             "project": read("config/project-contract.json"),
             "schema": (root / SOURCE_SCHEMA).read_bytes(),
+            "handoff": read("config/g3-abh-signoff-handoff.json"),
+            "typed_schema": (root / TYPED_SCHEMA).read_bytes(),
         }
     except (OSError, ValueError, UnicodeError):
         return {}
@@ -387,6 +438,10 @@ def markdown(report):
         "| Esquema candidato | v0.2, 22 campos; hash "
         + ("verificado" if report["schema_candidate"]["hash_verified"] else "NO verificado")
         + "; no publicable |",
+        "| Identidad tipada alternativa | v0.4, 22 campos, hash "
+        + ("verificado" if report["schema_identity_alternative"]["hash_verified"]
+           else "NO verificado")
+        + "; firma del arquitecto pendiente; NO publicable |",
         "| Barcelona Confort | 0.7.1 Test; motor SQL real no observado |",
         "| PrestaShop CI 1.7/8/9 | 3/3 aprobadas en run #43624367487; "
         "MySQL 5.7 bloquea el nuevo DDL Growth |",

@@ -10,6 +10,8 @@
 
 **Avance verificable G3-02 (sin firma):** la [propuesta tipada v0.4](G3_PST_TYPED_IDENTITY_PROPOSAL.md) resuelve con datos sintéticos la colisión aparente de claves entre cliente y pedido: `namespace:shop:customer:id` y `namespace:shop:order:id`, con `PSOrder.customer_source_key` igual a la PK de cliente en el mismo scope. La capa candidata y el YAML están separados de v0.2. **Esto solo cierra el diseño local comprobable**, no certifica DMO/PK/FK del tenant, asignación de namespace ni permisos de publicación. El arquitecto debe seleccionar y firmar el contrato definitivo.
 
+**Comparativa G3-08 lista, sin firmar:** v0.2 congelado (22 campos, SHA `8595c2f9acb5be388ba3b2ec156ec65379ab04bf5ebf3718e63231cb06b43e9d`) y alternativa tipada v0.4 (22 campos, SHA `2a0eb79ebb664c9465374584a033b75828f0b180e2a28af5558e7cbb1ba8dd0f`). Ambas están verificadas por CI; ninguna está seleccionada o aprobada. Se mantiene una sola decisión final de esquema, dependiente del arquitecto y el responsable de datos. El dossier no autoriza G4.
+
 **3. Esquema.** Candidato técnico v0.2 `schemas/ABH_PST_SCHEMA_REVIEW.yaml`, **22 campos**, `PSCustomer` y `PSOrder`, huella SHA-256 `8595c2f9acb5be388ba3b2ec156ec65379ab04bf5ebf3718e63231cb06b43e9d`. **No es esquema definitivo ni permiso de publicación**. Antes de finalizar G3: revisar contenido completo y preview sin guardar de `PST`, aprobar SHA exacto y conformidad de responsables. Si cambia un campo, hay que congelar una nueva huella.
 
 ## Tres constancias necesarias, sin repetir auditorías
