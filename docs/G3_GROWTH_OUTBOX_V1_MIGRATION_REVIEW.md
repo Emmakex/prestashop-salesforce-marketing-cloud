@@ -123,3 +123,12 @@ desechables MySQL 8/MariaDB 10.11:
 **No requiere acceso SQL del usuario ni nuevo ZIP.** BC continúa con
 `pssalesforcebridge` 0.7.1 en modo Test; este laboratorio solo
 demuestra el comportamiento de un diseño aislado.
+
+
+## Capa de selección de proveedor ya codificada, pendiente de activación (14/11/2026)
+
+El nuevo `pssalesforcebridge/src/Provider/ExplicitProviderRouter.php` es **código reutilizable del módulo**, no una clase del laboratorio. Separa el plan local por comercio, instalación, tienda, entidad y proveedor expresamente elegido: `source_namespace:shop_id:entity_type:entity_id`. Acepta candidatos PrestaShop `1.7.8.x`, `8.x`, `9.x`; los casos exactos certificados por CI y runtime existente siguen siendo `1.7.8.11`, `8.2.8`, `9.1.5`. El registro lógico no deriva namespace de URL, base de datos ni shop ID. La unicidad global del namespace **no está certificada** (G3-01).
+
+**Regla fija del piloto:** `ABH` requiere seleccionar explícitamente `marketing_cloud_growth`; seleccionar Engagement devuelve error y **no** existe fallback automático. Otros comercios pueden preparar una ruta `marketing_cloud_engagement` independiente, pero queda sin certificación de tenant ni permiso de envío. Todas las rutas se limitan a `mode=test`, `status=blocked` y flags de ingesta, Flow, marketing y worker `false`; `dispatch()` siempre rechaza. No hay DB, Salesforce, cola ni HTTP en este componente. No se integra todavía al bootstrap o worker del módulo instalado 0.7.1, no hay upgrade ni configuración nueva. Ninguna prueba de este selector es consentimiento, aprobación de PST o autorización para cambiar el proveedor operativo.
+
+La prueba `tests/growth-explicit-provider-routing-contract.php` comprueba sintéticamente identidad entre instalaciones/tiendas/entidades, tres familias PrestaShop, selección Growth de ABH, rechazo de producción y selección ambigua, aislamiento del legado y prohibición de salida. **Siguiente paso productivo tras cerrar G3:** unir el selector explícito con el outbox Growth namespaced y una instalación/rollback autorizados, después con el transporte Growth homologado, sin reutilizar registros ni sender Engagement. El CI de contratos **no sustituye** certificación de integración real de este componente en tiendas.
