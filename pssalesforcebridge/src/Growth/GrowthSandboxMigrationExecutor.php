@@ -173,6 +173,23 @@ final class GrowthSandboxMigrationExecutor
             if ((int) $stmt->fetchColumn() !== $expectedForeignKeys) {
                 throw new RuntimeException('growth_migration_foreign_key_drift');
             }
+            if ($kind !== 'binding') {
+                $target = $kind === 'outbox'
+                    ? $this->plan['tables']['binding']
+                    : $this->plan['tables']['outbox'];
+                $stmt = $this->db->prepare(
+                    'SELECT REFERENCED_TABLE_NAME, DELETE_RULE '
+                    . 'FROM information_schema.REFERENTIAL_CONSTRAINTS '
+                    . 'WHERE CONSTRAINT_SCHEMA = DATABASE() AND TABLE_NAME = ?'
+                );
+                $stmt->execute([$name]);
+                $foreignKeys = $stmt->fetchAll(PDO::FETCH_ASSOC);
+                if (count($foreignKeys) !== 1
+                    || $foreignKeys[0]['REFERENCED_TABLE_NAME'] !== $target
+                    || $foreignKeys[0]['DELETE_RULE'] !== 'RESTRICT') {
+                    throw new RuntimeException('growth_migration_foreign_key_target_drift');
+                }
+            }
         }
 
         $stmt = $this->db->prepare(
