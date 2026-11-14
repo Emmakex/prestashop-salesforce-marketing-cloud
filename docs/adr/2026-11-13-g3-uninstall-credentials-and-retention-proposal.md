@@ -2,7 +2,7 @@
 
 **Fecha:** 2026-11-13  
 **Estado:** PROPUESTO / SIN APROBACIÓN PARA PRODUCCIÓN  
-**Proyecto:** Puente PrestaShop con Salesforce. Piloto ABH/Barcelona Confort -> Marketing Cloud Growth (Next) + Data 360; no Engagement.
+**Proyecto:** Puente PrestaShop con Salesforce. Piloto ABH/Barcelona Confort -> Marketing Cloud Growth (Next) + Data 360; solo Growth + Data Cloud.
 
 ## Problema
 
@@ -20,7 +20,7 @@ no impide reanudar la integración, pero tampoco mantiene credenciales utilizabl
   retención, configuración de consentimiento fuente) y las marcas de
   inventario.
 - **Se retiran localmente** el client secret, client ID, account ID,
-  endpoints legacy, referencias de Data Extensions y Journey y token de cron.
+  endpoints legacy, referencias de almacenamiento discontinuado y orquestadores discontinuados y token de cron.
   No pueden reaparecer automáticamente durante una reinstalación.
 - **Una reinstalación** del mismo módulo en el mismo sitio mantiene las
   preferencias válidas y registros locales, obliga a modo `test`,

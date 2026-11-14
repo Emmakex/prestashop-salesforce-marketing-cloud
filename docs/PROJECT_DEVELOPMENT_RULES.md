@@ -18,7 +18,7 @@
 
 1. **Un cambio, un resultado.** No repetir G1/G2 ni crear nueva app, credenciales o paquetes de otro producto.
 2. **Primero estado real:** `main`, PRs, CI, `AGENTS.md`, contrato, canon y Roadmap.
-3. **Solo Growth + Data Cloud.** Mantener un núcleo multisite con namespace explícito. No SOAP, Data Extensions ni Journey API.
+3. **Solo Growth + Data Cloud.** Mantener un núcleo multisite con namespace explícito. No protocolo discontinuado, almacenamiento discontinuado ni orquestadores discontinuados API.
 4. **Fail-closed:** en la nueva 0.8.0 el módulo puede inspeccionar formas de hooks y metadata sin enviar ni persistir datos personales; la verdadera cola Growth necesita su siguiente corte y el contrato G3. No llamar sincronización a un preflight.
 5. **Reversible por defecto:** el upgrade desde 0.7.1 debe conservar las tablas/configuración existentes, bloquear antiguas rutas de ejecución y forzar Test. No purgar datos locales sin autorización y respaldo.
 6. **Datos personales:** ninguna PII en tests, artifacts, logs o chat. No deducir origen UTC de fechas MySQL `Europe/Madrid`; separar base legal y finalidad de cada consentimiento.

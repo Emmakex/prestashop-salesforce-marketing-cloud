@@ -1,7 +1,7 @@
 # Growth: puente de hooks existentes a outbox local bloqueado (candidato técnico)
 
 **14/11/2026 — Desarrollo implementado, NO conectado a Barcelona Confort.**  
-Destino ABH: Marketing Cloud **Growth/Next + Data 360**, no Engagement.
+Destino ABH: Marketing Cloud **Growth/Next + Data 360**, solo Growth + Data Cloud.
 
 ## Qué aporta al producto real
 
@@ -24,7 +24,7 @@ La clase **no** registra ni intercepta esos hooks. Solo traduce formas ya conoci
 
 ## Pruebas ejecutables, sin datos reales
 
-- `tests/growth-blocked-hook-adapter-contract.php`: PHP 7.1/8.5; hooks de cliente/pedido, reintentos, dedupe y scope por instalación/tienda/entidad; rechazo de Engagement, cart, status, objetos ambiguos, IDs malformados, fingerprints cruzados; no llamadas al callback ante entradas inválidas; no se filtra ningún valor de un objeto con email/fecha/total sintéticos.
+- `tests/growth-blocked-hook-adapter-contract.php`: PHP 7.1/8.5; hooks de cliente/pedido, reintentos, dedupe y scope por instalación/tienda/entidad; rechazo de producto discontinuado, cart, status, objetos ambiguos, IDs malformados, fingerprints cruzados; no llamadas al callback ante entradas inválidas; no se filtra ningún valor de un objeto con email/fecha/total sintéticos.
 - `tests/integration/g3_growth_prestashop_db_store.php`: usa **MySQL8 y MariaDB10.11** en `g3_ci`, sin tablas de cliente. Captura y reintenta un hook de cliente y un pedido usando `PrestaShopDbBlockedOutboxStore` real (API `Db` simulada con PDO), verificando filas locales **bloqueadas e idempotentes**, ausencia de PII, rechazo de scope, rollback de tablas CI y protección de `sfmc_*`.
 - `tests/runtime/prestashop-growth-db-api-contract.php`: ejecuta el hook bridge puro sobre **PrestaShop 1.7.8.11 / 8.2.8 / 9.1.5** reales con un almacén **en memoria**, sin crear las tablas Growth ni registrar hooks; verifica rechazo del fallback de tienda. El motor MySQL5.7 del runtime sigue bloqueado para DDL Growth.
 

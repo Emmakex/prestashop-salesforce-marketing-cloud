@@ -2,7 +2,7 @@
 
 **Fecha:** 2026-11-13  
 **Estado:** PROPUESTA / SIN APROBACIÓN DE RESPONSABLE, PRIVACIDAD NI DATA 360  
-**Comercio piloto:** ABH / Barcelona Confort. **Producto:** Marketing Cloud Growth/Next + Data 360 (no Engagement).
+**Comercio piloto:** ABH / Barcelona Confort. **Producto:** Marketing Cloud Growth/Next + Data 360 (solo Growth + Data Cloud).
 
 ## Contexto
 

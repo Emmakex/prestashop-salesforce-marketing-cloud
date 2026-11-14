@@ -2,7 +2,7 @@
 
 **Fecha:** 2026-11-13  
 **Estado:** PROPUESTA TÉCNICA SIN APROBACIÓN DE PRODUCCIÓN  
-**Ámbito:** Puente PrestaShop multiinstalación / multicomercio; ABH → Marketing Cloud Growth + Data 360 (no Engagement).
+**Ámbito:** Puente PrestaShop multiinstalación / multicomercio; ABH → Marketing Cloud Growth + Data 360 (solo Growth + Data Cloud).
 
 ## Decisión candidata en CI
 

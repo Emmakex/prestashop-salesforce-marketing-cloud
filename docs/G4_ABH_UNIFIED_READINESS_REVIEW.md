@@ -4,7 +4,7 @@
 
 ## Por qué se añade
 
-La investigación anterior ya aportó OAuth Core, token exchange Data 360, PST `Schema Required`, dos YAML congelados (v0.2 / v0.3), 24 campos revisados, huellas SHA256, catálogo DMO y pruebas reales del módulo PrestaShop. No necesitamos repetir preguntas, SQL, instalaciones ni sustituir Growth por Engagement.
+La investigación anterior ya aportó OAuth Core, token exchange Data 360, PST `Schema Required`, dos YAML congelados (v0.2 / v0.3), 24 campos revisados, huellas SHA256, catálogo DMO y pruebas reales del módulo PrestaShop. No necesitamos repetir preguntas, SQL, instalaciones ni sustituir Growth por producto discontinuado.
 
 El [PR #85](https://github.com/Emmakex/prestashop-salesforce-marketing-cloud/pull/85) dejó los pendientes humanos en **tres grupos**: identidad/finalidad/retención, relación cliente-pedido y esquema final con conformidades. El [PR #86](https://github.com/Emmakex/prestashop-salesforce-marketing-cloud/pull/86) certificó en laboratorio que **MySQL 5.7 ignora CHECK**, y el [PR #87](https://github.com/Emmakex/prestashop-salesforce-marketing-cloud/pull/87) añadió la inspección `Db` real, certificada [3/3](https://github.com/Emmakex/prestashop-salesforce-marketing-cloud/actions/runs/43624367487) para PrestaShop 1.7.8.11/8.2.8/9.1.5.
 
