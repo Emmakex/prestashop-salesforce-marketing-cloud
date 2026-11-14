@@ -48,6 +48,14 @@ final class G3TenantDmoCatalogProbe
         // Account relationship target for the standard Sales Order DMO.
         // A 403/404 means unverified for this OAuth identity, not absent.
         $account = $this->fetch($api . 'ssot__Account__dlm', $transport, true);
+        // Two further standard, OPTIONAL buyer-side DMO candidates.
+        // Schema metadata only: never fetch ContactPointEmail records/values.
+        $accountContact = $this->fetch(
+            $api . 'ssot__AccountContact__dlm', $transport, true
+        );
+        $contactEmail = $this->fetch(
+            $api . 'ssot__ContactPointEmail__dlm', $transport, true
+        );
 
         $objects = [
             'Individual' => self::summarize(
@@ -57,7 +65,8 @@ final class G3TenantDmoCatalogProbe
             'SalesOrder' => self::summarize(
                 $order, 'ssot__SalesOrder__dlm', 'OTHER',
                 ['ssot__Id__c', 'ssot__BillToAccountId__c',
-                 'ssot__SoldToCustomerId__c', 'ssot__BillToContactId__c']
+                 'ssot__SoldToCustomerId__c', 'ssot__BillToContactId__c',
+                 'ssot__BilltoEmailId__c']
             ),
             'Account' => $account === null
                 ? [
@@ -75,6 +84,15 @@ final class G3TenantDmoCatalogProbe
                     $account, 'ssot__Account__dlm', 'PROFILE',
                     ['ssot__Id__c', 'ssot__IndividualId__c']
                 ),
+            'AccountContact' => self::summarizeOptional(
+                $accountContact, 'ssot__AccountContact__dlm', 'UNASSIGNED',
+                ['ssot__Id__c', 'ssot__IndividualId__c',
+                 'ssot__AccountId__c', 'ssot__ContactEmailId__c']
+            ),
+            'ContactPointEmail' => self::summarizeOptional(
+                $contactEmail, 'ssot__ContactPointEmail__dlm', 'RELATED',
+                ['ssot__Id__c', 'ssot__PartyId__c']
+            ),
         ];
 
         // Both directions are inspected. The documented endpoint can list a
@@ -89,8 +107,15 @@ final class G3TenantDmoCatalogProbe
         $accountRelations = $this->fetchAllRelations(
             $api . 'ssot__Account__dlm/relationships', $transport
         );
+        $accountContactRelations = $this->fetchAllRelations(
+            $api . 'ssot__AccountContact__dlm/relationships', $transport
+        );
+        $contactEmailRelations = $this->fetchAllRelations(
+            $api . 'ssot__ContactPointEmail__dlm/relationships', $transport
+        );
         $relation = self::summarizeRelations(
-            $orderRelations, $individualRelations, $accountRelations
+            $orderRelations, $individualRelations, $accountRelations,
+            $accountContactRelations, $contactEmailRelations
         );
 
         return [
@@ -115,7 +140,8 @@ final class G3TenantDmoCatalogProbe
      * Visibility is NOT approval or a proof of source-mapped relationship.
      */
     private static function summarizeRelations(
-        $orderRelations, $individualRelations, $accountRelations
+        $orderRelations, $individualRelations, $accountRelations,
+        $accountContactRelations, $contactEmailRelations
     )
     {
         $result = [
@@ -141,10 +167,26 @@ final class G3TenantDmoCatalogProbe
             'active_sales_order_to_account_bill_to_relation_seen' => false,
             'active_account_to_individual_relation_seen' => false,
             'account_bridge_verified_by_metadata_only' => false,
+            'account_contact_relationship_metadata_accessible' =>
+                $accountContactRelations !== null,
+            'contact_email_relationship_metadata_accessible' =>
+                $contactEmailRelations !== null,
+            'account_contact_relationship_count' => null,
+            'contact_email_relationship_count' => null,
+            'account_contact_relationship_scan_complete' => false,
+            'contact_email_relationship_scan_complete' => false,
+            'sales_order_to_account_contact_bill_to_relation_seen' => false,
+            'account_contact_to_individual_relation_seen' => false,
+            'sales_order_to_contact_email_bill_to_relation_seen' => false,
+            'contact_email_to_individual_party_relation_seen' => false,
+            'account_contact_bridge_approved' => false,
+            'contact_email_bridge_approved' => false,
         ];
         foreach (['sales_order' => $orderRelations,
             'individual' => $individualRelations,
-            'account' => $accountRelations] as $which => $listing) {
+            'account' => $accountRelations,
+            'account_contact' => $accountContactRelations,
+            'contact_email' => $contactEmailRelations] as $which => $listing) {
             if ($listing === null) {
                 continue;
             }
@@ -184,6 +226,26 @@ final class G3TenantDmoCatalogProbe
                     && $target === 'ssot__Individual__dlm';
                 $accountIndividualReverse = $source === 'ssot__Individual__dlm'
                     && $target === 'ssot__Account__dlm';
+
+                // Two other documented standard paths. Never infer that
+                // an email string identifies a ContactPointEmail record:
+                // BilltoEmailId/PartyId refer to DMO *IDs*, not addresses.
+                self::observeBuyerBridge($result, $entry, $source, $target,
+                    'ssot__SalesOrder__dlm', 'ssot__AccountContact__dlm',
+                    'ssot__BillToContactId__c',
+                    'sales_order_to_account_contact_bill_to_relation_seen');
+                self::observeBuyerBridge($result, $entry, $source, $target,
+                    'ssot__AccountContact__dlm', 'ssot__Individual__dlm',
+                    'ssot__IndividualId__c',
+                    'account_contact_to_individual_relation_seen');
+                self::observeBuyerBridge($result, $entry, $source, $target,
+                    'ssot__SalesOrder__dlm', 'ssot__ContactPointEmail__dlm',
+                    'ssot__BilltoEmailId__c',
+                    'sales_order_to_contact_email_bill_to_relation_seen');
+                self::observeBuyerBridge($result, $entry, $source, $target,
+                    'ssot__ContactPointEmail__dlm', 'ssot__Individual__dlm',
+                    'ssot__PartyId__c',
+                    'contact_email_to_individual_party_relation_seen');
 
                 if ($orderAccountForward || $orderAccountReverse) {
                     $side = $orderAccountForward ? 'sourceField' : 'targetField';
@@ -239,6 +301,46 @@ final class G3TenantDmoCatalogProbe
         return $result;
     }
 
+
+    /**
+     * Observe a documented standard foreign-key edge in either direction.
+     * Never surface arbitrary names from tenant metadata; a visible edge
+     * alone never approves the source data mapping or identity resolution.
+     */
+    private static function observeBuyerBridge(array &$out, array $entry,
+        $source, $target, $fromDmo, $toDmo, $foreignKey, $flag)
+    {
+        if ($source === $fromDmo && $target === $toDmo) {
+            $fieldSide = 'sourceField';
+        } elseif ($source === $toDmo && $target === $fromDmo) {
+            $fieldSide = 'targetField';
+        } else {
+            return;
+        }
+        if (isset($entry[$fieldSide]['name'])
+            && $entry[$fieldSide]['name'] === $foreignKey) {
+            $out[$flag] = true;
+        }
+    }
+
+    private static function summarizeOptional($entry, $expectedName,
+        $expectedCategory, array $candidateFields)
+    {
+        if ($entry === null) {
+            return [
+                'metadata_readable' => false,
+                'observed_category' => 'UNVERIFIED',
+                'category_matches_proposal' => false,
+                'data_space_matches_observed_default' => false,
+                'id_field_is_primary_key' => false,
+                'candidate_fields_present' =>
+                    array_fill_keys($candidateFields, false),
+            ];
+        }
+        return self::summarize($entry, $expectedName, $expectedCategory,
+            $candidateFields);
+    }
+
     private static function summarize(array $entry, $expectedName,
         $expectedCategory, array $candidateFields)
     {
@@ -271,7 +373,7 @@ final class G3TenantDmoCatalogProbe
         // with UNASSIGNED category. This fixes the previous opaque
         // true/false mismatch, without treating it as an authorization.
         $category = strtoupper(trim($entry['category']));
-        if (!in_array($category, ['PROFILE', 'ENGAGEMENT', 'OTHER', 'UNASSIGNED'], true)) {
+        if (!in_array($category, ['PROFILE', 'ENGAGEMENT', 'OTHER', 'UNASSIGNED', 'RELATED'], true)) {
             $category = 'UNRECOGNIZED';
         }
         return [
@@ -367,6 +469,14 @@ final class G3TenantDmoCatalogProbe
                 . '/ssot/data-model-objects/ssot__Account__dlm',
             '/services/data/' . self::API_VERSION
                 . '/ssot/data-model-objects/ssot__Account__dlm/relationships',
+            '/services/data/' . self::API_VERSION
+                . '/ssot/data-model-objects/ssot__AccountContact__dlm',
+            '/services/data/' . self::API_VERSION
+                . '/ssot/data-model-objects/ssot__AccountContact__dlm/relationships',
+            '/services/data/' . self::API_VERSION
+                . '/ssot/data-model-objects/ssot__ContactPointEmail__dlm',
+            '/services/data/' . self::API_VERSION
+                . '/ssot/data-model-objects/ssot__ContactPointEmail__dlm/relationships',
         ];
         if (!in_array($path, $allowed, true)) {
             throw new RuntimeException('g3_dmo_path_not_allowlisted');
