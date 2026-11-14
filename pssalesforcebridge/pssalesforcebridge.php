@@ -701,10 +701,25 @@ class PsSalesforceBridge extends Module
         }
 
         return $output
+            . $this->renderProviderStatus()
             . $this->renderHealthDashboard()
             . $this->renderDataCloudReadiness()
             . $this->renderRetentionStatus()
             . $this->renderForm();
+    }
+
+    private function renderProviderStatus()
+    {
+        $merchant = Configuration::get(self::CONFIG_MERCHANT);
+        $provider = Configuration::get(self::CONFIG_PROVIDER);
+        $mode = Configuration::get(self::CONFIG_MODE);
+        if (MerchantProviderGate::growthTestSelected($merchant, $provider, $mode)) {
+            return $this->displayInformation($this->l('Growth + Data Cloud selected (Test). Existing connection evidence is preserved. Data Cloud ingestion and campaign sends remain blocked.'));
+        }
+        if ($this->legacyCaptureAllowed()) {
+            return $this->displayInformation($this->l('Engagement legacy selected for another merchant. Only explicitly configured providers can use the legacy paths.'));
+        }
+        return $this->displayError($this->l('No approved provider is selected. Legacy capture, backfill and outbound are blocked.'));
     }
 
     private function startCustomerBackfill()
@@ -904,7 +919,14 @@ class PsSalesforceBridge extends Module
     private function testConnection()
     {
         if (!$this->legacyCaptureAllowed()) {
-            return $this->displayInformation($this->l('Legacy Engagement connection test is not applicable. Growth uses the existing Salesforce Core and Data Cloud certification. No write or send was attempted.'));
+            if (MerchantProviderGate::growthTestSelected(
+                Configuration::get(self::CONFIG_MERCHANT),
+                Configuration::get(self::CONFIG_PROVIDER),
+                Configuration::get(self::CONFIG_MODE)
+            )) {
+                return $this->displayInformation($this->l('Growth uses the existing Salesforce Core and Data Cloud certification. This legacy Engagement test is not applicable; no request was made.'));
+            }
+            return $this->displayError($this->l('Select a merchant and provider before testing the connection.'));
         }
         try {
             $client = new AuthClient(
