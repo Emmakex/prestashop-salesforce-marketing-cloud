@@ -42,3 +42,19 @@ La alternativa B es la que merece revisión primero: usa datos y comprobaciones 
 - `docs/G3_08_BUSINESS_GOAL_COVERAGE.md`, `docs/G3_CUSTOMER_ORDER_RELATION_TOPOLOGY_DECISION.md`, issue #45.
 - Salesforce oficial: https://developer.salesforce.com/docs/marketing/marketing-cloud-growth/guide/mc-manage-flows.html — existen Flows ligados a campañas Marketing Cloud Next; **no certifica configuración ni activación para ABH**.
 - Salesforce oficial: https://developer.salesforce.com/docs/data/data-cloud-int/guide/c360-a-ingestion-api-schema-req.html — restricciones de schema y cambios no reversibles tras publicarlo.
+
+
+### Corte adicional: resultado triestado de pedido (14/11/2026, revisión sintética)
+
+El código histórico `OrderSyncLedger::hasOrderForCart()` usa consultas `Db::getValue()` y entrega un booleano. Un `false` o valor escalar `0` no acredita por sí solo si **no existe** pedido o si falló la consulta. Antes de reutilizar la comprobación en Growth, hay que exigir una semántica de lectura diferenciada.
+
+El intérprete puro `tests/review/G3GrowthOrderEvidenceInterpreter.php` distingue, para **dos lecturas independientes** (tabla nativa de pedidos y ledger del conector), `found`, `none` y `unknown`:
+
+- Solo un resultado exitoso y explícitamente vacío (`[]`) equivale a ausencia local *candidata*. Un `false`, `null`, `0`, formato incorrecto, campos adicionales o cruce de `shop_id/cart_id` producen `unknown` y retención de la acción.
+- Cualquier pedido encontrado en una de las lecturas supone carrito convertido, incluso si la segunda lectura falla. Una consulta devuelta como desconocida nunca permite inferir no compra.
+- Cada fila sintética se verifica por `id_shop`, `id_cart` e `id_order` de forma estricta; no se retorna el ID de pedido ni se procesan nombres, direcciones o correos. Las entradas del ensayo usan exclusivamente identificadores inventados.
+- La prueba `tests/g3-growth-order-evidence-contract.php` combina el intérprete con el guard previo `G3GrowthCartSourcePresendReview`, comprueba fallos y rechazo de estados ambiguos para ambas fuentes; la CI lo ejecuta en PHP 7.1/8.5.
+- **No hay un lector SQL Growth implementado, ni estas pruebas consultan PrestaShop.** Un adaptador futuro requerirá seleccionar `id_shop,id_cart,id_order` con una lectura que distinga resultado exitoso vacío de error, acotar el alcance por instalación, revalidar cerca del despacho, cerrar la carrera compra/envío y someterse a pruebas en las tres versiones soportadas.
+- Incluso si ambas lecturas sintéticas están vacías, la salida es `no_order_candidate_only`; `absence_certified_in_live_prestashop`, autorización Growth, envío e ingesta siguen `false`. Esto **no** cierra G3 ni autoriza G7.
+
+**Estado de la ADR:** candidata sin firma; la alternativa B sigue sin seleccionar. Sin upgrade, cambios de BO, publicación del esquema PST, Data Stream ni envío.
