@@ -143,3 +143,22 @@ Solo admite `customer` y `order` con los eventos ya registrados por hooks de Pre
 Ahora existe también una prueba de integración de extremo a extremo **local**: `tests/integration/g3_growth_provider_outbox_bridge.php` enlaza las dos clases del módulo con `G3GrowthOutboxSandboxStore` y las dos tablas exclusivas de Growth dentro de la BD desechable `g3_ci`. Se ejecuta sobre MySQL 8/MariaDB 10.11, comprueba reintentos, restauración de timestamp, fallo de transacción, varios comercios/tiendas/entidades, historial que no retrocede, bloqueo SQL de `status`, rechazo de Engagement/carts, rechazo de rollback no vacío y conservación de contadores de las tres tablas legadas. La otra prueba `tests/growth-provider-outbox-bridge-contract.php` verifica el comportamiento sin DB en PHP 7.1/8.5.
 
 **Importante:** se trata de un contrato funcional ya codificado, pero `pssalesforcebridge.php` no lo carga ni lo llama, no hay configuración de proveedor nueva, upgrade ejecutable ni migración de BC. Las tablas `g3_*` son exclusivamente de CI. Implementar una migración real con prefijo PrestaShop, datos de cliente, política de retención y acoplamiento a hooks exige aprobación separada después de G3. No es un Growth sender, y ninguna operación sale a Salesforce. Barcelona Confort continúa en **0.7.1, modo Test**, sin ZIP ni acceso SQL del usuario.
+
+
+## Preflight físico del upgrade por prefijo (14/11/2026): código real, **no ejecutado en tiendas**
+
+El componente `pssalesforcebridge/src/Growth/GrowthOutboxSchemaPlan.php` entrega un **plan puro, determinista y sin conexión SQL** para la siguiente actualización de la extensión en PrestaShop 1.7.8.x/8/9. Reutiliza `ExplicitProviderRouter` para validar comercio/versión/proveedor/namespace y rechaza cualquier selección de Engagement; no lee `_DB_PREFIX_` ni extrapola el namespace del dominio o de la base. El prefijo debe suministrarse explícitamente y cumplir una lista segura de caracteres y longitud.
+
+El plan propone **tres tablas nuevas**, siempre separadas de `sfmc_*`:
+
+| Tabla relativa al prefijo | Responsabilidad | Protección |
+| --- | --- | --- |
+| `growth_provider_binding_v1` | Vínculo explícito namespace/comercio/versión/proveedor Growth | `provider=marketing_cloud_growth`, `mode=test`, `status=blocked`, CHECK SQL |
+| `growth_outbox_v1` | Eventos de cliente/pedido minimizados, fingerprint único por namespace | FK a binding, CHECK `status=blocked`, InnoDB |
+| `growth_entity_ledger_v1` | Secuencia aceptada local por instalación/tienda/entidad | FK a outbox, CHECK `status=blocked`, InnoDB |
+
+Los identificadores de clave foránea se derivan de un hash corto del **prefijo de instalación** para evitar colisiones de nombre de constraints en un mismo esquema MySQL con varias tiendas PrestaShop. La secuencia de creación es `binding → outbox → ledger`; el orden previsto de desinstalación vacía es inverso. **No se utiliza `CREATE TABLE IF NOT EXISTS`:** que una tabla exista no demuestra que tenga el esquema esperado. El preflight clasifica inventario como `absent_review_only`, `partial_install_manual_review` o `present_requires_schema_integrity_review`; ninguna clasificación habilita un upgrade automático o encubre una instalación parcial.
+
+Se añaden contratos en `tests/growth-schema-plan-contract.php` (PHP 7.1/8.5) y `tests/integration/g3_growth_prefixed_schema_preview.php` (MySQL 8/MariaDB 10.11 exclusivamente en `g3_ci`). Esas pruebas ejecutan el DDL generado sobre **dos prefijos independientes** y comprueban CHECK bloqueante, unicidad de fingerprint, FK de outbox a selección de proveedor, FK del ledger al outbox, ausencia de efectos en `g3_sfmc_*`, rechazo de rollback no vacío y desmontaje de **solo** las tablas sintéticas ya vacías.
+
+**Límite explícito:** esta clase puede *describir* una migración, pero no contiene llamadas DB, no la ejecuta ni está enlazada al método `install()`, a `upgrade-*.php`, ni al bootstrap del módulo. No se ha elegido todavía el namespace global G3-01, ni aprobado privacidad/retención G3-07, ni autorizado una migración futura. Los SQL generados por el plan **no deben ejecutarse sobre Barcelona Confort**; hacerlo exige revisión del esquema real de cada tienda, backup, guardas transaccionales/idempotencia, revisión de prefijos y autorización de upgrade separada. El producto instalado sigue en **0.7.1, Test**, sin nuevo ZIP ni cambios SQL en la tienda.
