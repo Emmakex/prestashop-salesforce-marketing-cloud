@@ -1,6 +1,6 @@
 # BC — newsletter cross-source aggregate results (2026-11-13)
 
-> **Product correction:** ABH runs Marketing Cloud Growth (Next) and Data 360, solo Growth + Data Cloud. Historical references below to All Subscribers, publication lists or SubscriberKey protocolo discontinuado require a Growth-specific replacement based on Salesforce Core/Data 360 consent/purpose/suppression and Flow rules. These producto discontinuado-only terms do not justify requesting an producto discontinuado account. See [`ABH_GROWTH_CANONICAL_TARGET.md`](ABH_GROWTH_CANONICAL_TARGET.md).
+> **Product correction:** ABH runs Marketing Cloud Growth (Next) and Data 360, solo Growth + Data Cloud. Historical references below to modelo de supresión Growth aún sin aprobar, reglas de exclusión Growth pendientes de G6 or identificador de origen pendiente de G3 protocolo discontinuado require a Growth-specific replacement based on Salesforce Core/Data 360 consent/purpose/suppression and Flow rules. These producto discontinuado-only terms do not justify requesting an producto discontinuado account. See [`ABH_GROWTH_CANONICAL_TARGET.md`](ABH_GROWTH_CANONICAL_TARGET.md).
 
 
 **Evidence source:** operator's one-page phpMyAdmin PDF, `export (2).pdf`,
@@ -55,7 +55,7 @@ against the exact SQL column order.
   newsletter contacts is a separate purpose and workflow.
 - **394** email keys span multiple `bc_customer` rows irrespective
   of newsletter status. This does not authorize linking identities or
-  merging customers, orders, cart histories, or subscriber keys.
+  merging customers, orders, cart histories, or identificador de origen pendiente de G3s.
 - **27** positive-flag email keys have at least one guest customer row.
   This does not mean all are distinct people or currently messageable.
 - No positive newsletter *customer account* rows were found in
@@ -69,8 +69,8 @@ against the exact SQL column order.
 - Customer-account flags with opposing values may reflect registration
   changes or newer opt-outs. `newsletter=0` alone cannot be inferred
   to be a proved unsubscribe or a never-subscribed account.
-- Salesforce Marketing Cloud subscriber key mapping across separate
-  PrestaShop installations, all-subscribers and publication-list status,
+- Salesforce Marketing Cloud identificador de origen pendiente de G3 mapping across separate
+  PrestaShop installations, modelo de supresión Growth aún sin aprobar and reglas de exclusión Growth pendientes de G6 status,
   exclusions/suppression, global unsubscribes and complaints.
 - **Resolved on 2026-11-13 via operator SQL:** global
   `PS_SFMC_MODE=test`, `PS_SFMC_CART_CONSENT_MODE=marketing_optin`,
@@ -97,9 +97,9 @@ against the exact SQL column order.
    `active=1` over conflicting current status.
 4. Do not treat 91 conflict-free email keys as authorized to send.
    A future BU-specific, read-only current status/suppression reader
-   must check correct SubscriberKey and publication/All Subscribers
+   must check correct identificador de origen pendiente de G3 and publication/modelo de supresión Growth aún sin aprobar
    exclusions immediately before any orquestadores discontinuados entry.
-5. Protect multi-merchant `SubscriberKey` namespace: current
+5. Protect multi-merchant `identificador de origen pendiente de G3` namespace: current
    `ps_{shop_id}_{customer_id}` keys collide across installations
    sharing the same BU unless migration/mapping is deliberately designed.
 6. Confirm the actual PrestaShop newsletter collection wording,
@@ -108,7 +108,7 @@ against the exact SQL column order.
 
 Official Salesforce references for pending implementation:
 - https://developer.salesforce.com/docs/marketing/marketing-cloud/guide/listsubscriber
-- https://help.salesforce.com/s/articleView?id=mktg.mc_es_publication_lists.htm&type=5
+- https://help.salesforce.com/s/articleView?id=mktg.mc_es_reglas de exclusión Growth pendientes de G6.htm&type=5
 - https://help.salesforce.com/s/articleView?id=000389759&type=1
 
 **This PR is evidence + safety preflight only. It makes no module runtime,

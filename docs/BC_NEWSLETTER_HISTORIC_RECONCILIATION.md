@@ -34,7 +34,7 @@ Estado: **diagnóstico offline/SQL de solo lectura**. 13/11/2026.
   emails diferentes necesariamente. No descartar invitados por estatus.
 - Ni un email activo en SQL ni las IPs equivalen a autorización real
   de envío: comprobar texto de captación, finalidad, bajas, reclamaciones,
-  supresiones y `All Subscribers` del BU correcto de Salesforce.
+  supresiones y `modelo de supresión Growth aún sin aprobar` del BU correcto de Salesforce.
 
 ## Auditoría cruzada
 
@@ -68,9 +68,9 @@ la semántica de esas fechas.
 2. Conservar el histórico comercial cuando proceda; separar pertenencia
    a dataset analítico de elegibilidad de canal/purpose.
 3. La audiencia publicitaria se deduplica por identidad Salesforce
-   aprobada y `SubscriberKey` estable, con correspondencia shop/merchant.
+   aprobada y `identificador de origen pendiente de G3` estable, con correspondencia shop/merchant.
    No reactivar `Unsubscribed` desde el flag local.
-4. Se debe consultar `All Subscribers`, estado por publication list
+4. Se debe consultar `modelo de supresión Growth aún sin aprobar`, estado por reglas de exclusión Growth pendientes de G6
    cuando corresponda y todas las supresiones/bajas/objeciones de Salesforce.
    **Sin adaptador real de lectura certificado, BC sigue en Test**.
 5. Los carritos históricos no se enviarán retroactivamente a orquestadores discontinuados

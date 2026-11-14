@@ -9,7 +9,7 @@
 
 ABH dispone de Marketing Cloud Growth (Marketing Cloud Next) integrado con Salesforce Core (Lightning) y Data Cloud/Data 360. Se configuró la aplicación externa `ABH PrestaShop Marketing Cloud Growth`, OAuth Client Credentials y el conector Data Cloud `PST`. Las certificaciones sin escritura fueron satisfactorias.
 
-El módulo PrestaShop 0.7.1 tiene además una implementación histórica de producto discontinuado, con almacenamiento discontinuado y orquestador discontinuado `(endpoint discontinuado)`. Su existencia técnica **no** demuestra licencia ni compatibilidad con Growth de ABH. Al confundir ambas plataformas se pidieron falsos accesos Installed Packages/producto discontinuado y se hicieron pruebas protocolo discontinuado que no aproximaban el piloto a su objetivo.
+El módulo PrestaShop 0.7.1 tiene además una implementación histórica de producto discontinuado, con almacenamiento discontinuado y orquestador discontinuado `(endpoint discontinuado)`. Su existencia técnica **no** demuestra licencia ni compatibilidad con Growth de ABH. Al confundir ambas plataformas se pidieron falsos accesos mecanismo de configuración retirado/producto discontinuado y se hicieron pruebas protocolo discontinuado que no aproximaban el piloto a su objetivo.
 
 ## Decisión
 
@@ -17,7 +17,7 @@ El módulo PrestaShop 0.7.1 tiene además una implementación histórica de prod
 2. Mantener los componentes PrestaShop de captura/ledger/colas/recuperación comunes. Adaptadores de salida aislados, con prefijo de identidad por merchant.
 3. El destino legado producto discontinuado permanece como opción **no habilitada** en ABH, sin transferir credenciales ni clientes entre proveedores.
 4. Conservar evidencia ya certificada Core OAuth/token exchange. Siguiente gate: aprobar esquema PST, fuente de verdad/identidad/tz/retención/categorías. Sin esquema aprobado, no ingesta.
-5. Consentimiento y supresión deben derivarse del modelo Growth/Core/Data 360 realmente disponible, no de All Subscribers/Publication Lists protocolo discontinuado.
+5. Consentimiento y supresión deben derivarse del modelo Growth/Core/Data 360 realmente disponible, no de modelo de supresión Growth aún sin aprobar/reglas de exclusión Growth pendientes de G6 protocolo discontinuado.
 6. BC permanece en Test hasta circuito Growth completo, validación sintética, aprobación del propietario y rollback definido.
 
 ## Alternativas rechazadas
