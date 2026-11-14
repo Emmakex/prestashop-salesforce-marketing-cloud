@@ -1,85 +1,40 @@
 <?php
 
+/**
+ * Growth-only protected cron. Until G3/G4 and sender certification, the
+ * endpoint only reports blocked status. No old queue or campaign is touched.
+ */
 class PsSalesforceBridgeCronModuleFrontController extends ModuleFrontController
 {
     public function initContent()
     {
-        // Machine-to-machine endpoint: do not initialize/render theme content.
-        // Cron execution must not depend on front-office presentation state.
-        $this->setNoCacheHeaders();
-
-        $provided = (string) Tools::getValue('token');
-        $expected = (string) Configuration::get(PsSalesforceBridge::CONFIG_CRON_TOKEN);
-
-        if ($expected === '' || $provided === '' || !hash_equals($expected, $provided)) {
-            $this->respond(['ok' => false, 'error' => 'unauthorized'], 403);
-        }
-
-        try {
-            $backfill = $this->module->processCustomerBackfill();
-            $cartDetection = $this->module->processCartAbandonmentCandidates(100);
-            $customerDelivery = $this->module->processCustomerQueue(50);
-            $orderDelivery = $this->module->processOrderQueue(50);
-            $journeyDelivery = $this->module->processAbandonedCartJourneyQueue(20);
-            $retention = $this->processRetentionSafely();
-
-            $this->respond([
-                'ok' => true,
-                'result' => [
-                    'customer_backfill' => $backfill,
-                    'cart_detection' => $cartDetection,
-                    'customer_delivery' => $customerDelivery,
-                    'order_delivery' => $orderDelivery,
-                    'journey_delivery' => $journeyDelivery,
-                    'retention' => $retention,
-                ],
-            ], 200);
-        } catch (\Throwable $e) {
-            $this->logOperationalFailure('cron_failed', $e);
-            $this->respond(['ok' => false, 'error' => 'cron_failed'], 500);
-        }
-    }
-
-    private function setNoCacheHeaders()
-    {
         header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
         header('Pragma: no-cache');
         header('X-Robots-Tag: noindex, nofollow', true);
-    }
 
-    private function processRetentionSafely()
-    {
+        $provided = (string) Tools::getValue('token');
+        $expected = (string) Configuration::get(PsSalesforceBridge::CONFIG_CRON_TOKEN);
+        if ($provided === '' || $expected === '' || !hash_equals($expected, $provided)) {
+            $this->respond(['ok' => false, 'error' => 'unauthorized'], 403);
+        }
         try {
-            return $this->module->processRetention(false);
+            $this->respond($this->module->cronReport(), 200);
         } catch (\Throwable $e) {
-            $this->logOperationalFailure('retention_failed', $e);
-
-            return [
-                'ok' => false,
-                'error' => 'retention_failed',
-            ];
+            if (class_exists('PrestaShopLogger')) {
+                PrestaShopLogger::addLog(
+                    'Growth bridge cron status unavailable',
+                    3, null, 'PsSalesforceBridge'
+                );
+            }
+            $this->respond(['ok' => false, 'error' => 'cron_unavailable'], 500);
         }
     }
 
-    private function logOperationalFailure($event, \Throwable $error)
+    private function respond(array $data, $code)
     {
-        if (!class_exists('PrestaShopLogger')) {
-            return;
-        }
-
-        PrestaShopLogger::addLog(
-            'Salesforce bridge ' . (string) $event . ' [' . get_class($error) . ']',
-            3,
-            null,
-            'PsSalesforceBridge'
-        );
-    }
-
-    private function respond(array $payload, $status)
-    {
-        http_response_code((int) $status);
+        http_response_code((int) $code);
         header('Content-Type: application/json; charset=utf-8');
-        echo json_encode($payload);
+        echo json_encode($data);
         exit;
     }
 }

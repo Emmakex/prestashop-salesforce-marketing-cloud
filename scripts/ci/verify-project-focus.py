@@ -1,20 +1,14 @@
 #!/usr/bin/env python3
-"""Fail-closed check of *recorded* ABH provider and activation decisions.
-
-This job is offline and does NOT prove live Salesforce tenant settings,
-PrestaShop runtime configuration, lawful consent or campaign readiness.
-A deliberate contract change requires a reviewed architecture decision.
-"""
+"""Growth + Data Cloud ONLY: enforce product focus without approving live use."""
 import json
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-CONTRACT = ROOT / "config" / "project-contract.json"
-
 EXPECTED = {
     "schema_version": 1,
     "repository": "Emmakex/prestashop-salesforce-marketing-cloud",
-    "architecture": "reusable_multi_merchant_provider_adapters",
+    "architecture": "growth_only_multi_shop",
+    "delivery_policy": "growth_only_no_other_salesforce_product",
 }
 PILOT_EXPECTED = {
     "merchant": "ABH",
@@ -23,7 +17,6 @@ PILOT_EXPECTED = {
     "salesforce_platform": "salesforce_core_lightning",
     "data_platform": "data_cloud_data_360",
     "route": "salesforce_core_rest_or_data_360_ingestion",
-    "engagement_for_pilot": False,
     "prestashop_runtime_mode_observed": "test",
     "cart_consent_mode_observed": "marketing_optin",
     "oauth_status": "certified_no_write",
@@ -35,101 +28,111 @@ PILOT_EXPECTED = {
     "live_campaign_sends_authorized": False,
     "historical_backfill_authorized": False,
     "external_sender_provider": "not_implemented_for_pilot",
+    "target_module_version": "0.8.0",
 }
 PROVIDER_EXPECTED = {
-    ("marketing_cloud_growth", "pilot"): True,
-    ("marketing_cloud_growth", "enable_production"): False,
-    ("marketing_cloud_engagement", "pilot"): False,
-    ("marketing_cloud_engagement", "enable_for_abh"): False,
+    "marketing_cloud_growth": {
+        "pilot": True,
+        "transport": "salesforce_core_rest_data_cloud",
+        "enable_production": False,
+    }
 }
 
-
 def validate_contract(record):
-    """Return errors, not secrets nor original data."""
-    errors = []
     if not isinstance(record, dict):
         return ["contract_not_object"]
-    for field, wanted in EXPECTED.items():
-        if record.get(field) != wanted:
-            errors.append("contract_" + field)
-    versions = record.get("supported_prestashop_families")
-    if versions != ["1.7.8.x", "8.x", "9.x"]:
-        errors.append("prestashop_compatibility_changed")
+    errors = []
+    for key, expected in EXPECTED.items():
+        if record.get(key) != expected:
+            errors.append("contract_" + key)
+    if record.get("supported_prestashop_families") != ["1.7.8.x", "8.x", "9.x"]:
+        errors.append("versions_changed")
     pilot = record.get("pilot")
     if not isinstance(pilot, dict):
         return errors + ["pilot_not_object"]
-    for field, wanted in PILOT_EXPECTED.items():
-        observed = pilot.get(field)
-        if type(observed) is not type(wanted) or observed != wanted:
-            errors.append("pilot_" + field)
-    if type(pilot.get("cart_abandon_minutes_observed")) is not int or pilot.get(
-        "cart_abandon_minutes_observed"
-    ) != 60:
-        errors.append("pilot_cart_abandon_minutes_observed")
+    for key, expected in PILOT_EXPECTED.items():
+        value = pilot.get(key)
+        if type(value) is not type(expected) or value != expected:
+            errors.append("pilot_" + key)
     if pilot.get("installed_module_version_observed") != "0.7.1":
-        errors.append("pilot_installed_module_version_observed")
+        errors.append("bc_installed_release_overstated")
+    if type(pilot.get("cart_abandon_minutes_observed")) is not int \
+            or pilot.get("cart_abandon_minutes_observed") != 60:
+        errors.append("bc_cart_minutes_changed")
     if record.get("current_delivery_gate") != "pst_schema_data_owner_approval":
         errors.append("delivery_gate_changed")
-    providers = record.get("provider_registry")
-    if not isinstance(providers, dict):
-        return errors + ["provider_registry_not_object"]
-    for (name, key), value in PROVIDER_EXPECTED.items():
-        data = providers.get(name, {})
-        if not isinstance(data, dict) or data.get(key) is not value:
-            errors.append("provider_" + name + "_" + key)
-    if providers.get("marketing_cloud_growth", {}).get("transport") != "core_rest_data360":
-        errors.append("growth_transport_invalid")
-    if providers.get("marketing_cloud_engagement", {}).get("transport") != "legacy_adapter_only":
-        errors.append("engagement_transport_invalid")
+    if record.get("provider_registry") != PROVIDER_EXPECTED:
+        errors.append("product_not_growth_only")
     return errors
 
-
-REQUIRED_DOCUMENT_MARKERS = {
-    "AGENTS.md": [
-        "Marketing Cloud Growth", "Data Cloud / Data 360", "NO Marketing Cloud Engagement",
-        "PS_SFMC_MODE=test", "G3",
-    ],
+REQUIRED_DOCS = {
+    "AGENTS.md": ["Marketing Cloud Growth", "Data Cloud", "G3", "Test"],
     "docs/PROJECT_DEVELOPMENT_RULES.md": [
-        "G3 esquema PST", "Marketing Cloud Growth", "BLOQUEADO", "AGENTS.md",
+        "Marketing Cloud Growth", "Data Cloud", "G3", "BLOQUEADO",
     ],
     "docs/ABH_GROWTH_CANONICAL_TARGET.md": [
-        "Marketing Cloud Growth", "NOT Engagement", "Schema Required",
+        "Marketing Cloud Growth", "Data Cloud", "Schema Required",
     ],
-    "docs/PROJECT_DRIFT_POSTMORTEM.md": [
-        "PR #36", "PR #40", "PR #41",
-    ],
-    "README.md": [
-        "Marketing Cloud Growth", "AGENTS.md",
-    ],
-    "ROADMAP.md": [
-        "ABH Growth + Data 360", "docs/PROJECT_DEVELOPMENT_RULES.md",
-    ],
+    "README.md": ["Marketing Cloud Growth", "Data Cloud", "AGENTS.md"],
+    "ROADMAP.md": ["Marketing Cloud Growth", "Data Cloud", "G3"],
 }
-
+REQUIRED_GROWTH_FILES = [
+    "pssalesforcebridge/pssalesforcebridge.php",
+    "pssalesforcebridge/src/Growth/GrowthOnlyHookPreflight.php",
+    "pssalesforcebridge/controllers/front/cron.php",
+    "pssalesforcebridge/upgrade/upgrade-0.8.0.php",
+]
+FORBIDDEN_MODULE_FILES = [
+    "pssalesforcebridge/src/Salesforce/AuthClient.php",
+    "pssalesforcebridge/src/Salesforce/RestClient.php",
+    "pssalesforcebridge/src/Salesforce/JourneyClient.php",
+    "pssalesforcebridge/src/Customer/CustomerDataExtensionWriter.php",
+    "pssalesforcebridge/src/Order/OrderDataExtensionWriter.php",
+    "pssalesforcebridge/src/Queue/AbandonedCartJourneyProcessor.php",
+    "pssalesforcebridge/src/Journey/JourneyEventAuditRepository.php",
+    "pssalesforcebridge/controllers/front/recover.php",
+]
 
 def validate_repository(root=ROOT):
-    errors = []
     try:
-        record = json.loads((root / "config/project-contract.json").read_text(encoding="utf-8"))
+        contract = json.loads((root / "config/project-contract.json").read_text("utf-8"))
     except (OSError, UnicodeError, ValueError):
-        return ["project_contract_missing_or_invalid"]
-    errors.extend(validate_contract(record))
-    for path, markers in REQUIRED_DOCUMENT_MARKERS.items():
+        return ["contract_unreadable"]
+    errors = validate_contract(contract)
+    for path, keywords in REQUIRED_DOCS.items():
         try:
-            body = (root / path).read_text(encoding="utf-8")
+            content = (root / path).read_text("utf-8")
         except (OSError, UnicodeError):
-            errors.append("document_missing_" + path)
+            errors.append("missing_doc_" + path)
             continue
-        for marker in markers:
-            if marker not in body:
-                errors.append("missing_canonical_marker_" + path + "_" + marker)
+        for keyword in keywords:
+            if keyword not in content:
+                errors.append("missing_doc_keyword_" + path + "_" + keyword)
+    for path in REQUIRED_GROWTH_FILES:
+        if not (root / path).is_file():
+            errors.append("growth_module_file_missing_" + path)
+    for path in FORBIDDEN_MODULE_FILES:
+        if (root / path).exists():
+            errors.append("old_adapter_file_still_shipped_" + path)
+    module = root / "pssalesforcebridge/pssalesforcebridge.php"
+    try:
+        source = module.read_text("utf-8")
+    except (OSError, UnicodeError):
+        source = ""
+    for forbidden in [
+        "CustomerDataExtensionWriter", "JourneyClient", "RestClient",
+        "processCustomerQueue(", "processAbandonedCartJourneyQueue(",
+    ]:
+        if forbidden in source:
+            errors.append("old_adapter_function_still_loaded_" + forbidden)
+    if " $this->version = '0.8.0';" not in source:
+        errors.append("growth_only_module_version_mismatch")
     return errors
-
 
 if __name__ == "__main__":
     problems = validate_repository()
     if problems:
         for problem in problems:
-            print("ABH provider focus FAIL: " + problem)
+            print("Growth-only product focus FAIL: " + problem)
         raise SystemExit(1)
-    print("ABH provider focus PASS: Growth + Data 360, Test only; G3 schema approval next.")
+    print("Growth-only product focus PASS: Data Cloud, Test, no legacy adapter or sends.")

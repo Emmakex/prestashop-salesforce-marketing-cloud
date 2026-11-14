@@ -43,7 +43,6 @@ final class InstallationReadinessDashboard
         $html .= '<p><strong>Still requires separate approval:</strong> installation namespace uniqueness, '
             . 'historical date provenance, privacy/consent/retention, field dictionary, Data Stream '
             . 'refresh policy, DLO-to-DMO mapping, and final PST schema/stream activation.</p>';
-        $html .= '<p>Existing Marketing Cloud Engagement health above is separate from Data Cloud readiness.</p>';
         return $html . '</div>';
     }
 

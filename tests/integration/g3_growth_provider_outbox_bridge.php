@@ -48,6 +48,14 @@ function g3BridgeCount(PDO $db, $table)
     ], true)) {
         throw new RuntimeException('g3_bridge_unapproved_table');
     }
+    // Preserve absence as null. Growth-only CI never recreates old tables.
+    if (strpos($table, 'g3_sfmc_') === 0) {
+        $check = $db->query("SELECT COUNT(*) FROM information_schema.TABLES "
+            . "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = '" . $table . "'");
+        if ((int) $check->fetchColumn() === 0) {
+            return null;
+        }
+    }
     return (int) $db->query('SELECT COUNT(*) FROM ' . $table)->fetchColumn();
 }
 function g3BridgeCapture($router, $store, $shop, $entity, $id, $event, $hash)
@@ -142,15 +150,11 @@ function g3BridgeTest(PDO $db)
         "SELECT COUNT(*) FROM g3_growth_outbox_v1 WHERE status <> 'blocked'"
     )->fetchColumn() === 0, 'unblocked_persistent_row');
 
-    $legacyRouter = new ExplicitProviderRouter(
-        '8.2.8', 'OTHER_MERCHANT', ExplicitProviderRouter::ENGAGEMENT_LEGACY,
-        'growth_ci_legacy', 'test'
-    );
     $before = g3BridgeCount($db, 'g3_growth_outbox_v1');
-    g3BridgeRejected(function () use ($legacyRouter, $store) {
-        g3BridgeCapture($legacyRouter, $store, 1, 'customer', 44,
-            'CUSTOMER_CREATED', 'a');
-    }, 'engagement_was_accepted_as_growth');
+    g3BridgeRejected(function () {
+        new ExplicitProviderRouter('8.2.8', 'OTHER_MERCHANT',
+            'marketing_cloud_engagement', 'growth_ci_other', 'test');
+    }, 'non_growth_provider_was_accepted');
     g3BridgeRejected(function () use ($router, $store) {
         g3BridgeCapture($router, $store, 1, 'cart', 44,
             'CART_ABANDONED', 'a');

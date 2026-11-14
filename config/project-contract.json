@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
   "repository": "Emmakex/prestashop-salesforce-marketing-cloud",
-  "product": "Puente PrestaShop con Salesforce",
-  "architecture": "reusable_multi_merchant_provider_adapters",
+  "product": "Puente PrestaShop con Marketing Cloud Growth + Data Cloud",
+  "architecture": "growth_only_multi_shop",
   "supported_prestashop_families": [
     "1.7.8.x",
     "8.x",
@@ -15,7 +15,6 @@
     "salesforce_platform": "salesforce_core_lightning",
     "data_platform": "data_cloud_data_360",
     "route": "salesforce_core_rest_or_data_360_ingestion",
-    "engagement_for_pilot": false,
     "installed_module_version_observed": "0.7.1",
     "prestashop_runtime_mode_observed": "test",
     "cart_consent_mode_observed": "marketing_optin",
@@ -28,20 +27,17 @@
     "customer_data_live_ingestion_authorized": false,
     "live_campaign_sends_authorized": false,
     "historical_backfill_authorized": false,
-    "external_sender_provider": "not_implemented_for_pilot"
+    "external_sender_provider": "not_implemented_for_pilot",
+    "target_module_version": "0.8.0"
   },
   "provider_registry": {
     "marketing_cloud_growth": {
       "pilot": true,
-      "transport": "core_rest_data360",
+      "transport": "salesforce_core_rest_data_cloud",
       "enable_production": false
-    },
-    "marketing_cloud_engagement": {
-      "pilot": false,
-      "transport": "legacy_adapter_only",
-      "enable_for_abh": false
     }
   },
   "current_delivery_gate": "pst_schema_data_owner_approval",
-  "next_action": "approve_PSCustomer_PSOrder_schema_identity_retention_and_timezone_without_publishing"
+  "next_action": "approve_PSCustomer_PSOrder_schema_identity_retention_and_timezone_without_publishing",
+  "delivery_policy": "growth_only_no_other_salesforce_product"
 }
