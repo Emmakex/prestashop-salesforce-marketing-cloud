@@ -166,7 +166,6 @@ def review(profile, snapshot, packet, field_owner, mapping, project, yaml_bytes)
     if not isinstance(pilot, dict) or any(pilot.get(k) != expected for k, expected in {
         "merchant": "ABH", "provider": "marketing_cloud_growth",
         "data_platform": "data_cloud_data_360",
-        "engagement_for_pilot": False,
         "installed_module_version_observed": "0.7.1",
         "prestashop_runtime_mode_observed": "test",
         "data_cloud_schema_status": "schema_required_unapproved",
