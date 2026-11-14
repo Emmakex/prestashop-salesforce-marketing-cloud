@@ -157,6 +157,7 @@ jobs:
           php tests/g3-growth-order-evidence-contract.php
           php tests/growth-local-order-presence-contract.php
           php tests/growth-explicit-provider-routing-contract.php
+          php tests/merchant-provider-boundary-contract.php
           php tests/growth-provider-outbox-bridge-contract.php
           php tests/growth-schema-plan-contract.php
           php tests/growth-sql-engine-gate-contract.php
