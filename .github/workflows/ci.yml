@@ -155,6 +155,7 @@ jobs:
           php tests/g3-credential-lifecycle-contract.php
           php tests/g3-growth-cart-source-presend-contract.php
           php tests/g3-growth-order-evidence-contract.php
+          php tests/growth-local-order-presence-contract.php
           php tests/cart-segmentation-contract.php
           php tests/cart-consent-current-state-contract.php
           php tests/marketing-recovery-suppression-readiness-contract.php
