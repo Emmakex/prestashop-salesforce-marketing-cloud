@@ -11,7 +11,13 @@ require_once dirname(__DIR__, 2)
 require_once dirname(__DIR__, 2)
     . '/pssalesforcebridge/src/DataCloud/StagedAtomicUtcAcceptance.php';
 require_once dirname(__DIR__, 2)
+    . '/pssalesforcebridge/src/Compatibility/CustomerHookAdapter.php';
+require_once dirname(__DIR__, 2)
+    . '/pssalesforcebridge/src/Compatibility/OrderHookAdapter.php';
+require_once dirname(__DIR__, 2)
     . '/pssalesforcebridge/src/Growth/BlockedOutboxCoordinator.php';
+require_once dirname(__DIR__, 2)
+    . '/pssalesforcebridge/src/Growth/GrowthBlockedHookAdapter.php';
 require_once dirname(__DIR__, 2)
     . '/pssalesforcebridge/src/Growth/GrowthOutboxSchemaPlan.php';
 require_once dirname(__DIR__, 2)
@@ -27,6 +33,7 @@ use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthOutboxSchemaPlan as 
 use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthSandboxMigrationExecutor as Migration;
 use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\PrestaShopDbBlockedOutboxStore as Store;
 use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\BlockedOutboxCoordinator as Coordinator;
+use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthBlockedHookAdapter as HookAdapter;
 
 class PrestaShopDbFixture
 {
@@ -269,6 +276,52 @@ function psStoreRun(PDO $pdo)
     psStoreParallel();
     psStoreAssert(psStoreCount($pdo, $tables['outbox']) === 5,
         'parallel_events_missing_or_duplicate');
+
+    // Exercise the actual dormant module hook shape with the existing
+    // transactional Db-method store, not just a synthetic callback.
+    // The original event service owns the legacy payload fingerprint.
+    $hookCustomer = (object) [
+        'id' => 120, 'id_shop' => 1,
+        'email' => 'never-export@example.invalid',
+        'newsletter' => true, 'date_upd' => '2026-11-14 01:30:00'
+    ];
+    $hookOrder = (object) [
+        'id' => 120, 'id_shop' => 1,
+        'id_customer' => 120, 'id_cart' => 93,
+        'reference' => 'PRIVATE_CI_ORDER'
+    ];
+    $hookFirst = HookAdapter::capture($router, 'actionCustomerAccountAdd',
+        ['newCustomer' => $hookCustomer],
+        'customer:1:120:' . str_repeat('f', 40),
+        [$store, 'insertOrLoad']);
+    $hookRetry = HookAdapter::capture($router, 'actionCustomerAccountUpdate',
+        ['customer' => $hookCustomer],
+        'customer:1:120:' . str_repeat('f', 40),
+        [$store, 'insertOrLoad']);
+    $hookOrderResult = HookAdapter::capture($router, 'actionValidateOrder',
+        ['order' => $hookOrder], 'order:1:120:' . str_repeat('f', 40),
+        [$store, 'insertOrLoad']);
+    psStoreAssert($hookFirst['inserted'] === true
+        && $hookRetry['inserted'] === false
+        && $hookRetry['accepted_sequence'] === $hookFirst['accepted_sequence']
+        && $hookOrderResult['inserted'] === true
+        && $hookOrderResult['marketing_sends_authorized'] === false
+        && $hookOrderResult['data_360_ingestion_authorized'] === false
+        && psStoreCount($pdo, $tables['outbox']) === 7,
+        'hook_to_transactional_blocked_store_failed');
+    psStoreAssert(strpos(json_encode([$hookFirst, $hookRetry, $hookOrderResult]),
+        'never-export@example.invalid') === false,
+        'hook_accidentally_exposed_personal_data');
+    psStoreReject(function () use ($router, $store, $hookCustomer) {
+        $unscoped = clone $hookCustomer;
+        unset($unscoped->id_shop);
+        HookAdapter::capture($router, 'actionCustomerAccountAdd',
+            ['newCustomer' => $unscoped],
+            'customer:1:120:' . str_repeat('a', 40),
+            [$store, 'insertOrLoad']);
+    }, 'unscoped_customer_hook_reached_store');
+    psStoreAssert(psStoreCount($pdo, $tables['outbox']) === 7,
+        'unscoped_hook_created_row');
 
     psStoreReject(function () use ($pdo) {
         new Store(new PrestaShopDbFixture($pdo), '8.2.8',
