@@ -28,7 +28,7 @@ La [inspección completa de ABH (run #43495007989)](https://github.com/Emmakex/p
 
 **Antes de G4:** autorización separada para subir el esquema, configurar streams/mapping y pruebas de ingesta. Un `CI=green`, la inspección de metadatos o una firma de esquema G3 **no** dan permiso implícito de escritura en Data 360.
 
-**Antes de la primera campaña Growth y la recuperación de carritos (G6/G7):** completar fuente/evento de carritos, validación de actividad y compra, identidad de destinatarios, consentimiento por finalidad, supresión/bajas, límites de frecuencia y prueba de recuperación end-to-end sintética y autorizada. El adaptador histórico **Engagement** no satisface estas condiciones en ABH.
+**Antes de la primera campaña Growth y la recuperación de carritos (G6/G7):** completar fuente/evento de carritos, validación de actividad y compra, identidad de destinatarios, consentimiento por finalidad, supresión/bajas, límites de frecuencia y prueba de recuperación end-to-end sintética y autorizada. El adaptador histórico **producto discontinuado** no satisface estas condiciones en ABH.
 
 ## Qué hace el verificador y qué no
 

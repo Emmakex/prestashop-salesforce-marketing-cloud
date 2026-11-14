@@ -1,7 +1,7 @@
 # G3-06 · Decisión de topología cliente–pedido en ABH (sin publicar)
 
 **Fecha:** 2026-11-13  
-**Producto:** Salesforce Marketing Cloud Growth/Next + Data 360. **No** Marketing Cloud Engagement.  
+**Producto:** Salesforce Marketing Cloud Growth/Next + Data 360. **No** producto discontinuado.  
 **Estado:** EVIDENCIA REAL + ALTERNATIVAS, **firma pendiente**. Datos de PSCustomer/PSOrder no enviados.  
 **Bloqueo:** issue [#45](https://github.com/Emmakex/prestashop-salesforce-marketing-cloud/issues/45).
 
@@ -50,7 +50,7 @@ La misma conexión del entorno GitHub `salesforce-growth-certification` ejecutar
 
 La [inspección con paginación verificada #43495007989](https://github.com/Emmakex/prestashop-salesforce-marketing-cloud/actions/runs/43495007989), integrada por el [PR #69](https://github.com/Emmakex/prestashop-salesforce-marketing-cloud/pull/69), examinó **64 relaciones SalesOrder, 137 Individual y 326 Account**, todas con completitud declarada. **No detectó** las aristas candidatas, aunque esto no prueba que no puedan configurarse o activarse mediante un mapping futuro.
 
-**Decisión técnica temporal, sin aprobación:** mantener separados los pedidos y los perfiles evita una unión falsa (opción C). No es una solución final de negocio: no resuelve en Data 360 la segmentación persona–compra. Tampoco entrega **recuperación de carritos**, ya que PSCustomer/PSOrder v0.2/v0.3 no incluyen PSCart ni existe un Flow Growth aprobado. [Control ejecutable de cobertura del objetivo comercial](G3_08_BUSINESS_GOAL_COVERAGE.md). Los checks locales de pedido antes de enviar deben diseñarse y certificarse en el futuro adaptador Growth, no inferirse del flujo histórico Engagement.
+**Decisión técnica temporal, sin aprobación:** mantener separados los pedidos y los perfiles evita una unión falsa (opción C). No es una solución final de negocio: no resuelve en Data 360 la segmentación persona–compra. Tampoco entrega **recuperación de carritos**, ya que PSCustomer/PSOrder v0.2/v0.3 no incluyen PSCart ni existe un Flow Growth aprobado. [Control ejecutable de cobertura del objetivo comercial](G3_08_BUSINESS_GOAL_COVERAGE.md). Los checks locales de pedido antes de enviar deben diseñarse y certificarse en el futuro adaptador Growth, no inferirse del flujo histórico producto discontinuado.
 
 ## Aclaración oficial 14/11/2026 — relación estándar inactiva no es relación ausente
 

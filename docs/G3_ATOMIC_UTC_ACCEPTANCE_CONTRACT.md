@@ -10,7 +10,7 @@ El camino real de hooks es `CustomerEventService::enqueue` /
 → `QueueRepository::enqueue` (`INSERT IGNORE` de `sfmc_queue`).
 El hash comercial de cliente y pedido se calcula **antes** de encolar.
 Los workers `CustomerQueueProcessor/OrderQueueProcessor` interpretan el
-payload antiguo y lo entregan por el adaptador **Engagement legado**, que
+payload antiguo y lo entregan por el adaptador **producto discontinuado legado**, que
 **no es el destino certificado de ABH**.
 
 Este diseño requiere un gate específico para Growth:

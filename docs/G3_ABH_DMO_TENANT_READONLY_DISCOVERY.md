@@ -1,6 +1,6 @@
 # G3-05/G3-06 · Verificación del catálogo DMO real de ABH, solo lectura
 
-**13/11/2026, ampliación dirigida del catálogo.** **Comercio:** ABH / Barcelona Confort. **Producto:** Marketing Cloud Growth/Next sobre Core + Data 360, **NO** Engagement.  
+**13/11/2026, ampliación dirigida del catálogo.** **Comercio:** ABH / Barcelona Confort. **Producto:** Marketing Cloud Growth/Next sobre Core + Data 360, **NO** producto discontinuado.  
 **Gate:** G3 permanece bloqueado por aprobaciones del responsable; ningún catálogo consultado autoriza cambiar el esquema o los mapeos.
 
 ## Qué se va a inspeccionar realmente
@@ -16,7 +16,7 @@ La API oficial **Salesforce Data 360 Connect REST** permite consultar metadatos 
 | `GET …/ssot__Account__dlm` | Si es accesible, categoría, PK y campo `Account.IndividualId` | Que debamos crear/importar Accounts a partir de PSCustomer |
 | `GET …/ssot__Account__dlm/relationships` | Metadatos y flags fijos de los posibles enlaces `SalesOrder.BillToAccountId → Account.Id` y `Account.IndividualId → Individual.Id` | Que sean relaciones activas, que PSCustomer esté mapeado, ni que la ruta de dos saltos esté aprobada |
 
-Las respuestas se reducen **solo** a indicadores booleanos conocidos, categoría explícita de la allowlist `PROFILE / OTHER / ENGAGEMENT / UNASSIGNED / UNRECOGNIZED` y recuentos limitados de relaciones: ningún nombre de campo personalizado, objeto desconocido, dato individual, ID de Salesforce, token, URL real del tenant ni respuesta HTTP original se publica. Errores `401`, `403`, `404` o formatos no admitidos quedan como código fijo, sin cuerpo de error. Si la consulta de relaciones devuelve `403/404`, la evidencia indicará *metadata_accessible=false*, **no** “no existe relación”.
+Las respuestas se reducen **solo** a indicadores booleanos conocidos, categoría explícita de la allowlist `PROFILE / OTHER / producto discontinuado / UNASSIGNED / UNRECOGNIZED` y recuentos limitados de relaciones: ningún nombre de campo personalizado, objeto desconocido, dato individual, ID de Salesforce, token, URL real del tenant ni respuesta HTTP original se publica. Errores `401`, `403`, `404` o formatos no admitidos quedan como código fijo, sin cuerpo de error. Si la consulta de relaciones devuelve `403/404`, la evidencia indicará *metadata_accessible=false*, **no** “no existe relación”.
 
 ## Evidencia del primer GET real y por qué se amplía la lectura
 
