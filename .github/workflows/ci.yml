@@ -260,6 +260,7 @@ jobs:
           php tests/integration/g3_growth_provider_outbox_bridge.php
           php tests/integration/g3_growth_prefixed_schema_preview.php
           php tests/integration/g3_growth_migration_executor.php
+          php tests/integration/g3_growth_prestashop_db_store.php
           php tests/integration/g3_prestashop_adapter.php
           php tests/integration/g3_namespace_registry.php
           php tests/integration/g3_installation_proof.php
