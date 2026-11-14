@@ -65,7 +65,7 @@ class G3ReviewFingerprintTests(unittest.TestCase):
                 self.reject(lambda f, d, k=field: f.__setitem__(k, True))
 
     def test_cannot_change_product_or_choose_published_schema(self):
-        self.reject(lambda f, d: f.__setitem__("target_product", "marketing_cloud_engagement"))
+        self.reject(lambda f, d: f.__setitem__("target_product", "unsupported_external_product"))
         self.reject(lambda f, d: f.__setitem__("schema_to_publish", "v0.3"))
         self.reject(lambda f, d: f.__setitem__("review_only", False))
 

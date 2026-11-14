@@ -109,7 +109,7 @@ test -f /tmp/pssfmc-runtime-growth/pssalesforcebridge/pssalesforcebridge.php
 grep -Fq "\$this->version = '0.7.1';" /tmp/pssfmc-runtime-old/pssalesforcebridge/pssalesforcebridge.php
 grep -Fq "\$this->version = '0.8.0';" /tmp/pssfmc-runtime-growth/pssalesforcebridge/pssalesforcebridge.php
 test ! -e /tmp/pssfmc-runtime-growth/pssalesforcebridge/src/Salesforce/AuthClient.php
-test ! -e /tmp/pssfmc-runtime-growth/pssalesforcebridge/src/Salesforce/JourneyClient.php
+test ! -e /tmp/pssfmc-runtime-growth/pssalesforcebridge/src/Salesforce/RetiredFlowClient.php
 test ! -e /tmp/pssfmc-runtime-growth/pssalesforcebridge/controllers/front/recover.php
 
 echo "==> Pulling pinned runtime images"
@@ -246,7 +246,7 @@ assert d['ok'] is True and d['status']=='blocked_test',d
 assert d['provider']=='marketing_cloud_growth',d
 assert d['marketing_sends']['skipped']=='approval_required',d
 assert d['data_cloud_ingestion']['skipped']=='schema_required',d
-assert 'customer_delivery' not in d and 'journey_delivery' not in d,d
+assert 'customer_delivery' not in d and 'retired_flow_delivery' not in d,d
 PY
 curl -fsS --max-time 10 "http://127.0.0.1:${PORT}/" >/dev/null
 

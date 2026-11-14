@@ -58,8 +58,8 @@ function g3RuntimeSmoke()
     g3RuntimeCheck($adapter->install('ABH', 'marketing_cloud_growth', $namespace)
         === 'already_installed', 'install_not_idempotent');
     g3RuntimeReject(function () use ($adapter, $namespace) {
-        $adapter->install('ABH', 'marketing_cloud_engagement', $namespace);
-    }, 'engagement_fallback_accepted', 'g3_adapter_abh_growth_only');
+        $adapter->install('ABH', 'unsupported_external_product', $namespace);
+    }, 'retired_provider_fallback_accepted', 'g3_adapter_abh_growth_only');
     g3RuntimeReject(function () use ($adapter) {
         $adapter->install('ABH', 'marketing_cloud_growth', 'growth_ci_other');
     }, 'namespace_switch_accepted', 'g3_ps_runtime_binding_conflict');

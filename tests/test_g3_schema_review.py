@@ -28,8 +28,8 @@ class ReviewPacketTests(unittest.TestCase):
     def test_all_eight_gates_remain_pending_and_fields_match_schemas(self):
         self.assertEqual(g3.validate_repository(ROOT), [])
 
-    def test_growth_cannot_silently_become_engagement(self):
-        self.reject(lambda p, a, b: p.update(target_product="marketing_cloud_engagement"))
+    def test_growth_cannot_silently_become_retired_provider(self):
+        self.reject(lambda p, a, b: p.update(target_product="unsupported_external_product"))
 
     def test_cannot_mark_schema_approved(self):
         self.reject(lambda p, a, b: p.update(approval_state="approved"))
