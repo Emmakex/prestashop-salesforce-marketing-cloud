@@ -48,6 +48,14 @@ function g3BridgeCount(PDO $db, $table)
     ], true)) {
         throw new RuntimeException('g3_bridge_unapproved_table');
     }
+    // Preserve absence as null. Growth-only CI never recreates old tables.
+    if (strpos($table, 'g3_sfmc_') === 0) {
+        $check = $db->query("SELECT COUNT(*) FROM information_schema.TABLES "
+            . "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = '" . $table . "'");
+        if ((int) $check->fetchColumn() === 0) {
+            return null;
+        }
+    }
     return (int) $db->query('SELECT COUNT(*) FROM ' . $table)->fetchColumn();
 }
 function g3BridgeCapture($router, $store, $shop, $entity, $id, $event, $hash)
