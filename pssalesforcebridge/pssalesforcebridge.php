@@ -5,6 +5,7 @@ if (!defined('_PS_VERSION_')) {
 }
 
 require_once __DIR__ . '/src/Compatibility/Platform.php';
+require_once __DIR__ . '/src/Provider/MerchantProviderGate.php';
 require_once __DIR__ . '/src/Compatibility/CustomerHookAdapter.php';
 require_once __DIR__ . '/src/Compatibility/OrderHookAdapter.php';
 require_once __DIR__ . '/src/Compatibility/CartHookAdapter.php';
@@ -64,6 +65,7 @@ use Emmakex\PrestaShopSalesforceMarketingCloud\Journey\JourneyEventAuditReposito
 use Emmakex\PrestaShopSalesforceMarketingCloud\Order\OrderDataExtensionWriter;
 use Emmakex\PrestaShopSalesforceMarketingCloud\Order\OrderEventService;
 use Emmakex\PrestaShopSalesforceMarketingCloud\Order\OrderSyncLedger;
+use Emmakex\PrestaShopSalesforceMarketingCloud\Provider\MerchantProviderGate;
 use Emmakex\PrestaShopSalesforceMarketingCloud\Queue\AbandonedCartJourneyProcessor;
 use Emmakex\PrestaShopSalesforceMarketingCloud\Queue\CustomerQueueProcessor;
 use Emmakex\PrestaShopSalesforceMarketingCloud\Queue\OrderQueueProcessor;
@@ -85,6 +87,8 @@ class PsSalesforceBridge extends Module
     const CONFIG_CLIENT_SECRET = 'PS_SFMC_CLIENT_SECRET';
     const CONFIG_ACCOUNT_ID = 'PS_SFMC_ACCOUNT_ID';
     const CONFIG_MODE = 'PS_SFMC_MODE';
+    const CONFIG_PROVIDER = 'PS_SFMC_PROVIDER';
+    const CONFIG_MERCHANT = 'PS_SFMC_MERCHANT';
     const CONFIG_CART_ABANDON_MINUTES = 'PS_SFMC_CART_ABANDON_MINUTES';
     const CONFIG_CART_CONSENT_MODE = 'PS_SFMC_CART_CONSENT_MODE';
     const CONFIG_CUSTOMER_DE_KEY = 'PS_SFMC_CUSTOMER_DE_KEY';
@@ -147,16 +151,25 @@ class PsSalesforceBridge extends Module
 
     public function hookActionCustomerAccountAdd($params)
     {
+        if (!$this->legacyCaptureAllowed()) {
+            return false;
+        }
         return $this->captureCustomerEvent('CUSTOMER_CREATED', is_array($params) ? $params : []);
     }
 
     public function hookActionCustomerAccountUpdate($params)
     {
+        if (!$this->legacyCaptureAllowed()) {
+            return false;
+        }
         return $this->captureCustomerEvent('CUSTOMER_UPDATED', is_array($params) ? $params : []);
     }
 
     public function hookActionCartSave($params)
     {
+        if (!$this->legacyCaptureAllowed()) {
+            return false;
+        }
         $cart = CartHookAdapter::cartFromParams(is_array($params) ? $params : []);
         if (!$cart) {
             return false;
@@ -172,6 +185,9 @@ class PsSalesforceBridge extends Module
 
     public function hookActionValidateOrder($params)
     {
+        if (!$this->legacyCaptureAllowed()) {
+            return false;
+        }
         $params = is_array($params) ? $params : [];
         $order = OrderHookAdapter::orderFromParams($params);
         if (!$order) {
@@ -192,6 +208,9 @@ class PsSalesforceBridge extends Module
 
     public function hookActionOrderStatusPostUpdate($params)
     {
+        if (!$this->legacyCaptureAllowed()) {
+            return false;
+        }
         $params = is_array($params) ? $params : [];
         $context = OrderHookAdapter::statusContext($params);
         if (!is_array($context) || empty($context['order'])) {
@@ -216,6 +235,9 @@ class PsSalesforceBridge extends Module
 
     public function processCustomerBackfill($batchSize = null)
     {
+        if (!$this->legacyCaptureAllowed()) {
+            return ['skipped' => 'provider_not_legacy'];
+        }
         if ($batchSize === null) {
             $batchSize = (int) Configuration::get(self::CONFIG_CUSTOMER_BACKFILL_BATCH);
         }
@@ -225,6 +247,9 @@ class PsSalesforceBridge extends Module
 
     public function processCartAbandonmentCandidates($limit = 100)
     {
+        if (!$this->legacyCaptureAllowed()) {
+            return ['skipped' => 'provider_not_legacy'];
+        }
         $detector = new CartAbandonmentDetector(
             new CartRepository(),
             new OrderSyncLedger(),
@@ -236,6 +261,9 @@ class PsSalesforceBridge extends Module
 
     public function processCustomerQueue($limit = 50)
     {
+        if (!$this->legacyDeliveryAllowed()) {
+            return ['skipped' => 'provider_not_legacy', 'claimed' => 0, 'processed' => 0, 'retry' => 0, 'failed' => 0];
+        }
         if ((string) Configuration::get(self::CONFIG_MODE) !== 'production') {
             return ['skipped' => 'test_mode', 'claimed' => 0, 'processed' => 0, 'retry' => 0, 'failed' => 0];
         }
@@ -256,6 +284,9 @@ class PsSalesforceBridge extends Module
 
     public function processOrderQueue($limit = 50)
     {
+        if (!$this->legacyDeliveryAllowed()) {
+            return ['skipped' => 'provider_not_legacy', 'claimed' => 0, 'processed' => 0, 'retry' => 0, 'failed' => 0];
+        }
         if ((string) Configuration::get(self::CONFIG_MODE) !== 'production') {
             return ['skipped' => 'test_mode', 'claimed' => 0, 'processed' => 0, 'retry' => 0, 'failed' => 0];
         }
@@ -276,6 +307,9 @@ class PsSalesforceBridge extends Module
 
     public function processAbandonedCartJourneyQueue($limit = 20)
     {
+        if (!$this->legacyDeliveryAllowed()) {
+            return ['skipped' => 'provider_not_legacy', 'claimed' => 0, 'processed' => 0, 'suppressed' => 0, 'retry' => 0, 'failed' => 0];
+        }
         if ((string) Configuration::get(self::CONFIG_MODE) !== 'production') {
             return ['skipped' => 'test_mode', 'claimed' => 0, 'processed' => 0, 'suppressed' => 0, 'retry' => 0, 'failed' => 0];
         }
@@ -306,6 +340,23 @@ class PsSalesforceBridge extends Module
         return $processor->process($limit);
     }
 
+    private function legacyCaptureAllowed()
+    {
+        return MerchantProviderGate::legacyCaptureAllowed(
+            Configuration::get(self::CONFIG_MERCHANT),
+            Configuration::get(self::CONFIG_PROVIDER)
+        );
+    }
+
+    private function legacyDeliveryAllowed()
+    {
+        return MerchantProviderGate::legacyDeliveryAllowed(
+            Configuration::get(self::CONFIG_MERCHANT),
+            Configuration::get(self::CONFIG_PROVIDER),
+            Configuration::get(self::CONFIG_MODE)
+        );
+    }
+
     private function salesforceRestClient()
     {
         if ($this->salesforceRestClientCache instanceof RestClient) {
@@ -330,6 +381,9 @@ class PsSalesforceBridge extends Module
 
     private function captureCustomerEvent($eventType, array $params)
     {
+        if (!$this->legacyCaptureAllowed()) {
+            return false;
+        }
         $customer = CustomerHookAdapter::customerFromParams($params);
         if (!$customer) {
             return false;
@@ -360,7 +414,9 @@ class PsSalesforceBridge extends Module
 
     private function installConfiguration()
     {
-        return Configuration::updateValue(self::CONFIG_MODE, 'test')
+        return Configuration::updateValue(self::CONFIG_PROVIDER, MerchantProviderGate::UNSELECTED)
+            && Configuration::updateValue(self::CONFIG_MERCHANT, '')
+            && Configuration::updateValue(self::CONFIG_MODE, 'test')
             && Configuration::updateValue(self::CONFIG_CART_ABANDON_MINUTES, 60)
             && Configuration::updateValue(self::CONFIG_CART_CONSENT_MODE, CartEligibilityPolicy::MODE_MARKETING_OPTIN)
             && Configuration::updateValue(self::CONFIG_CUSTOMER_DE_KEY, 'PS_CUSTOMERS')
@@ -651,6 +707,9 @@ class PsSalesforceBridge extends Module
 
     private function startCustomerBackfill()
     {
+        if (!$this->legacyCaptureAllowed()) {
+            return $this->displayError($this->l('Legacy customer backfill requires an explicitly selected Engagement merchant.'));
+        }
         $shopIds = ShopResolver::activeShopIds(isset($this->context) ? $this->context : null);
         if (empty($shopIds)) {
             return $this->displayError($this->l('No active shops were found for customer backfill.'));
@@ -761,6 +820,13 @@ class PsSalesforceBridge extends Module
         $clientSecret = (string) Tools::getValue(self::CONFIG_CLIENT_SECRET);
         $accountId = trim((string) Tools::getValue(self::CONFIG_ACCOUNT_ID));
         $mode = Tools::getValue(self::CONFIG_MODE) === 'production' ? 'production' : 'test';
+        $provider = Tools::getValue(self::CONFIG_PROVIDER);
+        $merchant = Tools::getValue(self::CONFIG_MERCHANT);
+        try {
+            MerchantProviderGate::validate($merchant, $provider, $mode);
+        } catch (RuntimeException $e) {
+            return $this->displayError($this->l('Select a valid merchant and provider. Growth remains in Test; ABH must use Growth.'));
+        }
         $abandonMinutes = max(15, (int) Tools::getValue(self::CONFIG_CART_ABANDON_MINUTES));
         $consentMode = Tools::getValue(self::CONFIG_CART_CONSENT_MODE) === CartEligibilityPolicy::MODE_KNOWN_CONTACT
             ? CartEligibilityPolicy::MODE_KNOWN_CONTACT
@@ -776,36 +842,46 @@ class PsSalesforceBridge extends Module
         $retentionCartDays = max(1, min(3650, (int) Tools::getValue(self::CONFIG_RETENTION_CART_DAYS)));
         $retentionRecoveryDays = max(1, min(3650, (int) Tools::getValue(self::CONFIG_RETENTION_RECOVERY_DAYS)));
 
-        if (!$this->isHttpsUri($authBaseUri) || !$this->isHttpsUri($restBaseUri)) {
+        if ($provider === MerchantProviderGate::ENGAGEMENT &&
+            (!$this->isHttpsUri($authBaseUri) || !$this->isHttpsUri($restBaseUri))) {
             return $this->displayError($this->l('Authentication and REST Base URIs must be valid HTTPS URLs.'));
         }
 
-        if ($clientId === '') {
+        if ($provider === MerchantProviderGate::ENGAGEMENT && $clientId === '') {
             return $this->displayError($this->l('Client ID is required.'));
         }
 
-        if ($customerDeKey === '') {
+        if ($provider === MerchantProviderGate::ENGAGEMENT && $customerDeKey === '') {
             return $this->displayError($this->l('Customer Data Extension External Key is required.'));
         }
 
-        if ($orderDeKey === '') {
+        if ($provider === MerchantProviderGate::ENGAGEMENT && $orderDeKey === '') {
             return $this->displayError($this->l('Order Data Extension External Key is required.'));
         }
 
-        if ($journeyEventDefinitionKey === '' || !preg_match('/^[A-Za-z0-9_-]+$/', $journeyEventDefinitionKey)) {
+        if ($provider === MerchantProviderGate::ENGAGEMENT &&
+            ($journeyEventDefinitionKey === '' || !preg_match('/^[A-Za-z0-9_-]+$/', $journeyEventDefinitionKey))) {
             return $this->displayError($this->l('Journey Event Definition Key is required and may contain only letters, numbers, underscores and hyphens.'));
         }
 
-        Configuration::updateValue(self::CONFIG_AUTH_BASE_URI, $authBaseUri);
-        Configuration::updateValue(self::CONFIG_REST_BASE_URI, $restBaseUri);
-        Configuration::updateValue(self::CONFIG_CLIENT_ID, $clientId);
-        Configuration::updateValue(self::CONFIG_ACCOUNT_ID, $accountId);
+        // Selection and merchant are explicit; never reinterpret existing
+        // Engagement credentials as a Growth connection or overwrite them.
+        Configuration::updateValue(self::CONFIG_MERCHANT, $merchant);
+        Configuration::updateValue(self::CONFIG_PROVIDER, $provider);
         Configuration::updateValue(self::CONFIG_MODE, $mode);
+        if ($provider === MerchantProviderGate::ENGAGEMENT) {
+            Configuration::updateValue(self::CONFIG_AUTH_BASE_URI, $authBaseUri);
+            Configuration::updateValue(self::CONFIG_REST_BASE_URI, $restBaseUri);
+            Configuration::updateValue(self::CONFIG_CLIENT_ID, $clientId);
+            Configuration::updateValue(self::CONFIG_ACCOUNT_ID, $accountId);
+        }
         Configuration::updateValue(self::CONFIG_CART_ABANDON_MINUTES, $abandonMinutes);
         Configuration::updateValue(self::CONFIG_CART_CONSENT_MODE, $consentMode);
-        Configuration::updateValue(self::CONFIG_CUSTOMER_DE_KEY, $customerDeKey);
-        Configuration::updateValue(self::CONFIG_ORDER_DE_KEY, $orderDeKey);
-        Configuration::updateValue(self::CONFIG_JOURNEY_EVENT_DEFINITION_KEY, $journeyEventDefinitionKey);
+        if ($provider === MerchantProviderGate::ENGAGEMENT) {
+            Configuration::updateValue(self::CONFIG_CUSTOMER_DE_KEY, $customerDeKey);
+            Configuration::updateValue(self::CONFIG_ORDER_DE_KEY, $orderDeKey);
+            Configuration::updateValue(self::CONFIG_JOURNEY_EVENT_DEFINITION_KEY, $journeyEventDefinitionKey);
+        }
         Configuration::updateValue(self::CONFIG_RECOVERY_TOKEN_TTL_HOURS, $recoveryTtlHours);
         Configuration::updateValue(self::CONFIG_CUSTOMER_BACKFILL_BATCH, $backfillBatch);
         Configuration::updateValue(self::CONFIG_RETENTION_QUEUE_DAYS, $retentionQueueDays);
@@ -814,7 +890,7 @@ class PsSalesforceBridge extends Module
         Configuration::updateValue(self::CONFIG_RETENTION_CART_DAYS, $retentionCartDays);
         Configuration::updateValue(self::CONFIG_RETENTION_RECOVERY_DAYS, $retentionRecoveryDays);
 
-        if ($clientSecret !== '') {
+        if ($provider === MerchantProviderGate::ENGAGEMENT && $clientSecret !== '') {
             Configuration::updateValue(self::CONFIG_CLIENT_SECRET, $clientSecret);
         }
 
@@ -825,6 +901,9 @@ class PsSalesforceBridge extends Module
 
     private function testConnection()
     {
+        if (!$this->legacyCaptureAllowed()) {
+            return $this->displayInformation($this->l('Legacy Engagement connection test is not applicable. Growth uses the existing Salesforce Core and Data Cloud certification. No write or send was attempted.'));
+        }
         try {
             $client = new AuthClient(
                 (string) Configuration::get(self::CONFIG_AUTH_BASE_URI),
@@ -870,6 +949,8 @@ class PsSalesforceBridge extends Module
             self::CONFIG_CLIENT_SECRET => '',
             self::CONFIG_ACCOUNT_ID => (string) Configuration::get(self::CONFIG_ACCOUNT_ID),
             self::CONFIG_MODE => (string) Configuration::get(self::CONFIG_MODE),
+            self::CONFIG_PROVIDER => (string) Configuration::get(self::CONFIG_PROVIDER) ?: MerchantProviderGate::UNSELECTED,
+            self::CONFIG_MERCHANT => (string) Configuration::get(self::CONFIG_MERCHANT),
             self::CONFIG_CART_ABANDON_MINUTES => (int) Configuration::get(self::CONFIG_CART_ABANDON_MINUTES),
             self::CONFIG_CART_CONSENT_MODE => (string) Configuration::get(self::CONFIG_CART_CONSENT_MODE),
             self::CONFIG_CUSTOMER_DE_KEY => (string) Configuration::get(self::CONFIG_CUSTOMER_DE_KEY),
@@ -893,14 +974,22 @@ class PsSalesforceBridge extends Module
                     'icon' => 'icon-cloud',
                 ],
                 'input' => [
-                    ['type' => 'text', 'label' => $this->l('Authentication Base URI'), 'name' => self::CONFIG_AUTH_BASE_URI, 'required' => true],
-                    ['type' => 'text', 'label' => $this->l('REST Base URI'), 'name' => self::CONFIG_REST_BASE_URI, 'required' => true],
-                    ['type' => 'text', 'label' => $this->l('Client ID'), 'name' => self::CONFIG_CLIENT_ID, 'required' => true],
+                    ['type' => 'text', 'label' => $this->l('Merchant code'), 'name' => self::CONFIG_MERCHANT, 'desc' => $this->l('Unique merchant code, e.g. ABH. Required to select a provider.')],
+                    ['type' => 'select', 'label' => $this->l('Salesforce provider'), 'name' => self::CONFIG_PROVIDER, 'options' => [
+                        'query' => [
+                            ['id' => MerchantProviderGate::UNSELECTED, 'name' => $this->l('Not selected (safe default)')],
+                            ['id' => MerchantProviderGate::GROWTH, 'name' => $this->l('Marketing Cloud Growth + Data Cloud')],
+                            ['id' => MerchantProviderGate::ENGAGEMENT, 'name' => $this->l('Marketing Cloud Engagement (other merchants only)')],
+                        ], 'id' => 'id', 'name' => 'name'
+                    ]],
+                    ['type' => 'text', 'label' => $this->l('Legacy Engagement Authentication Base URI'), 'name' => self::CONFIG_AUTH_BASE_URI],
+                    ['type' => 'text', 'label' => $this->l('Legacy Engagement REST Base URI'), 'name' => self::CONFIG_REST_BASE_URI],
+                    ['type' => 'text', 'label' => $this->l('Legacy Engagement Client ID'), 'name' => self::CONFIG_CLIENT_ID],
                     ['type' => 'password', 'label' => $this->l('Client Secret'), 'name' => self::CONFIG_CLIENT_SECRET, 'desc' => $this->l('Leave blank to keep the existing secret.')],
                     ['type' => 'text', 'label' => $this->l('Business Unit MID / Account ID'), 'name' => self::CONFIG_ACCOUNT_ID],
-                    ['type' => 'text', 'label' => $this->l('Customer Data Extension External Key'), 'name' => self::CONFIG_CUSTOMER_DE_KEY, 'required' => true],
-                    ['type' => 'text', 'label' => $this->l('Order Data Extension External Key'), 'name' => self::CONFIG_ORDER_DE_KEY, 'required' => true],
-                    ['type' => 'text', 'label' => $this->l('Journey Event Definition Key'), 'name' => self::CONFIG_JOURNEY_EVENT_DEFINITION_KEY, 'required' => true, 'desc' => $this->l('Default: PRESTASHOP_ABANDONED_CART. Create and activate the matching API Entry Event in Journey Builder before enabling Production.')],
+                    ['type' => 'text', 'label' => $this->l('Legacy Customer Data Extension External Key'), 'name' => self::CONFIG_CUSTOMER_DE_KEY],
+                    ['type' => 'text', 'label' => $this->l('Legacy Order Data Extension External Key'), 'name' => self::CONFIG_ORDER_DE_KEY],
+                    ['type' => 'text', 'label' => $this->l('Legacy Journey Event Definition Key'), 'name' => self::CONFIG_JOURNEY_EVENT_DEFINITION_KEY, 'desc' => $this->l('Default: PRESTASHOP_ABANDONED_CART. Create and activate the matching API Entry Event in Journey Builder before enabling Production.')],
                     ['type' => 'text', 'label' => $this->l('Recovery link lifetime'), 'name' => self::CONFIG_RECOVERY_TOKEN_TTL_HOURS, 'suffix' => $this->l('hours'), 'desc' => $this->l('Allowed range: 1–720 hours. Default: 168 hours (7 days).')],
                     [
                         'type' => 'select',
