@@ -35,6 +35,8 @@ La [referencia oficial de Salesforce para relaciones DMO](https://help.salesforc
 
 Esta revisión **no implica pulsar Save, crear o habilitar relaciones, publicar PST, ingerir registros o autorizar campañas**. El responsable de datos debe aprobar aparte G3-02/G3-07 (finalidad/retención), y G3-08 solo se cierra con el esquema y SHA exactos.
 
+**Ampliación técnica G3-06, 14/11/2026 (sin firma):** el [inspector de metadata protegido](G3_ABH_DMO_TENANT_READONLY_DISCOVERY.md) incorpora `AccountContact` y `ContactPointEmail` como DMOs opcionales para observar dos rutas tipadas adicionales de `SalesOrder` hacia `Individual`. Son **candidatos**; no se deduce identidad del texto de email ni se usa `PartyId` como Individual si la relación apunta a Account. Los resultados de ABH deben revisarse tras el run protegido de `main`; hasta entonces, **no afirmar que existan estas aristas activas en el tenant**. El [expediente de topologías](G3_CUSTOMER_ORDER_RELATION_TOPOLOGY_DECISION.md) conserva A/B/C/D y añade B2/B3 como rutas intermedias a valorar, no aprobaciones. El arquitecto debe decidir con campos fuente/objetivo exactos y finalidad autorizada por responsable de datos. Sin publicar ni guardar configuración.
+
 ## Qué necesita decidir cada responsable
 
 Esta hoja separa **propuesta técnica**, **evidencia necesaria** y **decisión humana**. No atribuye permisos al indicador newsletter, no fija plazos legales, no transforma fechas históricas inciertas, no elige el esquema automáticamente y no invoca ningún servicio de Salesforce.
