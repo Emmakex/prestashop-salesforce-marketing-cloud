@@ -51,6 +51,16 @@ Ni siquiera un catálogo completo y una arista estándar visible autoriza por s�
 - El script `tests/live/g3-tenant-dmo-catalog.php` produce `g3-abh-dmo-catalog-sanitized.json`; el artifact permanece 14 días. Cualquier error de API deja `status=failed` y diagnóstico sanitario, sin poner un gate como aprobado.
 - `tests/g3-tenant-dmo-catalog-contract.php` prueba entradas sintéticas, errores, inyección de hosts, parámetros, archivos, ausencia de datos sensibles, y compatibilidad PHP 7.1/8.5 sin acceder a Salesforce.
 
+## Lectura resumida en Actions para que el responsable pueda decidir G3-06 (14/11/2026)
+
+El workflow protegido `ABH Data 360 DMO Catalog Read Only` publica ahora una pestaña **Summary / Resumen de ejecución** generada únicamente desde `g3-abh-dmo-catalog-sanitized.json`. No hace nuevas consultas ni usa permisos adicionales. Su lector `scripts/ci/render-g3-dmo-review-summary.py` acepta solo el archivo local fijo y descarta cualquier dato que no sea uno de los **cinco nombres de DMO** predefinidos, categoría permitida, booleanos de metadatos o recuentos acotados a 500. No copia tokens, correos, respuestas crudas, URL del tenant, IDs de registros ni campos propios. Si el resultado es incorrecto, falta o anuncia permisos indebidos, el resumen informa **«No hay evidencia validada»**, sin interpretar el silencio como ausencia de relaciones.
+
+La tabla presenta **acceso, categoría, PK y completitud de relaciones por DMO**, seguida de las tres rutas `SalesOrder→Account→Individual`, `SalesOrder→AccountContact→Individual` y `SalesOrder→ContactPointEmail→Individual`. Distingue cada tramo entre `Visible ACTIVE`, `Visible; ACTIVE no confirmado` y `No observada (no equivale a ausencia)`. Los indicadores son **solo metadatos de relaciones y nunca significan aprobación de mapping PST ni de destinatarios**; el texto recuerda expresamente que una relación inactiva podría no estar visible y que G3 sigue pendiente de propietario + arquitecto.
+
+El resumen se genera incluso si la inspección termina con error, pero **no suprime el error del job**. El artifact saneado original sigue disponible durante 14 días. Las pruebas sintéticas offline `tests/test_g3_dmo_review_summary.py` comprueban valores maliciosos/extraños, respuestas no certificadas, gating de permisos, categorías inválidas y que jamás se impriman emails ni atributos inesperados.
+
+**Acción concreta:** abrir `Actions → ABH Data 360 DMO Catalog Read Only → run de main → Summary`. No hace falta descargar un JSON para ver el estado técnico. Si hay resultados, incorporarlos a la decisión **sin marcarlos como aprobación**; si el job requiere autorización del entorno protegido, mantenerla y no ampliar permisos para evitarla.
+
 ## Cómo consultar el resultado
 
 En GitHub, `Actions → ABH Data 360 DMO Catalog Read Only`, abrir el run que corresponda a **`main`**. Si se ejecuta correctamente, revisar el artifact `g3-abh-dmo-catalog-readonly-...` y sus flags sanitizados. No copiar secretos ni respuestas completas. Un resultado **metadata_read_success_review_only** certificará únicamente los endpoints y campos presentes en ese instante.
