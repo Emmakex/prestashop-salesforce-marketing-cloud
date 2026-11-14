@@ -59,7 +59,7 @@ function boundaryReject($call, $expected)
     boundaryAssert(false, 'invalid_setting_accepted_' . $expected);
 }
 foreach ([
-    [null, Gate::GROWTH, 'test', 'provider_explicit_selection_required'],
+    [null, Gate::GROWTH, 'test', 'provider_merchant_required'],
     ['ABH', null, 'test', 'provider_explicit_selection_required'],
     ['ABH', Gate::ENGAGEMENT, 'test', 'provider_abh_growth_only'],
     ['ABH', Gate::GROWTH, 'production', 'provider_growth_not_authorized_for_production'],
