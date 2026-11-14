@@ -64,6 +64,39 @@ final class GrowthSqlEngineGate
         return $result;
     }
 
+    /**
+     * PrestaShop-native, read-only SQL engine preflight.
+     *
+     * Uses the same getValue(sql, useCache=false) API as the real module.
+     * No SQL mutation, schema installation, Salesforce call, or privilege
+     * escalation; unknown or failed reads are always ineligible.
+     * A supported engine is NEVER an approval to migrate a merchant DB.
+     */
+    public static function inspectPrestaShop($db)
+    {
+        if (!is_object($db) || !is_callable([$db, 'getValue'])) {
+            return self::inspect(false);
+        }
+        try {
+            // Explicitly skip query cache, including after a DB migration.
+            $version = $db->getValue('SELECT VERSION()', false);
+            if (!is_string($version) || trim($version) === '') {
+                return self::inspect(false);
+            }
+            $setting = null;
+            if (stripos($version, 'MariaDB') !== false) {
+                $setting = $db->getValue('SELECT @@check_constraint_checks', false);
+                if ($setting === false || $setting === null) {
+                    return self::inspect(false);
+                }
+            }
+            return self::inspect($version, $setting);
+        } catch (Throwable $e) {
+            // Do not expose DB, SQL or credentials in a client-facing report.
+            return self::inspect(false);
+        }
+    }
+
     /** Read only SELECT statements; always fail closed on unknown variables. */
     public static function inspectConnection(PDO $db)
     {
