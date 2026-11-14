@@ -260,7 +260,7 @@ with open('/tmp/pssfmc-cron.json', 'r', encoding='utf-8') as fh:
 assert report.get('ok') is True, report
 payload = report.get('result', report)
 serialized = json.dumps(payload)
-assert 'test_mode' in serialized, report
+assert 'provider_not_legacy' in serialized, report
 assert 'access_token' not in serialized.lower(), report
 assert 'client_secret' not in serialized.lower(), report
 PY
