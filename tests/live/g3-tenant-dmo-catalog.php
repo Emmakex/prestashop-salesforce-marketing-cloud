@@ -2,8 +2,9 @@
 /**
  * ABH G3 tenant metadata ONLY.
  * Runs on main in protected GitHub environment; no records/secret logging.
- * Built-in AuthClient makes one Core OAuth POST. Probe sends only three
- * Salesforce Connect REST GET requests to a fixed metadata allowlist.
+ * Built-in AuthClient makes one Core OAuth POST. Probe sends only fixed
+ * metadata GET requests for five DMOs and bounded relationship pages.
+ * No record endpoints, email addresses, identities or mapping writes.
  */
 $root = dirname(dirname(__DIR__));
 require_once $root . '/pssalesforcebridge/src/Growth/AuthClient.php';
