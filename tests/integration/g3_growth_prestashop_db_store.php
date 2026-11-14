@@ -36,9 +36,30 @@ class PrestaShopDbFixture
         $this->pdo = $db;
     }
 
-    public function getValue($sql)
+    public $uncachedCriticalReadCount = 0;
+    private $cache = [];
+
+    public function getValue($sql, $useCache = true)
     {
-        return $this->pdo->query($sql)->fetchColumn();
+        // Reproduce the dangerous PrestaShop caching contract: cached results
+        // are reused unless callers explicitly request fresh SQL execution.
+        $critical = strpos($sql, 'GET_LOCK(') !== false
+            || strpos($sql, 'RELEASE_LOCK(') !== false
+            || strpos($sql, 'growth_provider_binding_v1') !== false;
+        if ($critical && $useCache !== false) {
+            throw new RuntimeException('g3_db_cache_sensitive_read_not_fresh');
+        }
+        if ($critical) {
+            ++$this->uncachedCriticalReadCount;
+        }
+        if ($useCache && array_key_exists($sql, $this->cache)) {
+            return $this->cache[$sql];
+        }
+        $value = $this->pdo->query($sql)->fetchColumn();
+        if ($useCache) {
+            $this->cache[$sql] = $value;
+        }
+        return $value;
     }
 
     public function execute($sql)
@@ -189,6 +210,23 @@ function psStoreRun(PDO $pdo)
         && psStoreCount($pdo, $tablesB['outbox']) === 1
         && psStoreCount($pdo, $tables['ledger']) === 3,
         'incorrect_number_of_events');
+
+    // An existing in-memory store cannot trust a binding COUNT cached by Db.
+    // CI-only mutation changes the merchant on the synthetic binding, while
+    // keeping provider, status and FK intact. Capture must fail closed.
+    $binding = $tables['binding'];
+    psStoreAssert($pdo->exec("UPDATE " . $binding
+        . " SET merchant='TEMP_CI' WHERE merchant='ABH'") === 1,
+        'test_binding_change_not_applied');
+    psStoreReject(function () use ($router, $store) {
+        psStoreCapture($router, $store, 61, 'd');
+    }, 'stale_binding_was_accepted');
+    psStoreAssert($pdo->exec("UPDATE " . $binding
+        . " SET merchant='ABH' WHERE merchant='TEMP_CI'") === 1,
+        'test_binding_restore_failed');
+    psStoreAssert(psStoreCount($pdo, $tables['outbox']) === 4
+        && psStoreCount($pdo, $tables['ledger']) === 3,
+        'revoked_binding_created_event');
     $q = $pdo->prepare('SELECT latest_accepted_sequence FROM '
         . $tables['ledger'] . ' WHERE source_namespace=? AND shop_id=1 '
         . "AND entity_type='customer' AND entity_id=44");
