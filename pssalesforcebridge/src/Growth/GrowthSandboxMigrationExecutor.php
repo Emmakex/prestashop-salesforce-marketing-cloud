@@ -25,8 +25,10 @@ final class GrowthSandboxMigrationExecutor
         PDO $db, $prestashopVersion, $merchant, $provider, $namespace,
         $mode, $prefix
     ) {
-        // The sandbox boundary is checked before any DDL/DML.
+        // Both environment AND SQL CHECK enforcement must be established
+        // before planning any sandbox installation or DROP operations.
         self::assertSandbox($db);
+        GrowthSqlEngineGate::inspectConnection($db);
         $this->plan = GrowthOutboxSchemaPlan::preview(
             $prestashopVersion, $merchant, $provider, $namespace, $mode, $prefix
         );
