@@ -205,6 +205,8 @@ jobs:
           python scripts/ci/verify-g3-business-goal-coverage.py
           python scripts/ci/verify-g3-technical-closure.py
           python -m unittest discover -s tests -p 'test_g3_technical_closure.py'
+          python scripts/ci/verify-g3-signoff-handoff.py
+          python -m unittest discover -s tests -p 'test_g3_signoff_handoff.py'
           python scripts/ci/render-g4-readiness-report.py
           python -m unittest discover -s tests -p 'test_g4_unified_readiness.py'
           python -m unittest discover -s tests -p 'test_g3_business_goal_coverage.py'
