@@ -180,7 +180,11 @@ assertDmo($result['relationship']['sold_to_customer_relation_seen']
     && $result['relationship']['account_contact_relationship_scan_complete']
     && $result['relationship']['contact_email_relationship_scan_complete']
     && !$result['relationship']['account_contact_bridge_approved']
-    && !$result['relationship']['contact_email_bridge_approved'],
+    && !$result['relationship']['contact_email_bridge_approved']
+    && !$result['relationship']['active_sales_order_to_account_contact_bill_to_relation_seen']
+    && !$result['relationship']['active_account_contact_to_individual_relation_seen']
+    && !$result['relationship']['active_sales_order_to_contact_email_bill_to_relation_seen']
+    && !$result['relationship']['active_contact_email_to_individual_party_relation_seen'],
     'exact_relationship');
 assertDmo(!$result['relationship']['bill_to_contact_relation_seen'],
     'wrong_relation_target');
@@ -284,9 +288,13 @@ $bridges['contact_email_relationships']['relationships'][] = [
 $bridgeUrls = [];
 $bridgeAccountOnly = $probe->inspect(fakeGet($bridges, $bridgeUrls));
 assertDmo($bridgeAccountOnly['relationship']['sales_order_to_account_contact_bill_to_relation_seen']
+    && $bridgeAccountOnly['relationship']['active_sales_order_to_account_contact_bill_to_relation_seen']
     && $bridgeAccountOnly['relationship']['account_contact_to_individual_relation_seen']
+    && $bridgeAccountOnly['relationship']['active_account_contact_to_individual_relation_seen']
     && $bridgeAccountOnly['relationship']['sales_order_to_contact_email_bill_to_relation_seen']
+    && $bridgeAccountOnly['relationship']['active_sales_order_to_contact_email_bill_to_relation_seen']
     && !$bridgeAccountOnly['relationship']['contact_email_to_individual_party_relation_seen']
+    && !$bridgeAccountOnly['relationship']['active_contact_email_to_individual_party_relation_seen']
     && !$bridgeAccountOnly['relationship']['account_contact_bridge_approved']
     && !$bridgeAccountOnly['relationship']['contact_email_bridge_approved'],
     'buyer_bridge_scope_or_purpose_confused');
@@ -295,10 +303,53 @@ $bridges['contact_email_relationships']['relationships'][0]['targetEntity']['nam
 $bothBridgeUrls = [];
 $bothBridges = $probe->inspect(fakeGet($bridges, $bothBridgeUrls));
 assertDmo($bothBridges['relationship']['contact_email_to_individual_party_relation_seen']
+    && $bothBridges['relationship']['active_contact_email_to_individual_party_relation_seen']
     && $bothBridges['objects']['SalesOrder']['candidate_fields_present']['ssot__BilltoEmailId__c']
     && $bothBridges['relationship']['contact_email_relationship_scan_complete']
     && !$bothBridges['relationship']['contact_email_bridge_approved']
     && !$bothBridges['tenant_mapping_approved'], 'both_paths_falsely_certified');
+
+// Visibility and active status are different: an inactive/missing/unknown
+// relationship status may be recorded as "seen", but NEVER as ACTIVE.
+// This matters for owner review: existing metadata can describe dormant
+// standard edges with no PST data mapping configured in ABH.
+$inactiveBridges = $bridges;
+$inactiveBridges['relationships']['relationships'][2]['status'] = 'INACTIVE';
+$inactiveBridges['relationships']['relationships'][3]['status'] = 'active';
+$inactiveBridges['account_contact_relationships']['relationships'][0]['status']
+    = 'UNKNOWN';
+unset($inactiveBridges['contact_email_relationships']['relationships'][0]['status']);
+$inactiveUrls = [];
+$inactiveEvidence = $probe->inspect(fakeGet($inactiveBridges, $inactiveUrls));
+$ir = $inactiveEvidence['relationship'];
+assertDmo($ir['sales_order_to_account_contact_bill_to_relation_seen']
+    && !$ir['active_sales_order_to_account_contact_bill_to_relation_seen']
+    && $ir['account_contact_to_individual_relation_seen']
+    && !$ir['active_account_contact_to_individual_relation_seen']
+    && $ir['sales_order_to_contact_email_bill_to_relation_seen']
+    && !$ir['active_sales_order_to_contact_email_bill_to_relation_seen']
+    && $ir['contact_email_to_individual_party_relation_seen']
+    && !$ir['active_contact_email_to_individual_party_relation_seen']
+    && !$ir['account_contact_bridge_approved']
+    && !$ir['contact_email_bridge_approved']
+    && !$inactiveEvidence['tenant_mapping_approved'],
+    'inactive_or_unknown_edge_misreported_as_active');
+
+// The relation API can expose source and target in reverse order.
+// The FK field then belongs to targetField; status handling is unchanged.
+$reverseBuyer = fixtures();
+$reverseBuyer['account_contact_relationships']['relationships'] = [[
+    'sourceEntity' => ['name' => 'ssot__Individual__dlm'],
+    'targetEntity' => ['name' => 'ssot__AccountContact__dlm'],
+    'targetField' => ['name' => 'ssot__IndividualId__c'],
+    'status' => 'ACTIVE',
+]];
+$reverseUrls = [];
+$reverseBuyerEvidence = $probe->inspect(fakeGet($reverseBuyer, $reverseUrls));
+assertDmo($reverseBuyerEvidence['relationship']['account_contact_to_individual_relation_seen']
+    && $reverseBuyerEvidence['relationship']['active_account_contact_to_individual_relation_seen']
+    && !$reverseBuyerEvidence['relationship']['account_contact_bridge_approved'],
+    'reversed_active_buyer_edge_not_reported');
 
 // Optional DMOs can be unavailable to this metadata-only OAuth context.
 // A 403/404 must never become proof that a standard buyer link is absent.
@@ -319,6 +370,8 @@ assertDmo(!$missingOptionals['objects']['AccountContact']['metadata_readable']
     && !$missingOptionals['relationship']['contact_email_relationship_scan_complete']
     && !$missingOptionals['relationship']['account_contact_bridge_approved']
     && !$missingOptionals['relationship']['contact_email_bridge_approved']
+    && !$missingOptionals['relationship']['active_account_contact_to_individual_relation_seen']
+    && !$missingOptionals['relationship']['active_contact_email_to_individual_party_relation_seen']
     && strpos(json_encode($missingOptionals), 'not-published') === false,
     'optional_buyer_dmos_404_falsely_authorized');
 
