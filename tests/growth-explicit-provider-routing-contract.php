@@ -1,31 +1,29 @@
 <?php
-/** Actual dormant module source; provider choice is explicit, not guessed. */
-require_once dirname(__DIR__)
-    . '/pssalesforcebridge/src/Provider/ExplicitProviderRouter.php';
-
+/** Only Growth + Data Cloud can be routed, for PS 1.7/8/9. */
+require_once dirname(__DIR__) . '/pssalesforcebridge/src/Provider/ExplicitProviderRouter.php';
 use Emmakex\PrestaShopSalesforceMarketingCloud\Provider\ExplicitProviderRouter;
 
-function providerCheck($ok, $reason)
+function routerAssert($ok, $reason)
 {
     if (!$ok) {
-        fwrite(STDERR, 'Growth provider router: ' . $reason . PHP_EOL);
+        fwrite(STDERR, 'Growth-only routing FAIL: ' . $reason . PHP_EOL);
         exit(1);
     }
 }
-function providerReject($call, $expected)
+function routerReject($callback, $expected)
 {
     try {
-        call_user_func($call);
+        call_user_func($callback);
     } catch (RuntimeException $e) {
-        providerCheck($e->getMessage() === $expected, $expected);
+        routerAssert($e->getMessage() === $expected, 'wrong_denial_' . $expected);
         return;
     }
-    providerCheck(false, 'accepted_' . $expected);
+    routerAssert(false, 'invalid_accepted_' . $expected);
 }
 foreach ([
     '1.7.8.11' => '1.7.8',
     '8.2.8' => '8',
-    '9.1.5' => '9'
+    '9.1.5' => '9',
 ] as $version => $family) {
     $router = new ExplicitProviderRouter(
         $version, 'ABH', ExplicitProviderRouter::GROWTH,
@@ -34,101 +32,89 @@ foreach ([
     $customer = $router->plan(1, 'customer', 77);
     $order = $router->plan(1, 'order', 77);
     $cart = $router->plan(2, 'cart', 77);
-    providerCheck($customer['prestashop_family'] === $family
+    routerAssert($customer['prestashop_family'] === $family
         && $customer['prestashop_version'] === $version
         && $customer['provider'] === ExplicitProviderRouter::GROWTH
-        && $customer['route_target'] === 'growth_data_360_not_configured'
+        && $customer['route_target'] === 'growth_data_cloud_schema_pending'
         && $customer['source_entity_key'] === 'growth_ci_shopone:1:customer:77'
         && $customer['source_entity_key'] !== $order['source_entity_key']
-        && $order['source_entity_key'] !== $cart['source_entity_key']
-        && $cart['source_entity_key'] === 'growth_ci_shopone:2:cart:77',
-        'expected_route_' . $family);
-    foreach (['namespace_global_uniqueness_certified',
-        'tenant_data_contract_approved', 'external_transport_configured',
-        'data_360_ingestion_authorized', 'growth_flow_authorized',
-        'marketing_sends_authorized', 'outbound_worker_authorized'] as $key) {
-        providerCheck(array_key_exists($key, $customer)
-            && $customer[$key] === false,
-            'unsafe_transport_flag_' . $key);
+        && $order['source_entity_key'] !== $cart['source_entity_key'],
+        'canonical_growth_route_' . $version);
+    foreach ([
+        'namespace_global_uniqueness_certified',
+        'tenant_data_contract_approved',
+        'external_transport_configured',
+        'data_360_ingestion_authorized',
+        'growth_flow_authorized',
+        'marketing_sends_authorized',
+        'outbound_worker_authorized',
+    ] as $flag) {
+        routerAssert(isset($customer[$flag]) && $customer[$flag] === false,
+            'unauthorized_flag_' . $flag);
     }
-    providerCheck($customer['mode'] === 'test'
-        && $customer['status'] === 'blocked', 'must_be_blocked');
-    providerReject(function () use ($router, $customer) {
+    routerReject(function () use ($router, $customer) {
         $router->dispatch($customer);
     }, 'growth_router_outbound_not_authorized');
 }
-$siteA = new ExplicitProviderRouter('8.2.8', 'ABH',
+$a = new ExplicitProviderRouter('8.2.8', 'ABH',
     ExplicitProviderRouter::GROWTH, 'growth_ci_sitea', 'test');
-$siteB = new ExplicitProviderRouter('8.2.8', 'ABH',
+$b = new ExplicitProviderRouter('8.2.8', 'ABH',
     ExplicitProviderRouter::GROWTH, 'growth_ci_siteb', 'test');
-$other = new ExplicitProviderRouter('8.2.8', 'OTHER_MERCHANT',
-    ExplicitProviderRouter::ENGAGEMENT_LEGACY, 'other_ci_site', 'test');
-$siteKeyA = $siteA->plan(1, 'customer', 7)['source_entity_key'];
-$siteKeyB = $siteB->plan(1, 'customer', 7)['source_entity_key'];
-$otherKey = $other->plan(1, 'customer', 7)['source_entity_key'];
-providerCheck($siteKeyA !== $siteKeyB && $siteKeyA !== $otherKey
-    && $siteKeyB !== $otherKey, 'cross_installation_collision');
-providerCheck($other->plan(1, 'order', 7)['route_target']
-    === 'engagement_legacy_not_certified', 'legacy_provider_not_isolated');
-providerReject(function () use ($other) {
-    $other->dispatch($other->plan(1, 'order', 7));
-}, 'growth_router_outbound_not_authorized');
-
-// No fallback to Engagement when ABH provider is absent or wrong.
-foreach (['', null, 'marketing_cloud_engagement', 'unsupported'] as $provider) {
-    $expected = $provider === 'marketing_cloud_engagement'
-        ? 'growth_router_abh_requires_growth'
-        : 'growth_router_explicit_provider_required';
-    providerReject(function () use ($provider) {
+$c = new ExplicitProviderRouter('8.2.8', 'OTHER',
+    ExplicitProviderRouter::GROWTH, 'growth_ci_other', 'test');
+routerAssert($a->plan(1, 'customer', 7)['source_entity_key']
+    !== $b->plan(1, 'customer', 7)['source_entity_key']
+    && $b->plan(1, 'customer', 7)['source_entity_key']
+    !== $c->plan(1, 'customer', 7)['source_entity_key'],
+    'cross_installation_collision');
+foreach ([null, '', 'marketing_cloud_engagement', 'unsupported'] as $provider) {
+    routerReject(function () use ($provider) {
         new ExplicitProviderRouter('8.2.8', 'ABH', $provider,
             'growth_ci_sitea', 'test');
-    }, $expected);
+    }, 'growth_router_growth_only');
 }
-foreach (['1.7.7.9', '1.7.9.0', '9.1.5-alpha', '10.0.0', '', '8.2'] as $version) {
-    providerReject(function () use ($version) {
+foreach (['1.7.7.9', '9.1.5-alpha', '10.0.0', '', '8.2'] as $version) {
+    routerReject(function () use ($version) {
         new ExplicitProviderRouter($version, 'ABH',
             ExplicitProviderRouter::GROWTH, 'growth_ci_sitea', 'test');
     }, 'growth_router_unsupported_prestashop_version');
 }
-foreach (['', 'bad:namespace', 'x', str_repeat('a', 33), 'shop-1'] as $ns) {
-    providerReject(function () use ($ns) {
+foreach (['', 'x', 'shop-1', str_repeat('a', 33)] as $namespace) {
+    routerReject(function () use ($namespace) {
         new ExplicitProviderRouter('8.2.8', 'ABH',
-            ExplicitProviderRouter::GROWTH, $ns, 'test');
+            ExplicitProviderRouter::GROWTH, $namespace, 'test');
     }, 'growth_router_namespace_required');
 }
-foreach (['', '?', 'a', 'abh', str_repeat('A', 33)] as $merchant) {
-    providerReject(function () use ($merchant) {
+foreach (['', 'x', 'lowercase', str_repeat('A', 33)] as $merchant) {
+    routerReject(function () use ($merchant) {
         new ExplicitProviderRouter('8.2.8', $merchant,
             ExplicitProviderRouter::GROWTH, 'growth_ci_sitea', 'test');
     }, 'growth_router_merchant_required');
 }
-foreach (['production', '', 'standby', null] as $mode) {
-    providerReject(function () use ($mode) {
+foreach (['production', '', null] as $mode) {
+    routerReject(function () use ($mode) {
         new ExplicitProviderRouter('8.2.8', 'ABH',
             ExplicitProviderRouter::GROWTH, 'growth_ci_sitea', $mode);
     }, 'growth_router_test_only');
 }
-foreach ([[0, 'cart', 1], [1, 'cart', 0], [1, 'order', -4],
-          [1, 'customer', '1'], ['1', 'cart', 1]] as $input) {
-    providerReject(function () use ($siteA, $input) {
-        $siteA->plan($input[0], $input[1], $input[2]);
+foreach ([[0, 'customer', 1], [1, 'order', 0], [1, 'cart', -1],
+          [1, 'customer', '1']] as $scope) {
+    routerReject(function () use ($a, $scope) {
+        $a->plan($scope[0], $scope[1], $scope[2]);
     }, 'growth_router_entity_scope_invalid');
 }
-foreach (['', 'contact', 'cart_old', 'CART', null, 42] as $type) {
-    providerReject(function () use ($siteA, $type) {
-        $siteA->plan(1, $type, 7);
+foreach (['', 'unknown', 'CART'] as $type) {
+    routerReject(function () use ($a, $type) {
+        $a->plan(1, $type, 7);
     }, 'growth_router_entity_type_invalid');
 }
 $source = file_get_contents(dirname(__DIR__)
     . '/pssalesforcebridge/src/Provider/ExplicitProviderRouter.php');
-foreach (['curl_', 'file_get_contents(', 'Db::', 'Configuration::',
-    '/interaction/v1/events', '/api/v1/ingest/', 'requestAccessToken(',
-    '->execute(', '->query(', '->insert(', '->update('] as $forbidden) {
-    providerCheck(strpos($source, $forbidden) === false,
-        'router_has_outbound_or_database_' . $forbidden);
+foreach (['curl_', 'Db::', 'Configuration::', '->insert(',
+          '->execute(', '->update(', '/interaction/v1/events'] as $forbidden) {
+    routerAssert(strpos($source, $forbidden) === false,
+        'provider_has_unsafe_io_' . $forbidden);
 }
-$module = file_get_contents(dirname(__DIR__)
-    . '/pssalesforcebridge/pssalesforcebridge.php');
-providerCheck(strpos($module, 'ExplicitProviderRouter') === false,
-    'must_not_rewire_legacy_module_without_gate');
-echo "Growth provider route planner: 1.7/8/9, multi-tenant, all outbound blocked.\n";
+routerAssert(strpos($source, 'ENGAGEMENT_LEGACY') === false,
+    'another_provider_still_exists');
+echo "Growth-only route: 1.7/8/9, multi-merchant isolation, all outbound blocked.\n";

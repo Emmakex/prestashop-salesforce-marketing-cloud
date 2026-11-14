@@ -104,11 +104,9 @@ foreach ($results as $r) {
 // unknown source event, or broken store can ever persist.
 $calls = 0;
 $spy = function () use (&$calls) { ++$calls; return []; };
-outboxBridgeReject(function () use ($spy, $shaA) {
-    BlockedOutboxCoordinator::capture(
-        outboxBridgeRouter('other_ci_shop', 'OTHER', ExplicitProviderRouter::ENGAGEMENT_LEGACY),
-        1, 'customer', 71, 'CUSTOMER_CREATED', 'customer:1:71:' . $shaA, $spy);
-}, 'growth_outbox_provider_not_growth');
+outboxBridgeReject(function () {
+    outboxBridgeRouter('other_ci_shop', 'OTHER', 'marketing_cloud_engagement');
+}, 'growth_router_growth_only');
 outboxBridgeReject(function () use ($base, $spy, $shaA) {
     BlockedOutboxCoordinator::capture(
         $base, 1, 'cart', 71, 'CART_ABANDONED', 'cart:1:71:' . $shaA, $spy);
