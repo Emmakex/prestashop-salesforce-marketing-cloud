@@ -186,6 +186,11 @@ console prestashop:module install pssalesforcebridge --no-interaction
 test "$(sql "SELECT version FROM ps_module WHERE name='pssalesforcebridge' LIMIT 1")" = '0.7.1'
 sql "INSERT INTO ps_sfmc_log (level, event, context, created_at) VALUES ('info', 'CI_PRESERVE_MARKER', '{}', UTC_TIMESTAMP())"
 test "$(sql "SELECT COUNT(*) FROM ps_sfmc_log WHERE event='CI_PRESERVE_MARKER'")" = '1'
+# Snapshot a safely blocked 0.7.1 shop before simulating an unsafe old mode.
+# The rollback restores BOTH DB state and the exact historical code package.
+ROLLBACK_SQL="/tmp/pssfmc-rollback-${PS_VERSION//./-}.sql"
+docker exec "$DB_CONTAINER" mysqldump -uroot -padmin --single-transaction --quick --skip-lock-tables prestashop > "$ROLLBACK_SQL"
+test -s "$ROLLBACK_SQL"
 sql "UPDATE ps_configuration SET value='production' WHERE name='PS_SFMC_MODE'"
 
 echo "==> Phase B: upgrade to 0.8.0 with no historical data loss"
@@ -233,4 +238,21 @@ assert d['data_cloud_ingestion']['skipped']=='schema_required',d
 assert 'customer_delivery' not in d and 'journey_delivery' not in d,d
 PY
 curl -fsS --max-time 10 "http://127.0.0.1:${PORT}/" >/dev/null
-echo "Growth-only 0.8.0 runtime PASS on PrestaShop $PS_VERSION"
+
+echo "==> Phase D: restore 0.7.1 from pre-upgrade DB backup and exact historical files"
+copy_module /tmp/pssfmc-runtime-old/pssalesforcebridge
+docker exec -i "$DB_CONTAINER" mysql -uroot -padmin prestashop < "$ROLLBACK_SQL"
+test "$(sql "SELECT version FROM ps_module WHERE name='pssalesforcebridge' LIMIT 1")" = '0.7.1'
+test "$(sql "SELECT value FROM ps_configuration WHERE name='PS_SFMC_MODE' ORDER BY id_configuration DESC LIMIT 1")" = 'test'
+test "$(sql "SELECT COUNT(*) FROM ps_sfmc_log WHERE event='CI_PRESERVE_MARKER'")" = '1'
+docker exec -u www-data -w /var/www/html "$PS_CONTAINER" php -r '
+require "config/config.inc.php";
+$m = Module::getInstanceByName("pssalesforcebridge");
+if (!is_object($m) || $m->version !== "0.7.1"
+    || Configuration::get("PS_SFMC_MODE") !== "test") {
+    fwrite(STDERR, "Rollback did not restore 0.7.1 in Test\\n");
+    exit(1);
+}
+'
+echo "Rollback of historical 0.7.1 from snapshot PASS: Test gate and records preserved."
+echo "Growth-only 0.8.0 upgrade, clean install and rollback PASS on PrestaShop $PS_VERSION"
