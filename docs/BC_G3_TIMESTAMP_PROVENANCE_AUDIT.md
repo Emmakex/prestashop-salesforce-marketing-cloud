@@ -62,9 +62,9 @@ NO deben inventarse.
 El aviso de retención se observa, pero no se ha inspeccionado el estado
 del cron ni su primera ejecución; no pulsar acciones de retención,
 backfill o conexión como parte de esta auditoría. La etiqueta de
-“Marketing Cloud Engagement” del panel de salud del módulo 0.7.1
+“producto discontinuado” del panel de salud del módulo 0.7.1
 corresponde a la interfaz heredada: **el destino de ABH sigue siendo
-Marketing Cloud Growth + Data 360**, no Engagement.
+Marketing Cloud Growth + Data 360**, solo Growth + Data Cloud.
 
 **Siguiente trabajo sin permisos SQL del usuario:** diseñar y probar,
 con datos sintéticos, cómo registrar un instante de captura UTC verificable

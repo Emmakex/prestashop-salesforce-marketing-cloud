@@ -89,7 +89,7 @@ business review.
 
 BC stays **Test** until the current registration/checkout opt-in state,
 newsletter confirmation mechanism, stored evidence, scope, unsubscribe
-and complaint statuses in the correct Marketing Cloud Engagement
+and complaint statuses in the correct producto discontinuado
 Business Unit are verified. The default cart policy in 0.7.1
 requires first-party `newsletter`, yet still lacks an integrated
 read-only Salesforce suppression adapter; **do not activate Production**.

@@ -73,7 +73,7 @@ la semántica de esas fechas.
 4. Se debe consultar `All Subscribers`, estado por publication list
    cuando corresponda y todas las supresiones/bajas/objeciones de Salesforce.
    **Sin adaptador real de lectura certificado, BC sigue en Test**.
-5. Los carritos históricos no se enviarán retroactivamente a Journeys
+5. Los carritos históricos no se enviarán retroactivamente a orquestadores discontinuados
    durante la carga de datos. Una recuperación exige carrito actual sin
    pedido, ventana de tiempo verificada, finalidad y autorización.
 6. Este diagnóstico no autoriza ingesta Data Cloud, mensajes, activación
