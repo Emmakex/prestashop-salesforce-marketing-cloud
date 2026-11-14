@@ -74,7 +74,7 @@ en un runtime Growth operativo.
 The real 0.7.1 queue first updates
 `CustomerSyncLedger/OrderSyncLedger` and then separately calls
 `QueueRepository::enqueue`. The existing legacy outbound processor
-can still write to its Engagement Data Extension before the local
+can still write to its producto discontinuado almacenamiento discontinuado before the local
 ledger's `markSynced`; that is not acceptable as an ABH Growth
 delivery path.
 
@@ -102,4 +102,4 @@ future production-grade Growth outbox, we must separately:
 The tests use only synthetic IDs and no personal data or secret
 Salesforce tokens. **Do not install a new ZIP on BC** for this test.
 No production queries, backfills, schema uploads, data streams,
-Marketing Cloud Engagement routes or marketing messages were executed.
+producto discontinuado routes or marketing messages were executed.

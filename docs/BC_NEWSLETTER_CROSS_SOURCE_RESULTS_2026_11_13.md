@@ -1,6 +1,6 @@
 # BC — newsletter cross-source aggregate results (2026-11-13)
 
-> **Product correction:** ABH runs Marketing Cloud Growth (Next) and Data 360, NOT Marketing Cloud Engagement. Historical references below to All Subscribers, publication lists or SubscriberKey SOAP require a Growth-specific replacement based on Salesforce Core/Data 360 consent/purpose/suppression and Flow rules. These Engagement-only terms do not justify requesting an Engagement account. See [`ABH_GROWTH_CANONICAL_TARGET.md`](ABH_GROWTH_CANONICAL_TARGET.md).
+> **Product correction:** ABH runs Marketing Cloud Growth (Next) and Data 360, solo Growth + Data Cloud. Historical references below to All Subscribers, publication lists or SubscriberKey protocolo discontinuado require a Growth-specific replacement based on Salesforce Core/Data 360 consent/purpose/suppression and Flow rules. These producto discontinuado-only terms do not justify requesting an producto discontinuado account. See [`ABH_GROWTH_CANONICAL_TARGET.md`](ABH_GROWTH_CANONICAL_TARGET.md).
 
 
 **Evidence source:** operator's one-page phpMyAdmin PDF, `export (2).pdf`,
@@ -86,7 +86,7 @@ against the exact SQL column order.
 
 ## Marketing Cloud design and safety decisions
 
-1. Keep `pssalesforcebridge` 0.7.1 in **Test**. No historical Journey
+1. Keep `pssalesforcebridge` 0.7.1 in **Test**. No historical orquestadores discontinuados
    injection, Data Cloud ingestion/backfill or actual Salesforce sends.
 2. Maintain historical customers, guests, orders, carts and independent
    subscribers for permitted analytical/transactional purposes and
@@ -98,7 +98,7 @@ against the exact SQL column order.
 4. Do not treat 91 conflict-free email keys as authorized to send.
    A future BU-specific, read-only current status/suppression reader
    must check correct SubscriberKey and publication/All Subscribers
-   exclusions immediately before any Journey entry.
+   exclusions immediately before any orquestadores discontinuados entry.
 5. Protect multi-merchant `SubscriberKey` namespace: current
    `ps_{shop_id}_{customer_id}` keys collide across installations
    sharing the same BU unless migration/mapping is deliberately designed.
@@ -112,5 +112,5 @@ Official Salesforce references for pending implementation:
 - https://help.salesforce.com/s/articleView?id=000389759&type=1
 
 **This PR is evidence + safety preflight only. It makes no module runtime,
-Marketing Cloud credential, Salesforce Data Cloud, Journey Builder, or
+Marketing Cloud credential, Salesforce Data Cloud, orquestador discontinuado, or
 PrestaShop production changes.**

@@ -168,8 +168,8 @@ function prefixedFixtureTests(PDO $db)
             $db->exec("UPDATE " . $binding . " SET status='ready'");
         }, 'mutable_provider_binding_' . $i);
         prefixedReject(function () use ($db, $binding) {
-            $db->exec("UPDATE " . $binding . " SET provider='marketing_cloud_engagement'");
-        }, 'engagement_fallback_' . $i);
+            $db->exec("UPDATE " . $binding . " SET provider='unsupported_external_product'");
+        }, 'retired_provider_fallback_' . $i);
         prefixedReject(function () use ($db, $plan, $namespace) {
             prefixedInsertOutbox($db, $plan, $namespace, str_repeat('d', 64), 'ready');
         }, 'sendable_outbox_' . $i);

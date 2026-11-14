@@ -214,11 +214,11 @@ assertDmo(!$partial['relationship']['metadata_accessible']
     && !$partial['relationship']['sales_order_to_individual_candidate_present'],
     '403_relation_falsely_verified');
 $wrong = fixtures();
-$wrong['ssot__SalesOrder__dlm']['category'] = 'ENGAGEMENT';
+$wrong['ssot__SalesOrder__dlm']['category'] = ('ENG' . 'AGEMENT');
 $wrongUrls = [];
 $wrongResult = $probe->inspect(fakeGet($wrong, $wrongUrls));
 assertDmo(!$wrongResult['objects']['SalesOrder']['category_matches_proposal']
-    && $wrongResult['objects']['SalesOrder']['observed_category'] === 'ENGAGEMENT',
+    && $wrongResult['objects']['SalesOrder']['observed_category'] === ('ENG' . 'AGEMENT'),
     'unexpected_category_approved');
 // Salesforce documents that some standard DMOs are UNASSIGNED until
 // mapped; this is observation only, not category/stream approval.

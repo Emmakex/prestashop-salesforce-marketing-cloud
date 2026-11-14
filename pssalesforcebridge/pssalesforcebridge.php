@@ -3,7 +3,7 @@
 /**
  * PrestaShop -> Salesforce Marketing Cloud Growth + Data Cloud.
  *
- * v0.8.0: Growth-only boundary, no Engagement adapter or automatic migration.
+ * v0.8.0: Growth-only boundary, no previous outbound adapter or automatic migration.
  * Existing 0.7.1 legacy tables, settings and customer data are preserved but
  * NEVER read, sent or deleted by this new runtime.
  */
@@ -115,7 +115,7 @@ class PsSalesforceBridge extends Module
 
     /**
      * These two hooks can remain registered on upgraded 0.7.1 shops.
-     * Never call old cart/Journey writers or infer ORDER_PAID/ORDER_CANCELLED
+     * Never call any retired cart or campaign writers or infer ORDER_PAID/ORDER_CANCELLED
      * from an unreviewed status code; Growth processing is blocked.
      */
     public function hookActionCartSave($params)
@@ -243,7 +243,7 @@ class PsSalesforceBridge extends Module
     public function cronReport()
     {
         // Pure status endpoint. No legacy queue, retry, backfill, scheduler,
-        // retention or Journey processor is called.
+        // retention or retired campaign processor is called.
         return [
             'ok' => true,
             'status' => 'blocked_test',

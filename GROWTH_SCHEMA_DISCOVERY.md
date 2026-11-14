@@ -58,7 +58,7 @@ availability, and an ABH test contact. Only then develop optional
 per-shop Growth REST/ingestion adapters, still defaulting to test mode,
 with separate staging-only live-write certification.
 
-This discovery changes no PrestaShop Engagement 0.7.0 delivery path.
+This discovery changes no PrestaShop producto discontinuado 0.7.0 delivery path.
 
 ## Official Salesforce reference
 

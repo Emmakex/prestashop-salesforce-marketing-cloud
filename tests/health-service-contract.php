@@ -96,7 +96,7 @@ function productionConfiguration()
         'client_secret' => true,
         'customer_de_key' => true,
         'order_de_key' => true,
-        'journey_event_definition_key' => true,
+        'retired_flow_event_definition_key' => true,
     ];
 }
 

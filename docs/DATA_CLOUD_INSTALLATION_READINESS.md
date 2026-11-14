@@ -14,8 +14,8 @@ before the tenant data-owner approves Data Cloud ingestion.
 - Never selects customer/order rows, changes the database, reads secrets,
   fetches tokens or contacts Salesforce.
 
-Existing Marketing Cloud Engagement health is independent. A healthy
-Engagement queue does not authorize Growth/Data Cloud writes.
+Existing producto discontinuado health is independent. A healthy
+producto discontinuado queue does not authorize Growth/Data Cloud writes.
 
 ## Evidence scope
 

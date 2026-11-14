@@ -6,7 +6,7 @@ The connector keeps local operational data only for as long as it remains useful
 
 Retention runs from the existing protected cron at most once every 24 hours. A merchant can also run it manually from the module configuration screen.
 
-A retention failure is isolated from customer, order and Journey delivery. The cron reports a sanitized `retention_failed` result and never exposes database exceptions, credentials, queue payloads or customer data.
+A retention failure is isolated from customer, order and orquestadores discontinuados delivery. The cron reports a sanitized `retention_failed` result and never exposes database exceptions, credentials, queue payloads or customer data.
 
 ## Configurable windows
 
@@ -16,7 +16,7 @@ Defaults:
 
 - processed queue: 30 days;
 - local logs: 30 days;
-- Journey audit: 90 days;
+- orquestadores discontinuados audit: 90 days;
 - cart snapshots: 30 days;
 - recovery tokens: 30 days.
 
@@ -41,9 +41,9 @@ Rows in `sfmc_log` older than the configured log window are deleted.
 
 The protected cron also returns sanitized failure codes instead of raw exception messages, reducing the risk of secrets or customer context being exposed to callers.
 
-## Journey audit
+## orquestadores discontinuados audit
 
-Only terminal, non-error Journey audit rows are deleted automatically:
+Only terminal, non-error orquestadores discontinuados audit rows are deleted automatically:
 
 - `sent`;
 - `suppressed`.
@@ -101,7 +101,7 @@ Retention must never:
 - delete undelivered queue work;
 - delete terminal failures that still require investigation;
 - invalidate an active recovery link by deleting its abandoned snapshot prematurely;
-- delete an abandoned snapshot while its Journey event is unresolved;
+- delete an abandoned snapshot while its orquestadores discontinuados event is unresolved;
 - delete recovered-order attribution merely to remove token identity;
 - expose raw exception messages or secrets through cron responses.
 

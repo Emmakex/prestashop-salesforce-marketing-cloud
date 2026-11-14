@@ -100,12 +100,12 @@ foreach ($results as $r) {
         'outbox_pii_or_source_identity_exposed');
 }
 
-// No injection of an Engagement merchant, cart, malformed dedupe,
+// No injection of an RetiredProvider merchant, cart, malformed dedupe,
 // unknown source event, or broken store can ever persist.
 $calls = 0;
 $spy = function () use (&$calls) { ++$calls; return []; };
 outboxBridgeReject(function () {
-    outboxBridgeRouter('other_ci_shop', 'OTHER', 'marketing_cloud_engagement');
+    outboxBridgeRouter('other_ci_shop', 'OTHER', 'unsupported_external_product');
 }, 'growth_router_growth_only');
 outboxBridgeReject(function () use ($base, $spy, $shaA) {
     BlockedOutboxCoordinator::capture(

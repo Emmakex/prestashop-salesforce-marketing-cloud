@@ -1,14 +1,14 @@
 # G3 — Nueva cola Growth independiente, reversible y bloqueada (laboratorio)
 
 **Fecha:** 13/11/2026. **Proyecto:** puente PrestaShop reutilizable, primera tienda ABH/Barcelona Confort.  
-**Destino:** Salesforce Marketing Cloud **Growth/Next + Data 360**, **NO Engagement**.  
+**Destino:** Salesforce Marketing Cloud **Growth/Next + Data 360**, **solo Growth + Data Cloud**.  
 **Estado:** propuesta y prueba de CI en MySQL 8/MariaDB 10.11, **NO instalada**, **NO aprobada para producción**.
 
 ## Problema que resuelve
 
 El módulo instalado 0.7.1 incorpora `sfmc_queue` y los ledgers
 `sfmc_customer_sync` y `sfmc_order_sync` asociados al adaptador
-histórico de Engagement. La cola antigua utiliza una clave única
+histórico de producto discontinuado. La cola antigua utiliza una clave única
 `dedupe_key` **sin namespace de instalación**. No podemos convertirla
 en una cola Growth con `UPDATE` ni reapropiarnos de sus filas, porque
 crearía posibles colisiones, transacciones incompletas y envíos por el
@@ -52,7 +52,7 @@ período de retención requieren revisión del responsable (G3-07).
   namespace/tienda/tipo/entidad. El reintento del mismo fingerprint
   conserva el instante de la primera aceptación.
 - La cola Growth nunca comparte el mecanismo `claimBatch()` ni los
-  workers de `sfmc_queue` de Engagement.
+  workers de `sfmc_queue` de producto discontinuado.
 - No se crean Data Streams, Data Lake Objects, Data Model Objects,
   segmentos, Flows ni campañas mediante este componente.
 
@@ -129,25 +129,25 @@ demuestra el comportamiento de un diseño aislado.
 
 El nuevo `pssalesforcebridge/src/Provider/ExplicitProviderRouter.php` es **código reutilizable del módulo**, no una clase del laboratorio. Separa el plan local por comercio, instalación, tienda, entidad y proveedor expresamente elegido: `source_namespace:shop_id:entity_type:entity_id`. Acepta candidatos PrestaShop `1.7.8.x`, `8.x`, `9.x`; los casos exactos certificados por CI y runtime existente siguen siendo `1.7.8.11`, `8.2.8`, `9.1.5`. El registro lógico no deriva namespace de URL, base de datos ni shop ID. La unicidad global del namespace **no está certificada** (G3-01).
 
-**Regla fija del piloto:** `ABH` requiere seleccionar explícitamente `marketing_cloud_growth`; seleccionar Engagement devuelve error y **no** existe fallback automático. Otros comercios pueden preparar una ruta `marketing_cloud_engagement` independiente, pero queda sin certificación de tenant ni permiso de envío. Todas las rutas se limitan a `mode=test`, `status=blocked` y flags de ingesta, Flow, marketing y worker `false`; `dispatch()` siempre rechaza. No hay DB, Salesforce, cola ni HTTP en este componente. No se integra todavía al bootstrap o worker del módulo instalado 0.7.1, no hay upgrade ni configuración nueva. Ninguna prueba de este selector es consentimiento, aprobación de PST o autorización para cambiar el proveedor operativo.
+**Regla fija del piloto:** `ABH` requiere seleccionar explícitamente `marketing_cloud_growth`; seleccionar producto discontinuado devuelve error y **no** existe fallback automático. Otros comercios pueden preparar una ruta `unsupported_external_product` independiente, pero queda sin certificación de tenant ni permiso de envío. Todas las rutas se limitan a `mode=test`, `status=blocked` y flags de ingesta, Flow, marketing y worker `false`; `dispatch()` siempre rechaza. No hay DB, Salesforce, cola ni HTTP en este componente. No se integra todavía al bootstrap o worker del módulo instalado 0.7.1, no hay upgrade ni configuración nueva. Ninguna prueba de este selector es consentimiento, aprobación de PST o autorización para cambiar el proveedor operativo.
 
-La prueba `tests/growth-explicit-provider-routing-contract.php` comprueba sintéticamente identidad entre instalaciones/tiendas/entidades, tres familias PrestaShop, selección Growth de ABH, rechazo de producción y selección ambigua, aislamiento del legado y prohibición de salida. **Siguiente paso productivo tras cerrar G3:** unir el selector explícito con el outbox Growth namespaced y una instalación/rollback autorizados, después con el transporte Growth homologado, sin reutilizar registros ni sender Engagement. El CI de contratos **no sustituye** certificación de integración real de este componente en tiendas.
+La prueba `tests/growth-explicit-provider-routing-contract.php` comprueba sintéticamente identidad entre instalaciones/tiendas/entidades, tres familias PrestaShop, selección Growth de ABH, rechazo de producción y selección ambigua, aislamiento del legado y prohibición de salida. **Siguiente paso productivo tras cerrar G3:** unir el selector explícito con el outbox Growth namespaced y una instalación/rollback autorizados, después con el transporte Growth homologado, sin reutilizar registros ni sender producto discontinuado. El CI de contratos **no sustituye** certificación de integración real de este componente en tiendas.
 
 
 ## Integración local real entre selector Growth y outbox, sin instalar (14/11/2026)
 
-Se añade `pssalesforcebridge/src/Growth/BlockedOutboxCoordinator.php` al código reutilizable del módulo. Su función `capture()` consume **el selector real** `ExplicitProviderRouter` y el **contrato real de aceptación atómica** `StagedAtomicUtcAcceptance`. Exige explícitamente un almacenamiento `insertOrLoad` transaccional; nunca construye una conexión SQL ni usa la cola `sfmc_queue` de Engagement. Un comercio con proveedor `marketing_cloud_engagement` no puede entregar registros al outbox Growth.
+Se añade `pssalesforcebridge/src/Growth/BlockedOutboxCoordinator.php` al código reutilizable del módulo. Su función `capture()` consume **el selector real** `ExplicitProviderRouter` y el **contrato real de aceptación atómica** `StagedAtomicUtcAcceptance`. Exige explícitamente un almacenamiento `insertOrLoad` transaccional; nunca construye una conexión SQL ni usa la cola `sfmc_queue` de producto discontinuado. Un comercio con proveedor `unsupported_external_product` no puede entregar registros al outbox Growth.
 
 Solo admite `customer` y `order` con los eventos ya registrados por hooks de PrestaShop. Rechaza `cart` antes de cualquier intento de guardar: **PSCart no existe en el esquema aprobado**. La identidad incluye namespace explícito, tienda, tipo e ID de entidad; la deduplicación utiliza el contrato existente de fingerprint sin timestamp. El resultado regresa únicamente estado `blocked_local_only`, `accepted_sequence`, instante UTC de aceptación y flags que **siempre son false** para ingesta, Flow, envío, cola externa, versión de origen y unicidad global del namespace. **Ni la secuencia ni el instante UTC demuestran que el registro haya sido modificado en ese momento.**
 
-Ahora existe también una prueba de integración de extremo a extremo **local**: `tests/integration/g3_growth_provider_outbox_bridge.php` enlaza las dos clases del módulo con `G3GrowthOutboxSandboxStore` y las dos tablas exclusivas de Growth dentro de la BD desechable `g3_ci`. Se ejecuta sobre MySQL 8/MariaDB 10.11, comprueba reintentos, restauración de timestamp, fallo de transacción, varios comercios/tiendas/entidades, historial que no retrocede, bloqueo SQL de `status`, rechazo de Engagement/carts, rechazo de rollback no vacío y conservación de contadores de las tres tablas legadas. La otra prueba `tests/growth-provider-outbox-bridge-contract.php` verifica el comportamiento sin DB en PHP 7.1/8.5.
+Ahora existe también una prueba de integración de extremo a extremo **local**: `tests/integration/g3_growth_provider_outbox_bridge.php` enlaza las dos clases del módulo con `G3GrowthOutboxSandboxStore` y las dos tablas exclusivas de Growth dentro de la BD desechable `g3_ci`. Se ejecuta sobre MySQL 8/MariaDB 10.11, comprueba reintentos, restauración de timestamp, fallo de transacción, varios comercios/tiendas/entidades, historial que no retrocede, bloqueo SQL de `status`, rechazo de producto discontinuado/carts, rechazo de rollback no vacío y conservación de contadores de las tres tablas legadas. La otra prueba `tests/growth-provider-outbox-bridge-contract.php` verifica el comportamiento sin DB en PHP 7.1/8.5.
 
 **Importante:** se trata de un contrato funcional ya codificado, pero `pssalesforcebridge.php` no lo carga ni lo llama, no hay configuración de proveedor nueva, upgrade ejecutable ni migración de BC. Las tablas `g3_*` son exclusivamente de CI. Implementar una migración real con prefijo PrestaShop, datos de cliente, política de retención y acoplamiento a hooks exige aprobación separada después de G3. No es un Growth sender, y ninguna operación sale a Salesforce. Barcelona Confort continúa en **0.7.1, modo Test**, sin ZIP ni acceso SQL del usuario.
 
 
 ## Preflight físico del upgrade por prefijo (14/11/2026): código real, **no ejecutado en tiendas**
 
-El componente `pssalesforcebridge/src/Growth/GrowthOutboxSchemaPlan.php` entrega un **plan puro, determinista y sin conexión SQL** para la siguiente actualización de la extensión en PrestaShop 1.7.8.x/8/9. Reutiliza `ExplicitProviderRouter` para validar comercio/versión/proveedor/namespace y rechaza cualquier selección de Engagement; no lee `_DB_PREFIX_` ni extrapola el namespace del dominio o de la base. El prefijo debe suministrarse explícitamente y cumplir una lista segura de caracteres y longitud.
+El componente `pssalesforcebridge/src/Growth/GrowthOutboxSchemaPlan.php` entrega un **plan puro, determinista y sin conexión SQL** para la siguiente actualización de la extensión en PrestaShop 1.7.8.x/8/9. Reutiliza `ExplicitProviderRouter` para validar comercio/versión/proveedor/namespace y rechaza cualquier selección de producto discontinuado; no lee `_DB_PREFIX_` ni extrapola el namespace del dominio o de la base. El prefijo debe suministrarse explícitamente y cumplir una lista segura de caracteres y longitud.
 
 El plan propone **tres tablas nuevas**, siempre separadas de `sfmc_*`:
 
@@ -185,7 +185,7 @@ Antes de poder consultar o escribir exige estrictamente `G3_CI_ENABLE=yes_sandbo
 
 La ruta utiliza `GET_LOCK` por instalación/tienda/entidad para proteger concurrencia y `START TRANSACTION` → `SELECT ... FOR UPDATE` → alta idempotente en outbox → actualización del ledger → `COMMIT`. Los duplicados conservan secuencia y captura UTC originales. Un error o `executeS=false` nunca se interpreta como ausencia: se intenta `ROLLBACK` y el evento queda sin aceptación. La respuesta del almacenamiento debe cumplir exactamente el contrato existente `StagedAtomicUtcAcceptance`, sin datos extra ni autorización de salida.
 
-La prueba `tests/integration/g3_growth_prestashop_db_store.php` utiliza un doble de los **métodos de `Db` de PrestaShop**, respaldado por MySQL 8 y MariaDB 10.11 desechables: eventos con duplicados, cambios, tienda y entidad distintas, múltiples prefijos, cuatro procesos concurrentes, fallo forzado tras outbox/ledger, SELECT fallido, intento de proveedor Engagement, rechazo de PSCart, imposibilidad de desinstalar con eventos y conservación de los espejos legacy. **No equivale todavía a una ejecución de esa clase sobre una instalación PrestaShop auténtica**; los tests de runtime de las tres versiones deben complementarse con aceptación específica cuando G3 y el upgrade estén aprobados.
+La prueba `tests/integration/g3_growth_prestashop_db_store.php` utiliza un doble de los **métodos de `Db` de PrestaShop**, respaldado por MySQL 8 y MariaDB 10.11 desechables: eventos con duplicados, cambios, tienda y entidad distintas, múltiples prefijos, cuatro procesos concurrentes, fallo forzado tras outbox/ledger, SELECT fallido, intento de proveedor producto discontinuado, rechazo de PSCart, imposibilidad de desinstalar con eventos y conservación de los espejos legacy. **No equivale todavía a una ejecución de esa clase sobre una instalación PrestaShop auténtica**; los tests de runtime de las tres versiones deben complementarse con aceptación específica cuando G3 y el upgrade estén aprobados.
 
 BC mantiene `pssalesforcebridge` **0.7.1 en Test**. No hay nueva versión del módulo, ZIP para instalar, SQL sobre una tienda, publicación del esquema PST, permisos Growth, recuperación de carritos ni envío autorizado.
 

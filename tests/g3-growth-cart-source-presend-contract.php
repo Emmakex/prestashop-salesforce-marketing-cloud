@@ -56,7 +56,7 @@ expectG3Cart($clear['status'] === 'local_source_candidate_only' && $clear['reaso
 nonAuthorizingG3Cart($clear);
 
 $cases = [
-    ['provider', 'marketing_cloud_engagement', 'provider_not_growth'],
+    ['provider', 'unsupported_external_product', 'provider_not_growth'],
     ['runtime_mode', 'production', 'runtime_not_test'],
     ['installation_shop_scope', 'cross_scope', 'scope_not_verified'],
     ['installation_shop_scope', 'unknown', 'scope_not_verified'],

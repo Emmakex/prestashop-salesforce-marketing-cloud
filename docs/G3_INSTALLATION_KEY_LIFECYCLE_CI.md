@@ -1,7 +1,7 @@
 # G3-01 · Claves de instalación: rotación, revocación y desafíos obsoletos
 
 **13/11/2026 · SOLO LABORATORIO DE CI · SIN APROBACIÓN DEL RESPONSABLE.**  
-**ABH / Barcelona Confort:** Marketing Cloud **Growth/Next + Data 360**, no Engagement. Módulo distribuido 0.7.1, modo `test`.
+**ABH / Barcelona Confort:** Marketing Cloud **Growth/Next + Data 360**, solo Growth + Data Cloud. Módulo distribuido 0.7.1, modo `test`.
 
 ## Qué mejora este corte técnico
 

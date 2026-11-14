@@ -81,7 +81,7 @@ final class G3SandboxLegacyQueueBridge
             $oldStatus = $ledger->fetchColumn();
             if ($oldStatus !== false && $oldStatus !== 'blocked') {
                 // Never overwrite the ledger maintained by the installed
-                // Engagement worker. An opt-in migration needs its own ADR.
+                // RetiredProvider worker. An opt-in migration needs its own ADR.
                 throw new RuntimeException('g3_bridge_active_legacy_ledger');
             }
 

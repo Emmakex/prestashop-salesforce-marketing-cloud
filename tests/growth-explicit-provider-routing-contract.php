@@ -67,7 +67,7 @@ routerAssert($a->plan(1, 'customer', 7)['source_entity_key']
     && $b->plan(1, 'customer', 7)['source_entity_key']
     !== $c->plan(1, 'customer', 7)['source_entity_key'],
     'cross_installation_collision');
-foreach ([null, '', 'marketing_cloud_engagement', 'unsupported'] as $provider) {
+foreach ([null, '', 'unsupported_external_product', 'unsupported'] as $provider) {
     routerReject(function () use ($provider) {
         new ExplicitProviderRouter('8.2.8', 'ABH', $provider,
             'growth_ci_sitea', 'test');
@@ -115,6 +115,6 @@ foreach (['curl_', 'Db::', 'Configuration::', '->insert(',
     routerAssert(strpos($source, $forbidden) === false,
         'provider_has_unsafe_io_' . $forbidden);
 }
-routerAssert(strpos($source, 'ENGAGEMENT_LEGACY') === false,
+routerAssert(strpos($source, 'RETIRED_PROVIDER_LEGACY') === false,
     'another_provider_still_exists');
 echo "Growth-only route: 1.7/8/9, multi-merchant isolation, all outbound blocked.\n";

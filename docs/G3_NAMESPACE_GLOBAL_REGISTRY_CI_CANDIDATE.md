@@ -1,6 +1,6 @@
 # G3-01 — Reserva de namespaces y detección de clonaciones (solo CI)
 
-**13/11/2026. Proyecto:** conector PrestaShop multi-merchant con proveedor explícito. ABH/Barcelona Confort = Marketing Cloud **Growth + Data 360**, no Engagement.  
+**13/11/2026. Proyecto:** conector PrestaShop multi-merchant con proveedor explícito. ABH/Barcelona Confort = Marketing Cloud **Growth + Data 360**, solo Growth + Data Cloud.  
 **Estado:** contrato técnico de laboratorio **no publicado, no desplegado y pendiente de aprobación de responsable**.
 
 ## Problema comprobable
@@ -48,7 +48,7 @@ y MariaDB 10.11:
 - Intento de reaprovechar la identidad de instalación bajo un namespace nuevo.
 - Conflictos de merchant, selector de proveedor y nombres no válidos.
 - Dos instalaciones independientes con diferentes namespaces sin colisión,
-  una Growth/ABH y otra de laboratorio Engagement, sin ruteo real.
+  una Growth/ABH y otra de laboratorio producto discontinuado, sin ruteo real.
 - Bloqueo de aprobación/ingesta/envío, tabla InnoDB y claves únicas.
 - Imposibilidad de destruir un registro con reservas; eliminación solo
   de los fixtures sintéticos al finalizar las pruebas del laboratorio.

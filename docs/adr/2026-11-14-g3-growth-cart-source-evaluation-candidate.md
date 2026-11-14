@@ -4,7 +4,7 @@
 
 ## Problema de negocio y límites conocidos
 
-Objetivo: recuperar carritos abandonados y evitar recordar compras ya completadas. El destino contratado en ABH es **Marketing Cloud Growth/Next + Data 360**, no Engagement. La instalación `pssalesforcebridge` 0.7.1 en Test ya registra capturas de carritos, usa un plazo de 60 minutos y posee `CartAbandonmentDetector`, `OrderSyncLedger::hasOrderForCart`, `CartContactStateReader` y `AbandonedCartJourneyProcessor`. **Este último usa Journey Builder de Engagement y nunca debe ser el sender ABH.**
+Objetivo: recuperar carritos abandonados y evitar recordar compras ya completadas. El destino contratado en ABH es **Marketing Cloud Growth/Next + Data 360**, solo Growth + Data Cloud. La instalación `pssalesforcebridge` 0.7.1 en Test ya registra capturas de carritos, usa un plazo de 60 minutos y posee `CartAbandonmentDetector`, `OrderSyncLedger::hasOrderForCart`, `CartContactStateReader` y `AbandonedCartflow anteriorProcessor`. **Este último usa orquestador discontinuado de producto discontinuado y nunca debe ser el sender ABH.**
 
 Los YAML congelados v0.2/v0.3 definen PSCustomer/PSOrder, **no PSCart**. El catálogo Data 360 ABH leído completamente (527 relaciones de SalesOrder/Individual/Account) tampoco resuelve el vínculo comercial comprador–pedido. No hay consentimiento/supresión Growth certificado, Flow/campaña verificado ni permiso de exportación. G3-01…08 sigue pendiente y G4/G7 bloqueados.
 
@@ -13,7 +13,7 @@ Los YAML congelados v0.2/v0.3 definen PSCustomer/PSOrder, **no PSCart**. El cat�
 | Opción | Implicación | Evidencia o autorización necesaria | Estado |
 | --- | --- | --- | --- |
 | **A. Nuevo objeto PSCart/evento Data 360** | Cambia esquema de ingestión; crea catálogo/retención y posible exposición de carrito | Nuevo expediente G3 con minimización, PK/FK, Event Time/Record Modified según categoría, Stream/DMO, finalidad y firma separada | **No seleccionado** |
-| **B. Cálculo de abandono y conversión en PrestaShop; futuro transporte Growth** | Evita presuponer un tercer objeto PST; revalida estado actual en el origen antes de activar un Flow; no reutiliza sender Engagement | Selección de transporte/Flow **realmente soportado por el tenant ABH**, consentimiento por finalidad, supresiones, límites de frecuencia, carrera de compra vs envío y transacción de cierre | **Candidato de mínima exposición; no aprobado** |
+| **B. Cálculo de abandono y conversión en PrestaShop; futuro transporte Growth** | Evita presuponer un tercer objeto PST; revalida estado actual en el origen antes de activar un Flow; no reutiliza sender producto discontinuado | Selección de transporte/Flow **realmente soportado por el tenant ABH**, consentimiento por finalidad, supresiones, límites de frecuencia, carrera de compra vs envío y transacción de cierre | **Candidato de mínima exposición; no aprobado** |
 | **C. Señal Growth directa sin PSCart en Data 360** | Requiere comprobar API/evento soportado por la edición y relación con campaña | Evidencia del tenant y permisos; test sintético, idempotencia, recuperación y supresión; sin inventar endpoint | **No verificado** |
 
 La alternativa B es la que merece revisión primero: usa datos y comprobaciones que PrestaShop ya controla, sin asumir que son autorizaciones de marketing. **No se decide aquí la topología final ni se exime G3 de sus aprobaciones PSCustomer/PSOrder.** Para segmentación de compradores en Data 360 seguimos necesitando G3-06.
@@ -38,7 +38,7 @@ La alternativa B es la que merece revisión primero: usa datos y comprobaciones 
 
 ## Fuentes y precedentes
 
-- `pssalesforcebridge/src/Queue/AbandonedCartJourneyProcessor.php` (solo Engagement histórico) y `pssalesforcebridge/src/Order/OrderSyncLedger.php`.
+- `pssalesforcebridge/src/Queue/worker-cart-retirado` (solo producto discontinuado histórico) y `pssalesforcebridge/src/Order/OrderSyncLedger.php`.
 - `docs/G3_08_BUSINESS_GOAL_COVERAGE.md`, `docs/G3_CUSTOMER_ORDER_RELATION_TOPOLOGY_DECISION.md`, issue #45.
 - Salesforce oficial: https://developer.salesforce.com/docs/marketing/marketing-cloud-growth/guide/mc-manage-flows.html — existen Flows ligados a campañas Marketing Cloud Next; **no certifica configuración ni activación para ABH**.
 - Salesforce oficial: https://developer.salesforce.com/docs/data/data-cloud-int/guide/c360-a-ingestion-api-schema-req.html — restricciones de schema y cambios no reversibles tras publicarlo.

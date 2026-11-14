@@ -129,7 +129,7 @@ function g3UpgradeRun()
             'native_reinstall_version_mismatch');
         $customer = $module->processCustomerQueue(1);
         $order = $module->processOrderQueue(1);
-        $cart = $module->processAbandonedCartJourneyQueue(1);
+        $cart = $module->processAbandonedCartRetiredFlowQueue(1);
         g3UpgradeCheck(isset($customer['skipped'], $order['skipped'], $cart['skipped'])
             && $customer['skipped'] === 'g3_growth_delivery_not_approved'
             && $order['skipped'] === 'g3_growth_delivery_not_approved'
@@ -191,14 +191,14 @@ function g3UpgradeRun()
     // Even with a fixture 0.8.0, all legacy workers remain Test blocked.
     $customer = $module->processCustomerQueue(1);
     $order = $module->processOrderQueue(1);
-    $cart = $module->processAbandonedCartJourneyQueue(1);
+    $cart = $module->processAbandonedCartRetiredFlowQueue(1);
     g3UpgradeCheck(isset($customer['skipped'])
         && $customer['skipped'] === 'g3_growth_delivery_not_approved'
         && isset($order['skipped'])
         && $order['skipped'] === 'g3_growth_delivery_not_approved'
         && isset($cart['skipped'])
         && $cart['skipped'] === 'g3_growth_delivery_not_approved',
-        'growth_binding_failed_to_block_engagement_senders');
+        'growth_binding_failed_to_block_retired_provider_senders');
 
     $db = Db::getInstance();
     $outbox = _DB_PREFIX_ . 'g3_growth_outbox_v1';

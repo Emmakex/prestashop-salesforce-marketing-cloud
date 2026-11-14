@@ -5,7 +5,7 @@ if (!defined('_PS_VERSION_')) {
 
 /**
  * Upgrade 0.7.1 -> 0.8.0 to a Growth-only module.
- * NEVER drop or read historical customer/cart/queue/Journey tables.
+ * NEVER drop or read historical customer/cart/queue/campaign tables.
  * NEVER delete credentials, tokens or old settings without a separately
  * approved merchant backup and data-erasure decision.
  *

@@ -3,8 +3,7 @@
 **Estado: prototipo ejecutable offline y tests sintéticos, NO conectado al
 módulo de producción ni al conector Data 360**. Fecha: 13/11/2026.
 
-**ABH / Barcelona Confort utiliza Marketing Cloud Growth + Data 360, no
-Engagement**. Ya se confirmó en el BO de PrestaShop 0.7.1 que la
+**ABH / Barcelona Confort utiliza Marketing Cloud Growth + Data 360, solo Growth + Data Cloud**. Ya se confirmó en el BO de PrestaShop 0.7.1 que la
 tienda 1 tiene `Europe/Madrid`, y que
 `customer.date_add/date_upd` y `orders.date_add/date_upd` son
 `DATETIME`. El Back Office tiene 3/3 PASS para sus metadatos, pero

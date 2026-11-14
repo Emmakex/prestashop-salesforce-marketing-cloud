@@ -82,16 +82,9 @@ REQUIRED_GROWTH_FILES = [
     "pssalesforcebridge/controllers/front/cron.php",
     "pssalesforcebridge/upgrade/upgrade-0.8.0.php",
 ]
-FORBIDDEN_MODULE_FILES = [
-    "pssalesforcebridge/src/Salesforce/AuthClient.php",
-    "pssalesforcebridge/src/Salesforce/RestClient.php",
-    "pssalesforcebridge/src/Salesforce/JourneyClient.php",
-    "pssalesforcebridge/src/Customer/CustomerDataExtensionWriter.php",
-    "pssalesforcebridge/src/Order/OrderDataExtensionWriter.php",
-    "pssalesforcebridge/src/Queue/AbandonedCartJourneyProcessor.php",
-    "pssalesforcebridge/src/Journey/JourneyEventAuditRepository.php",
-    "pssalesforcebridge/controllers/front/recover.php",
-]
+ALLOWED_MODULE_SOURCE_DIRS = {"Compatibility", "DataCloud", "Growth", "Provider"}
+
+
 
 def validate_repository(root=ROOT):
     try:
@@ -111,20 +104,18 @@ def validate_repository(root=ROOT):
     for path in REQUIRED_GROWTH_FILES:
         if not (root / path).is_file():
             errors.append("growth_module_file_missing_" + path)
-    for path in FORBIDDEN_MODULE_FILES:
-        if (root / path).exists():
-            errors.append("old_adapter_file_still_shipped_" + path)
+    source_dir = root / "pssalesforcebridge/src"
+    for path in source_dir.iterdir():
+        if path.is_dir() and path.name not in ALLOWED_MODULE_SOURCE_DIRS:
+            errors.append("unexpected_module_adapter_directory_" + path.name)
     module = root / "pssalesforcebridge/pssalesforcebridge.php"
     try:
         source = module.read_text("utf-8")
     except (OSError, UnicodeError):
         source = ""
-    for forbidden in [
-        "CustomerDataExtensionWriter", "JourneyClient", "RestClient",
-        "processCustomerQueue(", "processAbandonedCartJourneyQueue(",
-    ]:
+    for forbidden in ("curl_exec(", "stream_socket_client(", "fsockopen("):
         if forbidden in source:
-            errors.append("old_adapter_function_still_loaded_" + forbidden)
+            errors.append("unreviewed_runtime_transport_" + forbidden)
     if " $this->version = '0.8.0';" not in source:
         errors.append("growth_only_module_version_mismatch")
     return errors

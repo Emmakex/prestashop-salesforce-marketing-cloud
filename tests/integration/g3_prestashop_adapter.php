@@ -68,7 +68,7 @@ function g3AdapterTest(PDO $db)
     ], 'binding_not_explicit');
 
     foreach ([
-        ['8.2.8', 'ABH', 'marketing_cloud_engagement', 'growth_ci_abhtest', 'test'],
+        ['8.2.8', 'ABH', 'unsupported_external_product', 'growth_ci_abhtest', 'test'],
         ['8.2.8', 'ABH', 'marketing_cloud_growth', 'growth_ci_abhtest', 'production'],
         ['9.1.5', 'ABH', 'marketing_cloud_growth', 'growth_ci_abhtest', 'test'],
         ['8.2.8', 'ABH', 'marketing_cloud_growth', 'growth_ci_other', 'test'],
@@ -79,9 +79,9 @@ function g3AdapterTest(PDO $db)
         }, 'provider_or_installation_switch_accepted');
     }
     g3AdapterFail(function () use ($adapter) {
-        $adapter->install('8.2.8', 'OTHER_MERCHANT', 'marketing_cloud_engagement',
+        $adapter->install('8.2.8', 'OTHER_MERCHANT', 'unsupported_external_product',
             'growth_ci_other', 'test');
-    }, 'legacy_engagement_must_not_be_auto_installed');
+    }, 'legacy_retired_provider_must_not_be_auto_installed');
 
     // DB constraints enforce Test/blocked even if application code is bypassed.
     g3AdapterFail(function () use ($db) {
@@ -91,7 +91,7 @@ function g3AdapterTest(PDO $db)
         $db->exec("UPDATE g3_ps_adapter_binding_v1 SET status = 'ready'");
     }, 'binding_status_guard_missing');
     g3AdapterFail(function () use ($db) {
-        $db->exec("UPDATE g3_ps_adapter_binding_v1 SET provider = 'marketing_cloud_engagement'");
+        $db->exec("UPDATE g3_ps_adapter_binding_v1 SET provider = 'unsupported_external_product'");
     }, 'binding_provider_guard_missing');
 
     // Synthetic, blocked row must prevent destructive rollback.

@@ -18,7 +18,7 @@ final class G3CandidateCredentialLifecycle
             'PS_SFMC_ACCOUNT_ID',
             'PS_SFMC_CUSTOMER_DE_KEY',
             'PS_SFMC_ORDER_DE_KEY',
-            'PS_SFMC_JOURNEY_EVENT_DEFINITION_KEY',
+            'PS_SFMC_RETIRED_FLOW_EVENT_DEFINITION_KEY',
             'PS_SFMC_CRON_TOKEN',
         ];
     }
@@ -32,7 +32,7 @@ final class G3CandidateCredentialLifecycle
             'PS_SFMC_CUSTOMER_BACKFILL_BATCH' => 50,
             'PS_SFMC_RETENTION_QUEUE_DAYS' => 30,
             'PS_SFMC_RETENTION_LOG_DAYS' => 30,
-            'PS_SFMC_RETENTION_JOURNEY_DAYS' => 90,
+            'PS_SFMC_RETENTION_RETIRED_FLOW_DAYS' => 90,
             'PS_SFMC_RETENTION_CART_DAYS' => 30,
             'PS_SFMC_RETENTION_RECOVERY_DAYS' => 30,
             'PS_SFMC_RETENTION_LAST_RUN_AT' => '',
@@ -88,7 +88,7 @@ final class G3CandidateCredentialLifecycle
                 return false;
             }
         }
-        // No Engagement Data Extension/Journey default target on Growth.
+        // No RetiredProvider retired store/RetiredFlow default target on Growth.
         // A new local cron token is NOT a Salesforce delivery authorization.
         try {
             $cronToken = bin2hex(random_bytes(24));

@@ -333,9 +333,9 @@ function psStoreRun(PDO $pdo)
 
     psStoreReject(function () use ($pdo) {
         new Store(new PrestaShopDbFixture($pdo), '8.2.8',
-            'ABH', 'marketing_cloud_engagement', 'growth_ci_ps_store_a',
+            'ABH', 'unsupported_external_product', 'growth_ci_ps_store_a',
             'test', 'ci_psa_');
-    }, 'engagement_store_accepted');
+    }, 'retired_provider_store_accepted');
     psStoreReject(function () use ($router, $store) {
         psStoreCapture($router, $store, 44, 'a', 1, 'cart', 'CART_ABANDONED');
     }, 'unapproved_cart_saved');

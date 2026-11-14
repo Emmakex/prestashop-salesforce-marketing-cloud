@@ -164,7 +164,7 @@ $extra = $good;
 $extra['email'] = 'synthetic@example.invalid';
 g3RefreshReject($extra, 'g3_refresh_evidence_shape_invalid');
 $wrong = $good;
-$wrong['refresh_mode'] = 'engagement';
+$wrong['refresh_mode'] = 'retired_provider';
 g3RefreshReject($wrong, 'g3_refresh_evidence_enum_invalid');
 $wrong = $good;
 $wrong['source_state_rechecked'] = 1;

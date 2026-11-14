@@ -28,7 +28,7 @@ Each matrix entry provisions a real PrestaShop installation with a real SQL serv
 8. Perform a clean 0.7.0 installation from the exact ZIP contents.
 9. Verify all connector tables, required configuration defaults and registered hooks.
 10. Exercise customer, cart and order connector hook methods with real PrestaShop core objects.
-11. Verify the customer, order and Journey workers remain fail-closed in `test` mode and perform no outbound Salesforce write.
+11. Verify the customer, order and orquestadores discontinuados workers remain fail-closed in `test` mode and perform no outbound Salesforce write.
 12. Execute customer backfill, abandoned-cart detection and retention components locally.
 13. Verify the local health report.
 14. Call the protected HTTP health endpoint.
@@ -63,11 +63,11 @@ This matrix does **not** claim:
 
 - that every PrestaShop 1.7.8.x, 8.x or 9.x patch release has been executed;
 - live Salesforce Marketing Cloud credentials or tenant configuration;
-- a live Journey Builder send, email delivery or Salesforce-side Data Extension schema;
+- a live orquestador discontinuado send, email delivery or Salesforce-side almacenamiento discontinuado schema;
 - arbitrary third-party modules that subscribe to the same PrestaShop hooks;
 - unsupported PrestaShop <=1.7.7 or 1.6 installations.
 
-Live Marketing Cloud/Journey certification remains a separate deployment gate. The connector's storefront safety is tested in `test` mode specifically to prove that local commerce flows do not require Salesforce availability.
+Live Marketing Cloud/orquestadores discontinuados certification remains a separate deployment gate. The connector's storefront safety is tested in `test` mode specifically to prove that local commerce flows do not require Salesforce availability.
 
 ## Reproduction
 

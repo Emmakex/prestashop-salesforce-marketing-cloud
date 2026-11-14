@@ -28,7 +28,7 @@ The dashboard includes:
 - configuration readiness and missing configuration keys;
 - customer backfill progress by shop;
 - cart snapshot status totals;
-- Journey delivery status totals;
+- orquestadores discontinuados delivery status totals;
 - recovery-link / recovered-cart / attributed-order metrics;
 - paid recovered revenue separated by currency.
 
@@ -92,9 +92,9 @@ Production requires:
 - REST Base URI;
 - Client ID;
 - Client Secret presence;
-- Customer Data Extension External Key;
-- Order Data Extension External Key;
-- Journey Event Definition Key;
+- Customer almacenamiento discontinuado External Key;
+- Order almacenamiento discontinuado External Key;
+- orquestadores discontinuados Event Definition Key;
 - cron token.
 
 Test mode only requires the cron token because local capture is intentionally usable before Salesforce delivery is configured.

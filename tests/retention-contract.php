@@ -58,7 +58,7 @@ $service = new RetentionService(new RetentionRepository());
 $result = $service->run([
     'queue_days' => 30,
     'log_days' => 30,
-    'journey_days' => 90,
+    'retired_flow_days' => 90,
     'cart_days' => 30,
     'recovery_days' => 30,
 ], 1793188800);
@@ -81,11 +81,11 @@ retentionAssert(
 );
 retentionAssert(
     strpos($sql, "`status` IN ('sent', 'suppressed')") !== false,
-    'Journey retention must be restricted to sent and suppressed terminal audit states.'
+    'RetiredFlow retention must be restricted to sent and suppressed terminal audit states.'
 );
 retentionAssert(
     strpos($sql, "`status` IN ('failed'") === false,
-    'Failed Journey audit must not be auto-purged.'
+    'Failed RetiredFlow audit must not be auto-purged.'
 );
 retentionAssert(
     strpos($sql, "('empty', 'ineligible', 'converted', 'recovered')") !== false,
@@ -102,7 +102,7 @@ retentionAssert(
 retentionAssert(
     strpos($sql, "q.`event_type` = 'CART_ABANDONED'") !== false
     && strpos($sql, "q.`status` IN ('pending', 'processing', 'retry', 'failed')") !== false,
-    'Abandoned snapshot cleanup must preserve carts with outstanding or failed Journey work.'
+    'Abandoned snapshot cleanup must preserve carts with outstanding or failed RetiredFlow work.'
 );
 retentionAssert(
     strpos($sql, "`status` = 'active'") === false,

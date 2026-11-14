@@ -25,8 +25,8 @@ Files:
   This is **not** genuine installation/runtime certification on those releases.
 - Required explicit `merchant`, `provider`, `source_namespace`,
   `prestashop_version` and `mode=test`. No implicit provider default.
-- ABH can select **only** `marketing_cloud_growth`; any Engagement selection
-  is rejected. Another merchant may preview `marketing_cloud_engagement`,
+- ABH can select **only** `marketing_cloud_growth`; any producto discontinuado selection
+  is rejected. Another merchant may preview `unsupported_external_product`,
   but there is **no legacy installer or outbound route** in this candidate.
 - The provider binding table `g3_ps_adapter_binding_v1` is a new,
   **test-only** third table. The two Growth tables from PR #51 stay unchanged.

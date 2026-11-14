@@ -1,6 +1,6 @@
 # Marketing Cloud Growth — certificación OAuth sin escrituras
 
-La organización ABH utiliza Salesforce Marketing Cloud Growth (Marketing Cloud Next), no Marketing Cloud Engagement. No utilizar el workflow de SFMC Engagement ni sus tokens /v2/token ni sus Data Extensions/Journey API para Growth.
+La organización ABH utiliza Salesforce Marketing Cloud Growth (Marketing Cloud Next), solo Growth + Data Cloud. No utilizar el workflow de SFMC producto discontinuado ni sus tokens /v2/token ni sus almacenamiento discontinuado/orquestadores discontinuados API para Growth.
 
 ## Datos verificados
 
@@ -20,7 +20,7 @@ En Emmakex/prestashop-salesforce-marketing-cloud → Settings → Environments, 
 - Secret del Environment: **SF_GROWTH_CLIENT_ID** = Consumer Key de Salesforce
 - Secret del Environment: **SF_GROWTH_CLIENT_SECRET** = Consumer Secret de Salesforce
 
-No compartir, versionar, registrar ni adjuntar claves o tokens. No guardar las credenciales en el módulo 0.7.0 Engagement.
+No compartir, versionar, registrar ni adjuntar claves o tokens. No guardar las credenciales en el módulo 0.7.0 producto discontinuado.
 
 Ejecutar manualmente Actions → **Salesforce Growth OAuth Auth Only** → Run workflow → main. Antes, comprobar que el usuario Run As tiene permisos API y acceso a esta aplicación mediante perfil/conjunto de permisos cuando la política es preautorización de administrador.
 

@@ -2,7 +2,7 @@
 
 ## Scope
 
-Version 0.4.0 captures and classifies carts locally. It does **not** send Journey Builder events to Salesforce. Outbound abandoned-cart delivery is introduced in 0.5.0.
+Version 0.4.0 captures and classifies carts locally. It does **not** send orquestador discontinuado events to Salesforce. Outbound abandoned-cart delivery is introduced in 0.5.0.
 
 ## Capture source
 
@@ -48,7 +48,7 @@ The default policy is `marketing_optin` and is intentionally fail-closed. It req
 
 A configurable `known_contact` mode exists for installations whose independently documented legal basis permits abandoned-cart communication without the marketing opt-in fields. It is not safe for BC by default and must not be enabled without a lawful basis and reviewed suppression controls. The connector does not decide the merchant's legal basis; the strict policy remains the default.
 
-Starting in 0.7.1, the Journey worker re-reads the current PrestaShop customer immediately before issuing a recovery URL. Changed email, deleted/inactive/missing or cross-shop customer, or lost first-party subscription under `marketing_optin` causes suppression rather than a send. A local PrestaShop newsletter flag is only a technical signal; external unsubscribes, current suppression status, checkbox wording and legal purpose still require independent verification. No production campaign is automatically authorized by installing the patch.
+Starting in 0.7.1, the orquestadores discontinuados worker re-reads the current PrestaShop customer immediately before issuing a recovery URL. Changed email, deleted/inactive/missing or cross-shop customer, or lost first-party subscription under `marketing_optin` causes suppression rather than a send. A local PrestaShop newsletter flag is only a technical signal; external unsubscribes, current suppression status, checkbox wording and legal purpose still require independent verification. No production campaign is automatically authorized by installing the patch.
 
 ## Conversion suppression
 
@@ -63,7 +63,7 @@ If either source finds an order, the cart is marked `converted` and no `CART_ABA
 
 - `sfmc_cart`: one current canonical snapshot per shop/cart;
 - `sfmc_cart_item`: normalized current line items;
-- `sfmc_queue`: deduplicated `CART_ABANDONED` events awaiting the 0.5.0 Journey Builder delivery layer.
+- `sfmc_queue`: deduplicated `CART_ABANDONED` events awaiting the 0.5.0 orquestador discontinuado delivery layer.
 
 ## Inactivity
 

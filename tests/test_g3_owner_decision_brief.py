@@ -69,7 +69,7 @@ class G3OwnerBriefTests(unittest.TestCase):
         self.reject(lambda t, f, p: t.replace("No existe cifra de días aprobada", "Se aprueban 365 días"))
 
     def test_wrong_provider_is_rejected(self):
-        self.reject(lambda t, f, p: t.replace("Marketing Cloud **Growth/Next + Data 360**", "Marketing Cloud **Engagement**"))
+        self.reject(lambda t, f, p: t.replace("Marketing Cloud **Growth/Next + Data 360**", "Marketing Cloud **RetiredProvider**"))
 
 
 if __name__ == "__main__":

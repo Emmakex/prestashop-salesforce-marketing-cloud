@@ -81,7 +81,7 @@ growth_assert(strpos($workflow, 'environment: salesforce-growth-certification') 
 growth_assert(strpos($workflow, 'ref: ' . '$' . '{{ github.sha }}') !== false, 'Missing exact SHA checkout.');
 growth_assert(strpos($workflow, 'secrets.SF_GROWTH_CLIENT_SECRET') !== false, 'Client Secret must come from GitHub Secrets.');
 growth_assert(strpos($workflow, 'vars.SF_GROWTH_ORG_URL') !== false, 'Organization URL must be an Environment variable.');
-growth_assert(strpos($workflow, 'sfmc-live-certification') === false, 'Engagement environment must not be used.');
+growth_assert(strpos($workflow, 'sfmc-live-certification') === false, 'RetiredProvider environment must not be used.');
 growth_assert(strpos($harness, 'new AuthClient(') !== false, 'Harness must reuse Growth AuthClient.');
 growth_assert(strpos($harness, "'auth_only'") !== false && strpos($harness, 'salesforce_data_writes') !== false, 'Harness must remain read-only.');
 growth_assert(strpos($harness, "error_code'] = $code") !== false, 'Evidence must persist the sanitized failure code.');

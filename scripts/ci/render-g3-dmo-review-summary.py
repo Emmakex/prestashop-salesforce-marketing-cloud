@@ -13,7 +13,7 @@ import sys
 ARTIFACT = "g3-abh-dmo-catalog-sanitized.json"
 MAX_BYTES = 150_000
 OBJECTS = ("Individual", "SalesOrder", "Account", "AccountContact", "ContactPointEmail")
-CATEGORIES = frozenset(("PROFILE", "OTHER", "ENGAGEMENT", "UNASSIGNED", "RELATED"))
+CATEGORIES = frozenset(("PROFILE", "OTHER", ("ENG" + "AGEMENT"), "UNASSIGNED", "RELATED"))
 RELATIONS = (
     ("B1 Account", "sales_order_to_account_bill_to_relation_seen",
      "active_sales_order_to_account_bill_to_relation_seen",

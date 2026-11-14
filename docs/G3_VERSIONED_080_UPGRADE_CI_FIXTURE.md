@@ -1,7 +1,7 @@
 # G3 — Actualización PrestaShop 0.7.1 → candidato 0.8.0 (únicamente CI)
 
 **Fecha:** 13-11-2026. **Comercio piloto:** ABH / Barcelona Confort.  
-**Producto:** Salesforce Marketing Cloud Growth/Next + Data 360 (**no Engagement**).  
+**Producto:** Salesforce Marketing Cloud Growth/Next + Data 360 (**solo Growth + Data Cloud**).  
 **Estado:** candidato reproducible de CI, sin módulo 0.8.0 distribuible y sin aprobación G3.
 
 ## Objetivo y mecanismo

@@ -126,7 +126,7 @@ function migrationTest(PDO $db)
             'binding_missing_' . $prefix);
         migrationMustFail(function () use ($db, $plan) {
             $db->exec('UPDATE ' . $plan['tables']['binding']
-                . " SET provider='marketing_cloud_engagement'");
+                . " SET provider='unsupported_external_product'");
         }, 'provider_check_not_enforced');
         $plans[] = $plan;
         $executors[] = $executor;

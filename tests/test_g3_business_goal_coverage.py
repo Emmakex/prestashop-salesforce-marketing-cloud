@@ -93,7 +93,7 @@ class G3BusinessGoalReview(unittest.TestCase):
         self.expect_block(lambda p,f,o,m,c,d,b:
             p["open_decisions"][5].__setitem__("state", "approved"))
         self.expect_block(lambda p,f,o,m,c,d,b:
-            c["pilot"].__setitem__("provider", "marketing_cloud_engagement"))
+            c["pilot"].__setitem__("provider", "unsupported_external_product"))
         self.expect_block(lambda p,f,o,m,c,d,b:
             c["pilot"].__setitem__("prestashop_runtime_mode_observed", "production"))
 

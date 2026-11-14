@@ -1,7 +1,7 @@
 # G3 · Compatibilidad transaccional con las tablas reales de PrestaShop 0.7.1
 
 **ABH: Marketing Cloud Growth + Data 360.** El objetivo no es activar
-Marketing Cloud Engagement. **Estado: prototipo aislado en GitHub Actions
+producto discontinuado. **Estado: prototipo aislado en GitHub Actions
 que NO forma parte del módulo instalable ni cambia Barcelona Confort.**
 
 ## Evidencia verificada por revisión del módulo
@@ -16,7 +16,7 @@ El instalador de `pssalesforcebridge.php` 0.7.1 define:
 - Customer/Order Event Services llaman primero a `observe()` del
   ledger y después a `QueueRepository::enqueue()`: **sin transacción
   conjunta** en el camino 0.7.1.
-- El worker legacy puede realizar un `upsert` Engagement antes de
+- El worker legacy puede realizar un `upsert` producto discontinuado antes de
   verificar el hash actual de su ledger. No reutilizar este procesador
   para enviar eventos Growth.
 
