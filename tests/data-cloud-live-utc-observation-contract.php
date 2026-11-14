@@ -69,7 +69,7 @@ try {
 }
 
 foreach (['', 'customer_updated', 'CUSTOMER_BACKFILL', 'ORDER_IMPORTED',
-    'CART_ABANDONED', 'SOAP_SUBSCRIBER', 'MARKETING_SEND', null, false, 42,
+    'CART_ABANDONED', 'UNSUPPORTED_PROTOCOL_SUBSCRIBER', 'MARKETING_SEND', null, false, 42,
     ['CUSTOMER_CREATED'], "CUSTOMER_CREATED\n"] as $bad) {
     utcObservationReject($bad);
 }

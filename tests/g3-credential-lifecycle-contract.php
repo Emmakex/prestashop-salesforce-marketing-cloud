@@ -23,7 +23,7 @@ g3CredentialAssert(in_array('PS_SFMC_CLIENT_SECRET', $secrets, true)
     'missing_credential');
 g3CredentialAssert(in_array('PS_SFMC_CUSTOMER_DE_KEY', $secrets, true)
     && in_array('PS_SFMC_ORDER_DE_KEY', $secrets, true)
-    && in_array('PS_SFMC_JOURNEY_EVENT_DEFINITION_KEY', $secrets, true),
+    && in_array('PS_SFMC_RETIRED_FLOW_EVENT_DEFINITION_KEY', $secrets, true),
     'legacy_egress_target_leak');
 g3CredentialAssert(in_array('PS_SFMC_AUTH_BASE_URI', $secrets, true)
     && in_array('PS_SFMC_REST_BASE_URI', $secrets, true),

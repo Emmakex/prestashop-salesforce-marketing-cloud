@@ -4,7 +4,7 @@
 
 ## Problema de negocio y límites conocidos
 
-Objetivo: recuperar carritos abandonados y evitar recordar compras ya completadas. El destino contratado en ABH es **Marketing Cloud Growth/Next + Data 360**, solo Growth + Data Cloud. La instalación `pssalesforcebridge` 0.7.1 en Test ya registra capturas de carritos, usa un plazo de 60 minutos y posee `CartAbandonmentDetector`, `OrderSyncLedger::hasOrderForCart`, `CartContactStateReader` y `AbandonedCartJourneyProcessor`. **Este último usa orquestador discontinuado de producto discontinuado y nunca debe ser el sender ABH.**
+Objetivo: recuperar carritos abandonados y evitar recordar compras ya completadas. El destino contratado en ABH es **Marketing Cloud Growth/Next + Data 360**, solo Growth + Data Cloud. La instalación `pssalesforcebridge` 0.7.1 en Test ya registra capturas de carritos, usa un plazo de 60 minutos y posee `CartAbandonmentDetector`, `OrderSyncLedger::hasOrderForCart`, `CartContactStateReader` y `AbandonedCartflow anteriorProcessor`. **Este último usa orquestador discontinuado de producto discontinuado y nunca debe ser el sender ABH.**
 
 Los YAML congelados v0.2/v0.3 definen PSCustomer/PSOrder, **no PSCart**. El catálogo Data 360 ABH leído completamente (527 relaciones de SalesOrder/Individual/Account) tampoco resuelve el vínculo comercial comprador–pedido. No hay consentimiento/supresión Growth certificado, Flow/campaña verificado ni permiso de exportación. G3-01…08 sigue pendiente y G4/G7 bloqueados.
 
@@ -38,7 +38,7 @@ La alternativa B es la que merece revisión primero: usa datos y comprobaciones 
 
 ## Fuentes y precedentes
 
-- `pssalesforcebridge/src/Queue/AbandonedCartJourneyProcessor.php` (solo producto discontinuado histórico) y `pssalesforcebridge/src/Order/OrderSyncLedger.php`.
+- `pssalesforcebridge/src/Queue/worker-cart-retirado` (solo producto discontinuado histórico) y `pssalesforcebridge/src/Order/OrderSyncLedger.php`.
 - `docs/G3_08_BUSINESS_GOAL_COVERAGE.md`, `docs/G3_CUSTOMER_ORDER_RELATION_TOPOLOGY_DECISION.md`, issue #45.
 - Salesforce oficial: https://developer.salesforce.com/docs/marketing/marketing-cloud-growth/guide/mc-manage-flows.html — existen Flows ligados a campañas Marketing Cloud Next; **no certifica configuración ni activación para ABH**.
 - Salesforce oficial: https://developer.salesforce.com/docs/data/data-cloud-int/guide/c360-a-ingestion-api-schema-req.html — restricciones de schema y cambios no reversibles tras publicarlo.

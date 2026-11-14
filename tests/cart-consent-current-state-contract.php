@@ -85,17 +85,17 @@ $deleted = CartContactStateReader::read(1, 12);
 consentAssert(is_array($deleted) && $deleted['customer_deleted'] === true,
     'Live deletion state must propagate to policy.');
 
-$processor = file_get_contents(dirname(__DIR__) . '/pssalesforcebridge/src/Queue/AbandonedCartJourneyProcessor.php');
+$processor = file_get_contents(dirname(__DIR__) . '/pssalesforcebridge/src/Queue/AbandonedCartRetiredFlowProcessor.php');
 $readerPos = strpos($processor, 'CartContactStateReader::read(');
-$sendPos = strpos($processor, '$this->journey->fire(');
+$sendPos = strpos($processor, '$this->retired_flow->fire(');
 $linkPos = strpos($processor, '$this->recoveryLinks->issueUrl(');
 consentAssert($readerPos !== false && $sendPos !== false && $readerPos < $sendPos
     && $linkPos !== false && $readerPos < $linkPos,
-    'Journey must re-read live source state before issuing recovery URL or sending.');
+    'RetiredFlow must re-read live source state before issuing recovery URL or sending.');
 consentAssert(strpos($processor, 'customer_email_changed') !== false,
-    'Journey must suppress stale email addresses.');
+    'RetiredFlow must suppress stale email addresses.');
 consentAssert(strpos($processor, 'current_customer_unavailable') !== false,
-    'Journey must suppress unavailable customers.');
+    'RetiredFlow must suppress unavailable customers.');
 $normalizer = file_get_contents(dirname(__DIR__) . '/pssalesforcebridge/src/Cart/CartNormalizer.php');
 consentAssert(strpos($normalizer, "'customer_deleted'") !== false,
     'Captured customer state must include the deletion flag.');

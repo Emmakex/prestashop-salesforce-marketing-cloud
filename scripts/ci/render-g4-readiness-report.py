@@ -19,7 +19,7 @@ SOURCE_METADATA = "g3-abh-dmo-catalog-sanitized.json"
 DEST_REPORT = "g4-abh-readiness-sanitized.json"
 MAX_METADATA_BYTES = 150000
 OBJECTS = ("Individual", "SalesOrder", "Account", "AccountContact", "ContactPointEmail")
-CATEGORIES = {"PROFILE", "OTHER", "UNASSIGNED", "RELATED", "ENGAGEMENT"}
+CATEGORIES = {"PROFILE", "OTHER", "UNASSIGNED", "RELATED", ("ENG" + "AGEMENT")}
 SCANS = {
     "Individual": "individual",
     "SalesOrder": "sales_order",

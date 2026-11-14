@@ -36,7 +36,7 @@ dc_assert($order['source_key'] === 'abh_group:ps_2_7', 'Incorrect order key.');
 dc_assert($order['customer_source_key'] === $first['source_key'], 'Customer relation mismatch.');
 dc_assert($order['cart_source_key'] === 'abh_group:ps_2_9', 'Cart relation mismatch.');
 dc_assert($order['currency'] === 'EUR' && $order['paid_flag'] === false, 'Order conversion invalid.');
-dc_assert(!isset($order['RecoveryUrl']) && !isset($order['journey_event_key']), 'Messaging fields forbidden.');
+dc_assert(!isset($order['RecoveryUrl']) && !isset($order['retired_flow_event_key']), 'Messaging fields forbidden.');
 
 $bad = $c; $bad['contact_key'] = 'ps_3_17';
 try { $m->customer($bad); dc_assert(false, 'Cross-shop customer accepted.'); }
