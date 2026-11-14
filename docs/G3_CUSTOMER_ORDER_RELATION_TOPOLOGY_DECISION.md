@@ -52,6 +52,29 @@ La [inspección con paginación verificada #43495007989](https://github.com/Emma
 
 **Decisión técnica temporal, sin aprobación:** mantener separados los pedidos y los perfiles evita una unión falsa (opción C). No es una solución final de negocio: no resuelve en Data 360 la segmentación persona–compra. Tampoco entrega **recuperación de carritos**, ya que PSCustomer/PSOrder v0.2/v0.3 no incluyen PSCart ni existe un Flow Growth aprobado. [Control ejecutable de cobertura del objetivo comercial](G3_08_BUSINESS_GOAL_COVERAGE.md). Los checks locales de pedido antes de enviar deben diseñarse y certificarse en el futuro adaptador Growth, no inferirse del flujo histórico Engagement.
 
+## Aclaración oficial 14/11/2026 — relación estándar inactiva no es relación ausente
+
+**Nueva evidencia del fabricante; no es un nuevo resultado de lectura del tenant ABH.** Salesforce explica expresamente que una relación DMO estándar puede estar **inactiva hasta que se mapean ambos campos**, y que en la pestaña `Relationships` de un DMO solo aparecen por defecto las relaciones activadas. Las inactivas pueden requerir `Show inactive relationships` en la ventana `Edit Relationships`. También cita la cardinalidad **muchos pedidos por individuo** como ejemplo de relación `SalesOrder` / `Individual`. Estas afirmaciones de producto **no demuestran** que un campo directo específico PST→Individual exista, esté disponible o sea activable en ABH.
+
+- [Salesforce Help · Data Model Object Relationships (estados y cardinalidad)](https://help.salesforce.com/s/articleView?id=data.c360_a_data_model_object_relationships.htm&language=en_US&type=5).
+- [Salesforce Developers · Sales Order DMO, campos y FK tipadas](https://developer.salesforce.com/docs/data/data-cloud-dmo-mapping/guide/c360dm-si-salesorderdmo-dmo.html).
+- [Salesforce Developers · Account DMO](https://developer.salesforce.com/docs/data/data-cloud-dmo-mapping/guide/c360dm-account-dmo.html).
+
+**Interpretación correcta del scan ABH #43495007989:** `64 SalesOrder + 137 Individual + 326 Account = 527` metadatos leídos con paginación completa bajo los filtros del lector. No se detectaron las **aristas candidatas activas/visibles**, pero la completitud de esa API no implica que incluya todas las **relaciones estándar inactivas o sin mapping**. El resultado permite bloquear una unión no verificada; **no** permite declarar imposible la topología estándar ni imponer C/D.
+
+### Orden de comprobación G3-06, sin escrituras ni nuevos permisos
+
+| Prioridad | Ruta a revisar en la definición del modelo Salesforce | Condición para aceptar como futuro diseño | Estado ABH |
+| --- | --- | --- | --- |
+| 1 | `SalesOrder.BillToAccountId → Account.Id` y `Account.IndividualId → Individual.Id` | El arquitecto debe comprobar ambos extremos y sus mappings, clave calificada por origen/instalación, correspondencia 1:N y compatibilidad con finalidad/retención. **La existencia de Account en el catálogo no autoriza fabricar Accounts desde PSCustomer** | Referencias de modelo documentadas; relaciones/mapping PST **no verificados ni aprobados** |
+| 2 | Otras FK **tipadas** de Sales Order: `BillToContactId → AccountContact.Id`, `BilltoEmailId → ContactPointEmail.Id` | Confirmar si los DMOs intermedios existen y se pueden mapear con **identificadores** válidos, no con texto de email ni por similitud nominal. Si se usa contacto o dirección, finalidad y consentimiento se revisan aparte | **No verificado** para PST |
+| 3 | Eventual relación directa `SalesOrder → Individual` | Pedir al arquitecto **nombres exactos de ambos campos, cardinalidad y fuente de mapping**; la mención genérica de cardinalidad en Salesforce Help NO certifica una FK directa en ABH | **No confirmada** |
+| 4 | Contención C (pedido aislado) o relación personalizada D | C impide segmentar compradores por sus pedidos; D necesita nueva revisión de esquema, modelo, coste y autorización. Elegir solo cuando la revisión de rutas estándar justifique la decisión | **No seleccionadas ni firmadas** |
+
+**Secuencia de decisión:** primero ver el catálogo del DMO en modo solo lectura, incluidas las **relaciones inactivas** cuando la UI las muestre, y el estado del mapping de cada extremo. A continuación, documentar **qué field ID realmente representa al comprador**, cómo se conserva `source_namespace:shop_id`, y qué hacer con invitados, relaciones huérfanas o cruzadas. Solo entonces el arquitecto firma una opción A/B/C/D. La revisión de interfaz debe ser **sin guardar, habilitar, mapear, crear ni borrar** ninguna relación; los permisos G4 son independientes.
+
+**Límite:** `PSOrder.customer_source_key` sigue siendo exclusivamente una FK fuente candidata. No mapearla por defecto a `SoldToCustomerId`, `BillToContactId`, `BilltoEmailId` ni `BillToAccountId`: son campos semánticamente distintos. Un valor de email coincidente no es una FK; usar `ContactPointEmail.Id` exige un identificador válido y un modelo de contacto aprobado.
+
 ## Decisión humana imprescindible para pasar a G3-08
 
 Arquitecto Data 360: seleccionar **A/B/C/D**, categoría del futuro Data Stream, DMO(s) destino, campos PK/FK y relaciones, semántica por `source_namespace` y `shop_id`; comprobar entidades necesarias en ABH y cómo manejar invitados, pedidos históricos y borrados. Responsable de datos: finalidad y necesidad de cada campo, consentimientos distintos, retención/supresión; resolver **G3-02/G3-07**. Responsable de implementación: fuente de fecha real de modificación **G3-03/G3-04**, identidad G3-01 y reversibilidad.
