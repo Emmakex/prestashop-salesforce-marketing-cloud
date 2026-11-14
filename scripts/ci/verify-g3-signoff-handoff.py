@@ -11,6 +11,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 SHA = "8595c2f9acb5be388ba3b2ec156ec65379ab04bf5ebf3718e63231cb06b43e9d"
 SCHEMA = "schemas/ABH_PST_SCHEMA_REVIEW.yaml"
+TYPED_SCHEMA = "schemas/ABH_PST_TYPED_IDENTITY_CANDIDATE.yaml"
+TYPED_SHA = "2a0eb79ebb664c9465374584a033b75828f0b180e2a28af5558e7cbb1ba8dd0f"
 EXPECTED_DECISIONS = [
     ("DATA_AND_PRIVACY", "data_owner_and_privacy",
      ("namespace_allocation_confirmed", "data_processing_purpose_approved",
@@ -30,7 +32,7 @@ DENIED = (
 )
 
 
-def validate(handoff, closure, schema_bytes):
+def validate(handoff, closure, schema_bytes, typed_schema_bytes):
     errors = []
     if not isinstance(handoff, dict) or not isinstance(closure, dict):
         return ["g3_handoff_invalid_input"]
@@ -57,6 +59,18 @@ def validate(handoff, closure, schema_bytes):
         errors.append("g3_handoff_schema_not_review_only")
     if not isinstance(schema_bytes, bytes) or hashlib.sha256(schema_bytes).hexdigest() != SHA:
         errors.append("g3_handoff_frozen_schema_mismatch")
+    alt = handoff.get("schema_identity_alternative")
+    if alt != {
+        "version": "v0.4", "path": TYPED_SCHEMA, "sha256": TYPED_SHA,
+        "object_count": 2, "field_count": 22,
+        "identity_pattern": "source_namespace:shop_id:entity_type:entity_id",
+        "architect_review_status": "pending",
+        "selection_formally_approved": False,
+        "schema_upload_authorized": False,
+    }:
+        errors.append("g3_handoff_typed_alternative_not_review_only")
+    if not isinstance(typed_schema_bytes, bytes) or hashlib.sha256(typed_schema_bytes).hexdigest() != TYPED_SHA:
+        errors.append("g3_handoff_typed_schema_mismatch")
     if closure.get("review_stage") != "technical_closure_candidate_not_owner_approval" \
             or closure.get("point_3_schema_finalization", {}).get("schema_approved") is not False \
             or closure.get("point_1_data_privacy", {}).get("export_to_data_360_authorized") is not False \
@@ -120,15 +134,17 @@ def main():
             (ROOT / "config/g3-abh-technical-closure-candidate.json").read_text("utf-8")
         )
         content = (ROOT / SCHEMA).read_bytes()
+        typed_content = (ROOT / TYPED_SCHEMA).read_bytes()
     except (OSError, ValueError, UnicodeError):
         raise SystemExit("G3 handoff: unreadable source")
-    errors = validate(obj, closure, content)
+    errors = validate(obj, closure, content, typed_content)
     if errors:
         for error in errors:
             print("G3 handoff FAIL: " + error)
         raise SystemExit(1)
     print("G3 handoff PASS: technical proposal frozen; "
-          "3 formal signoffs pending; G4, ingestion and sends denied.")
+          "3 formal signoffs pending; G4, ingestion and sends denied; "
+        "typed v0.4 alternative hash checked, not selected.")
 
 
 if __name__ == "__main__":

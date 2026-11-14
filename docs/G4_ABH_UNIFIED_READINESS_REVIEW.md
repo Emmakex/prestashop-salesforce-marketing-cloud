@@ -8,6 +8,10 @@ La investigación anterior ya aportó OAuth Core, token exchange Data 360, PST `
 
 El [PR #85](https://github.com/Emmakex/prestashop-salesforce-marketing-cloud/pull/85) dejó los pendientes humanos en **tres grupos**: identidad/finalidad/retención, relación cliente-pedido y esquema final con conformidades. El [PR #86](https://github.com/Emmakex/prestashop-salesforce-marketing-cloud/pull/86) certificó en laboratorio que **MySQL 5.7 ignora CHECK**, y el [PR #87](https://github.com/Emmakex/prestashop-salesforce-marketing-cloud/pull/87) añadió la inspección `Db` real, certificada [3/3](https://github.com/Emmakex/prestashop-salesforce-marketing-cloud/actions/runs/43624367487) para PrestaShop 1.7.8.11/8.2.8/9.1.5.
 
+## Vías de identidad sujetas a firma
+
+El informe de preparación exige ahora integridad SHA-256 de **v0.2** y de la alternativa tipada **v0.4**; comprueba que todas las firmas y permisos permanecen pendientes/bloqueados. Una manipulación de cualquiera de los dos esquemas, una firma falsa o una autorización de publicación invalida el informe. El candidato v0.4 no equivale a relación DMO autorizada.
+
 ## Entregables
 
 - **Script sin red ni SQL:** `scripts/ci/render-g4-readiness-report.py`. Genera `g4-abh-readiness-sanitized.json` en el directorio local de la ejecución.

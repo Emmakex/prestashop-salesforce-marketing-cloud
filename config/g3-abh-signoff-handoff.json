@@ -13,6 +13,17 @@
     "field_count": 22,
     "selection_formally_approved": false
   },
+  "schema_identity_alternative": {
+    "version": "v0.4",
+    "path": "schemas/ABH_PST_TYPED_IDENTITY_CANDIDATE.yaml",
+    "sha256": "2a0eb79ebb664c9465374584a033b75828f0b180e2a28af5558e7cbb1ba8dd0f",
+    "object_count": 2,
+    "field_count": 22,
+    "identity_pattern": "source_namespace:shop_id:entity_type:entity_id",
+    "architect_review_status": "pending",
+    "selection_formally_approved": false,
+    "schema_upload_authorized": false
+  },
   "technical_recommendations": {
     "namespace": "registry_assigned_unique_per_installation_not_domain_or_db",
     "source_key": "source_namespace:shop_id:entity_type:entity_id",

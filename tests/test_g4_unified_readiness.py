@@ -61,6 +61,9 @@ class G4UnifiedReadinessTests(unittest.TestCase):
         self.assertEqual(r["local_contract"], "verified_pending_owner_approval")
         self.assertEqual(r["data_360"]["state"], "no_current_run_artifact")
         self.assertEqual(r["schema_candidate"]["sha256"], g4.SOURCE_HASH)
+        self.assertEqual(r["schema_identity_alternative"]["sha256"], g4.TYPED_SHA)
+        self.assertTrue(r["schema_identity_alternative"]["hash_verified"])
+        self.assertFalse(r["schema_identity_alternative"]["selection_formally_approved"])
         self.assertTrue(r["schema_candidate"]["hash_verified"])
         self.assertEqual(r["remaining_owner_actions"], list(g4.OWNER_ACTIONS))
         self.assertEqual(r["pilot"]["shop_sql_engine"], "not_observed")
@@ -157,6 +160,15 @@ class G4UnifiedReadinessTests(unittest.TestCase):
     def test_changed_schema_or_owner_gates_fail_closed(self):
         cases = [
             ("schema", lambda v: v + b"\n"),
+            ("typed_schema", lambda v: v + b"\n"),
+            ("handoff", lambda v: {**v, "status": "approved"}),
+            ("handoff", lambda v: {**v, "schema_identity_alternative": {
+                **v["schema_identity_alternative"],
+                "selection_formally_approved": True,
+            }}),
+            ("handoff", lambda v: {**v, "authorizations": {
+                **v["authorizations"], "schema_upload": True,
+            }}),
             ("closure", lambda v: {**v, "module_mode": "production"}),
             ("closure", lambda v: {
                 **v, "point_3_schema_finalization": {
