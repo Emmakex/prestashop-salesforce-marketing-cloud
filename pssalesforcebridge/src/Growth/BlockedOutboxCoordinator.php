@@ -43,7 +43,7 @@ final class BlockedOutboxCoordinator
             throw new RuntimeException('growth_outbox_provider_not_growth');
         }
         if ($route['status'] !== 'blocked' || $route['mode'] !== 'test'
-            || $route['route_target'] !== 'growth_data_360_not_configured'
+            || $route['route_target'] !== 'growth_data_cloud_schema_pending'
             || $route['data_360_ingestion_authorized'] !== false
             || $route['growth_flow_authorized'] !== false
             || $route['marketing_sends_authorized'] !== false
