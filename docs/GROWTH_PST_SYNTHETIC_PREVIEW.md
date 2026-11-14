@@ -18,3 +18,5 @@ El router ya propone `namespace:shop_id:customer:entity_id` / `namespace:shop_id
 `identity_contract_approved=false`, `source_updated_utc_verified=false`, `marketing_consent_approved=false`, `schema_upload_authorized=false`, `data_cloud_ingestion_authorized=false`, `marketing_sends_authorized=false`.
 
 Prueba aislada (sin credenciales): `php tests/growth-pst-synthetic-preview-contract.php`. **No ejecutar contra clientes ni en producción**. No hay nuevo flujo de importación, actualización de BC, acceso SQL ni necesidad de repetir OAuth.
+
+**Continuación técnica:** [propuesta local de claves tipadas v0.4](G3_PST_TYPED_IDENTITY_PROPOSAL.md), validada con fixtures y sin alterar el contrato v0.2 congelado ni las autorizaciones G3.

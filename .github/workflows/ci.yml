@@ -96,6 +96,7 @@ jobs:
           php tests/growth-schema-contract.php
           php tests/data-cloud-mapping-contract.php
           php tests/growth-pst-synthetic-preview-contract.php
+          php tests/g3-growth-typed-identity-contract.php
           php tests/g3-dlo-dmo-relationship-contract.php
           php tests/g3-tenant-dmo-catalog-contract.php
           php tests/data-cloud-batch-contract.php
@@ -139,6 +140,7 @@ jobs:
         run: python scripts/ci/validate-pst-ingestion-schema.py
       - name: G3 full 24-field review + negative approval tests (offline)
         run: |
+          python -m unittest discover -s tests -p 'test_g3_typed_identity_schema.py'
           python scripts/ci/verify-g3-schema-review.py
           python -m unittest discover -s tests -p 'test_g3_schema_review.py'
           python scripts/ci/verify-g3-review-fingerprint.py
