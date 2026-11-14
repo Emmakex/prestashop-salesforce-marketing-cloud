@@ -142,15 +142,11 @@ function g3BridgeTest(PDO $db)
         "SELECT COUNT(*) FROM g3_growth_outbox_v1 WHERE status <> 'blocked'"
     )->fetchColumn() === 0, 'unblocked_persistent_row');
 
-    $legacyRouter = new ExplicitProviderRouter(
-        '8.2.8', 'OTHER_MERCHANT', ExplicitProviderRouter::ENGAGEMENT_LEGACY,
-        'growth_ci_legacy', 'test'
-    );
     $before = g3BridgeCount($db, 'g3_growth_outbox_v1');
-    g3BridgeRejected(function () use ($legacyRouter, $store) {
-        g3BridgeCapture($legacyRouter, $store, 1, 'customer', 44,
-            'CUSTOMER_CREATED', 'a');
-    }, 'engagement_was_accepted_as_growth');
+    g3BridgeRejected(function () {
+        new ExplicitProviderRouter('8.2.8', 'OTHER_MERCHANT',
+            'marketing_cloud_engagement', 'growth_ci_other', 'test');
+    }, 'non_growth_provider_was_accepted');
     g3BridgeRejected(function () use ($router, $store) {
         g3BridgeCapture($router, $store, 1, 'cart', 44,
             'CART_ABANDONED', 'a');
