@@ -1,6 +1,6 @@
 # G3-02 y G3-07 · Revisión concreta de finalidad y minimización de datos
 
-**Comercio:** ABH / Barcelona Confort. **Destino:** Marketing Cloud **Growth/Next + Data 360**, NO Engagement.  
+**Comercio:** ABH / Barcelona Confort. **Destino:** Marketing Cloud **Growth/Next + Data 360**, solo Growth + Data Cloud.  
 **Estado:** `PENDING_DATA_PRIVACY_OWNER`. **No es consentimiento, revisión legal aprobada ni autorización para exportar datos.**
 
 Este documento concreta las **24 decisiones de campo** que el responsable de datos y privacidad debe resolver antes de publicar `PSCustomer` y `PSOrder` en la fuente `PST` de Data 360. El registro versionado es [`config/g3-field-purpose-owner-decisions.json`](../config/g3-field-purpose-owner-decisions.json); el inventario base y las huellas de los dos YAML siguen **sin modificaciones**, conforme al [snapshot G3](G3_REVIEW_FINGERPRINT_SNAPSHOT.md).

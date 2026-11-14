@@ -1,6 +1,6 @@
 # G3-01 · Prueba de posesión de clave externa y desafío de un solo uso (laboratorio)
 
-**13/11/2026 · CI-only / sin autorización G3.** ABH/Barcelona Confort utiliza Marketing Cloud **Growth (Next) + Data 360**, **no Engagement**. El módulo instalado sigue siendo `pssalesforcebridge` 0.7.1 en `test`.
+**13/11/2026 · CI-only / sin autorización G3.** ABH/Barcelona Confort utiliza Marketing Cloud **Growth (Next) + Data 360**, **solo Growth + Data Cloud**. El módulo instalado sigue siendo `pssalesforcebridge` 0.7.1 en `test`.
 
 ## Qué problema añade el PR #59 y cómo lo reducimos
 
