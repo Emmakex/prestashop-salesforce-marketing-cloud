@@ -85,7 +85,7 @@ final class G3TenantDmoCatalogProbe
                     ['ssot__Id__c', 'ssot__IndividualId__c']
                 ),
             'AccountContact' => self::summarizeOptional(
-                $accountContact, 'ssot__AccountContact__dlm', 'PROFILE',
+                $accountContact, 'ssot__AccountContact__dlm', 'UNASSIGNED',
                 ['ssot__Id__c', 'ssot__IndividualId__c',
                  'ssot__AccountId__c', 'ssot__ContactEmailId__c']
             ),
