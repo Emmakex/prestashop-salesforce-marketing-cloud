@@ -12,7 +12,7 @@ cohorts, without automatically becoming marketing recipients.
   `sfmc_cart` and item details in `sfmc_cart_item`.
 - The configured inactivity threshold defaults to 60 minutes (minimum 15).
 - `CartAbandonmentDetector` checks native PrestaShop orders and the local
-  order ledger to suppress converted carts; Journey dispatch re-checks
+  order ledger to suppress converted carts; orquestadores discontinuados dispatch re-checks
   conversion and cart freshness before a send.
 - Existing `CartEligibilityPolicy` requires product + known customer +
   valid email + active customer, and defaults to the raw newsletter/optin
@@ -29,7 +29,7 @@ cohorts, without automatically becoming marketing recipients.
 - PrestaShop core historic carts predate installation of the module and
   are not reconstructed just by installing 0.7.0. Backfill needs a
   separate read-only first scan, event freshness checks and a lawful
-  purpose; historical carts must not retroactively trigger Journey events.
+  purpose; historical carts must not retroactively trigger orquestadores discontinuados events.
 
 ## Proposed independent cohorts
 
@@ -75,7 +75,7 @@ new configuration, credentials or cron actions.
    provenance, suppression, source_key and customer/order relations;
    decide if old cart item details are necessary at all.
 4. Implement an analytics-only ingestion mapper separately from
-   Journey recovery actions. Re-check each cart's native order state,
+   orquestadores discontinuados recovery actions. Re-check each cart's native order state,
    eligibility and suppression immediately before a planned send.
    Include throttling, campaign frequency caps and opt-out handling.
 5. Approve synthetic test, then production ingestion, then actual

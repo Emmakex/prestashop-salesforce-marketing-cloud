@@ -81,7 +81,7 @@ verification stays with an authorized BC data owner, without
 sending personal data into code repositories or chat.
 
 The release remains in Test; no backfill, Data Cloud schema/stream
-publication or Journey Builder campaign has been authorized.
+publication or orquestador discontinuado campaign has been authorized.
 
 ## Follow-up: distinct customers and newsletter traceability (2026-11-12)
 
@@ -123,7 +123,7 @@ documented, purpose-specific legal determination. BC has **one candidate
 cart with only optin=1** (11 with either flag, 10 with newsletter).
 The runtime's technical eligibility flag is **not** proof of lawful
 contact authorization. Keep Test mode and do not switch to Production
-until policy/consent/suppression and Journey entry rules are reviewed and
+until policy/consent/suppression and orquestadores discontinuados entry rules are reviewed and
 separately certified.
 
 ### Next review gates
@@ -134,7 +134,7 @@ separately certified.
    sources, including external email tools. A shop flag alone may not
    reflect a subsequent unsubscribe in Salesforce.
 3. Decide whether 0.7.0 should require verified first-party newsletter
-   subscription (and separately documented alternatives) before a Journey
+   subscription (and separately documented alternatives) before a orquestadores discontinuados
    send; partner optin alone is **not** a safe default for BC.
 4. Recheck current no-order state, inactivity timestamp, recency window and
    unique customer contact before any recovery; never mass-send to old carts.

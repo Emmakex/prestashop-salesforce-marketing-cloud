@@ -58,7 +58,7 @@ Record Modified strategy and G3 owner approvals are still pending.
 - v0.3 candidate has 24 fields, 12 per object, including mandatory ISO UTC
   source_updated_utc values. No final approval or upload.
 - StagedUtcRecordMapper + StagedUtcPayloadBuilder now model the full offline
-  journey from normalized records to JSON data envelope using synthetic data.
+  orquestadores discontinuados from normalized records to JSON data envelope using synthetic data.
   They fail closed on unknown timezone, DST overlap/gap, missing UTC field,
   bad UTC formats, duplicate identities, cross-shop references and large batches.
 - Existing IngestionPayloadBuilder, PrestaShop live worker, OAuth config and

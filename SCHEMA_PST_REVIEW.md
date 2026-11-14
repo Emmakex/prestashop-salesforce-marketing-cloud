@@ -65,7 +65,7 @@ Object category proposals:
    without writing customer records.
 
 Until this gate passes, **no schema upload, no data streams, no record writes,
-no email marketing activation**. Existing PrestaShop Engagement release 0.7.0
+no email marketing activation**. Existing PrestaShop producto discontinuado release 0.7.0
 remains unchanged.
 
 Salesforce references:
