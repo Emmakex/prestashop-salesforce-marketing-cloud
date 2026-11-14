@@ -8,6 +8,14 @@ on:
       - 'tests/live/g3-tenant-dmo-catalog.php'
       - 'tests/review/G3TenantDmoCatalogProbe.php'
       - 'scripts/ci/render-g3-dmo-review-summary.py'
+      - 'scripts/ci/render-g4-readiness-report.py'
+      - 'config/g3-abh-technical-closure-candidate.json'
+      - 'config/g3-pst-review-fingerprint-freeze.json'
+      - 'config/g3-pst-schema-review.json'
+      - 'config/g3-field-purpose-owner-decisions.json'
+      - 'config/g3-pst-dlo-dmo-mapping-candidate.json'
+      - 'schemas/ABH_PST_SCHEMA_REVIEW.yaml'
+      - 'config/project-contract.json'
   workflow_dispatch:
 
 permissions:
@@ -58,6 +66,18 @@ jobs:
         if: ${{ always() }}
         shell: bash
         run: python3 scripts/ci/render-g3-dmo-review-summary.py
+      - name: Consolidate G4 readiness without tenant mutation
+        if: ${{ always() }}
+        shell: bash
+        run: python3 scripts/ci/render-g4-readiness-report.py
+      - name: Store G4 no-write readiness summary
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: g4-abh-readiness-readonly-${{ github.run_id }}-${{ github.run_attempt }}
+          path: g4-abh-readiness-sanitized.json
+          if-no-files-found: ignore
+          retention-days: 14
       - name: Store sanitized metadata flags only
         if: ${{ always() }}
         uses: actions/upload-artifact@v4
