@@ -105,7 +105,7 @@ def render(evidence):
         entry = objects.get(name)
         entry = entry if isinstance(entry, dict) else {}
         category = entry.get("observed_category")
-        cat = category if category in CATEGORIES else "Sin verificar"
+        cat = category if isinstance(category, str) and category in CATEGORIES else "Sin verificar"
         prefix = SCANS[name]
         count = relation.get(prefix + "_relationship_count")
         bounded = (type(count) is int and 0 <= count <= 500)
