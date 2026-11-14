@@ -43,8 +43,8 @@ jobs:
       - name: Lint PHP
         run: find pssalesforcebridge tests -name '*.php' -print0 | xargs -0 -n1 php -l
 
-  health-contract:
-    name: Health contract (${{ matrix.php }})
+  growth-only-module:
+    name: Growth-only module (${{ matrix.php }})
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -58,68 +58,11 @@ jobs:
         with:
           php-version: ${{ matrix.php }}
           coverage: none
-      - name: Run health contracts
+      - name: Certify Growth-only source, safe upgrade, no legacy egress
         run: |
-          php tests/health-service-contract.php
-          php tests/health-dashboard-contract.php
-
-  sync-contract:
-    name: Sync correctness (${{ matrix.php }})
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        php: ['7.1', '8.5']
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
-      - uses: shivammathur/setup-php@v2
-        with:
-          php-version: ${{ matrix.php }}
-          coverage: none
-      - name: Run sync correctness contract
-        run: php tests/sync-correctness-contract.php
-
-  retention-contract:
-    name: Retention contract (${{ matrix.php }})
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        php: ['7.1', '8.5']
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
-      - uses: shivammathur/setup-php@v2
-        with:
-          php-version: ${{ matrix.php }}
-          coverage: none
-      - name: Run privacy retention contract
-        run: php tests/retention-contract.php
-
-  release-contract:
-    name: Release contract (${{ matrix.php }})
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        php: ['7.1', '8.5']
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
-      - uses: shivammathur/setup-php@v2
-        with:
-          php-version: ${{ matrix.php }}
-          coverage: none
-      - name: Validate release and upgrade contract
-        run: |
-          php tests/release-contract.php
-          php tests/db-single-row-contract.php
-          php tests/db-namespace-contract.php
-          php tests/sfmc-live-certification-contract.php
+          php tests/growth-only-module-contract.php
+          php tests/growth-explicit-provider-routing-contract.php
+          php tests/growth-provider-outbox-bridge-contract.php
 
   growth-auth-contract:
     name: Growth OAuth contract (${{ matrix.php }})
@@ -150,9 +93,6 @@ jobs:
           php tests/g3-record-modified-refresh-review-contract.php
           php tests/data-cloud-live-utc-observation-contract.php
           php tests/data-cloud-atomic-utc-acceptance-contract.php
-          php tests/g3-prestashop-adapter-contract.php
-          php tests/g3-provider-egress-contract.php
-          php tests/g3-credential-lifecycle-contract.php
           php tests/g3-growth-cart-source-presend-contract.php
           php tests/g3-growth-order-evidence-contract.php
           php tests/growth-local-order-presence-contract.php
@@ -160,10 +100,6 @@ jobs:
           php tests/growth-provider-outbox-bridge-contract.php
           php tests/growth-schema-plan-contract.php
           php tests/growth-sql-engine-gate-contract.php
-          php tests/cart-segmentation-contract.php
-          php tests/cart-consent-current-state-contract.php
-          php tests/marketing-recovery-suppression-readiness-contract.php
-          php tests/sfmc-subscriber-soap-readonly-contract.php
           php tests/data-cloud-shop-timezone-contract.php
           php tests/data-cloud-v03-payload-contract.php
           php tests/data-cloud-multi-installation-contract.php
@@ -253,26 +189,21 @@ jobs:
           php -l tests/integration/G3GrowthOutboxSandboxMigration.php
           php -l tests/integration/G3GrowthOutboxSandboxStore.php
           php -l tests/integration/g3_growth_outbox_v1.php
-      - name: Verify sandbox mirrors exact installed module DDL
-        run: python3 scripts/ci/verify-g3-legacy-mirror.py
       - name: Certify isolated transactional journal and legacy queue mirror
         run: |
           php tests/integration/g3_mysql_acceptance.php
-          php tests/integration/g3_prestashop_071_queue_mirror.php
           php tests/integration/g3_growth_outbox_v1.php
           php tests/integration/g3_growth_provider_outbox_bridge.php
           php tests/integration/g3_growth_prefixed_schema_preview.php
           php tests/integration/g3_growth_migration_executor.php
           php tests/integration/g3_growth_prestashop_db_store.php
-          php tests/integration/g3_prestashop_adapter.php
           php tests/integration/g3_namespace_registry.php
-          php tests/integration/g3_installation_proof.php
           php tests/integration/g3_proof_key_lifecycle.php
 
   package:
     name: Build release package
     runs-on: ubuntu-latest
-    needs: [php-syntax, health-contract, sync-contract, retention-contract, release-contract, growth-auth-contract, data-cloud-schema-contract]
+    needs: [php-syntax, growth-only-module, growth-auth-contract, data-cloud-schema-contract, g3-mysql-sandbox]
     steps:
       - uses: actions/checkout@v4
         with:
@@ -281,24 +212,28 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          VERSION=0.7.1
+          VERSION=0.8.0
           mkdir -p build
           ZIP="build/pssalesforcebridge-${VERSION}.zip"
           zip -r "$ZIP" pssalesforcebridge \
             -x '*/vendor/*' '*.DS_Store'
           unzip -Z1 "$ZIP" | grep -qx 'pssalesforcebridge/pssalesforcebridge.php'
-          unzip -Z1 "$ZIP" | grep -qx 'pssalesforcebridge/upgrade/upgrade-0.7.1.php'
+          unzip -Z1 "$ZIP" | grep -qx 'pssalesforcebridge/upgrade/upgrade-0.8.0.php'
+          if unzip -Z1 "$ZIP" | grep -Eiq '(src/(Salesforce|Customer|Order|Cart|Queue|Journey|Recovery|Operations)/|controllers/front/recover.php|upgrade/upgrade-0\.7\.)'; then
+            echo 'Legacy adapter or old upgrade logic must not ship in the Growth-only ZIP'
+            exit 1
+          fi
           if unzip -Z1 "$ZIP" | grep -q '^pssalesforcebridge/vendor/'; then
             echo 'vendor directory must not be packaged'
             exit 1
           fi
-          unzip -p "$ZIP" pssalesforcebridge/pssalesforcebridge.php | grep -Fq "\$this->version = '0.7.1';"
+          unzip -p "$ZIP" pssalesforcebridge/pssalesforcebridge.php | grep -Fq "\$this->version = '0.8.0';"
           unzip -p "$ZIP" pssalesforcebridge/composer.json | grep -Fq '"php": ">=7.1"'
           sha256sum "$ZIP" > "${ZIP}.sha256"
       - uses: actions/upload-artifact@v4
         with:
-          name: pssalesforcebridge-0.7.1
+          name: pssalesforcebridge-0.8.0
           path: |
-            build/pssalesforcebridge-0.7.1.zip
-            build/pssalesforcebridge-0.7.1.zip.sha256
+            build/pssalesforcebridge-0.8.0.zip
+            build/pssalesforcebridge-0.8.0.zip.sha256
           if-no-files-found: error
