@@ -3,12 +3,12 @@
 ## Reason
 
 The ABH external client app has passed OAuth Client Credentials certification.
-Marketing Cloud Growth (Marketing Cloud Next) **does not** use Marketing Cloud Engagement
-Installed Packages, Data Extension Rowset APIs, or Journey Builder `/interaction/v1/events`.
+Marketing Cloud Growth (Marketing Cloud Next) **does not** use producto discontinuado
+Installed Packages, almacenamiento discontinuado Rowset APIs, or orquestador discontinuado `(endpoint discontinuado)`.
 An OAuth success alone cannot certify the Marketing Cloud Growth data path.
 
 This microcut adds a **manual-only, metadata-only** discovery probe; it does not
-change the 0.7.0 PrestaShop module configuration or any Engagement delivery worker.
+change the 0.7.0 PrestaShop module configuration or any producto discontinuado delivery worker.
 
 ## Manual invocation
 

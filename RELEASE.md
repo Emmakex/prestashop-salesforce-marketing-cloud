@@ -5,7 +5,7 @@
 Public module version `0.7.1` upgrades from an installed `0.7.0` without table DDL or changes to merchant configuration. The old `0.7.0` release history remains below.
 
 - The default `marketing_optin` cart eligibility requires the **first-party newsletter flag**, never a partner opt-in alone; rejects missing or deleted/inactive customers.
-- Journey re-reads the latest PrestaShop customer record before issuing a recovery link or calling Salesforce; mismatched shop, changed email, deleted/inactive customer, or current newsletter withdrawal is suppressed.
+- orquestadores discontinuados re-reads the latest PrestaShop customer record before issuing a recovery link or calling Salesforce; mismatched shop, changed email, deleted/inactive customer, or current newsletter withdrawal is suppressed.
 - Dedicated synthetic regression contract runs on PHP 7.1 and PHP 8.5; runtime certification still spans PrestaShop 1.7.8.11, 8.2.8 and 9.1.5.
 - Package: `pssalesforcebridge-0.7.1.zip` and `.sha256`, both built from the exact CI-certified SHA.
 - No new Data Cloud streams, customer data sends or campaigns; BC must remain in `test` until contact permissions, external suppression and relevant legal basis are checked.
@@ -49,7 +49,7 @@ Fresh installation and upgrade converge on these defaults:
 
 - processed queue retention: 30 days
 - local log retention: 30 days
-- Journey audit retention: 90 days
+- orquestadores discontinuados audit retention: 90 days
 - cart snapshot retention: 30 days
 - recovery token retention: 30 days
 - last retention run: empty

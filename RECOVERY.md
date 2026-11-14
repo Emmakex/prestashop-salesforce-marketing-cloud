@@ -16,7 +16,7 @@ Version `0.6.0` introduced one-time abandoned-cart recovery links without turnin
 ## Recovery flow
 
 ```text
-Journey Builder email
+orquestador discontinuado email
         ↓
 RecoveryUrl with opaque token
         ↓
@@ -59,7 +59,7 @@ Recovery fails closed when:
 - the source cart no longer exists;
 - the source cart belongs to another shop;
 - the cart has already produced an order;
-- the current cart snapshot no longer matches the snapshot for which the Journey event was sent;
+- the current cart snapshot no longer matches the snapshot for which the orquestadores discontinuados event was sent;
 - the source cart no longer contains recoverable products.
 
 ## Attribution
@@ -121,6 +121,6 @@ The Back Office recovery summary exposes:
 
 These metrics are based on PrestaShop order state and totals, not on email-open tracking.
 
-## Journey field
+## orquestadores discontinuados field
 
-`RecoveryUrl` is populated just-in-time immediately before the Journey Builder API call. Test mode never fires Journey events and therefore does not generate customer-facing recovery links.
+`RecoveryUrl` is populated just-in-time immediately before the orquestador discontinuado API call. Test mode never fires orquestadores discontinuados events and therefore does not generate customer-facing recovery links.
