@@ -17,9 +17,12 @@ TOKENS = [
     "so" + "ap",
     "data" + "_extension",
     "all" + " subscribers",
+    "all" + "_subscribers",
     "all" + "subscribers",
     "publication" + " list",
+    "publication" + "_list",
     "subscriber" + "key",
+    "subscriber" + "_key",
     "installed" + " package",
 ]
 PATTERNS = [re.compile(re.escape(token), re.I) for token in TOKENS]
