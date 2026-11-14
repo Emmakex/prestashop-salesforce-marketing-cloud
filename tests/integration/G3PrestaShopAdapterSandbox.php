@@ -11,7 +11,7 @@ require_once __DIR__ . '/G3GrowthOutboxSandboxMigration.php';
 final class G3PrestaShopAdapterSandbox
 {
     const GROWTH = 'marketing_cloud_growth';
-    const ENGAGEMENT = 'marketing_cloud_engagement';
+    const RETIRED_PROVIDER = 'unsupported_external_product';
     const BINDING_TABLE = 'g3_ps_adapter_binding_v1';
 
     private $pdo;
@@ -34,7 +34,7 @@ final class G3PrestaShopAdapterSandbox
         if (!is_string($merchant) || !preg_match('/^[A-Z][A-Z0-9_]{1,31}$/D', $merchant)) {
             throw new RuntimeException('g3_adapter_merchant_required');
         }
-        if ($provider !== self::GROWTH && $provider !== self::ENGAGEMENT) {
+        if ($provider !== self::GROWTH && $provider !== self::RETIRED_PROVIDER) {
             throw new RuntimeException('g3_adapter_explicit_provider_required');
         }
         if ($merchant === 'ABH' && $provider !== self::GROWTH) {
@@ -67,9 +67,9 @@ final class G3PrestaShopAdapterSandbox
     public function install($version, $merchant, $provider, $namespace, $mode)
     {
         $plan = self::preflight($version, $merchant, $provider, $namespace, $mode);
-        // Engagement is a separate legacy provider, never a Growth fallback.
+        // RetiredProvider is a separate legacy provider, never a Growth fallback.
         if (!$plan['growth_schema_install_supported']) {
-            throw new RuntimeException('g3_adapter_engagement_install_not_implemented');
+            throw new RuntimeException('g3_adapter_retired_provider_install_not_implemented');
         }
         $present = $this->presentTables();
         if (count($present) === 3) {
@@ -112,7 +112,7 @@ final class G3PrestaShopAdapterSandbox
     {
         $plan = self::preflight($version, $merchant, $provider, $namespace, $mode);
         if (!$plan['growth_schema_install_supported']) {
-            throw new RuntimeException('g3_adapter_engagement_rollback_not_implemented');
+            throw new RuntimeException('g3_adapter_retired_provider_rollback_not_implemented');
         }
         $present = $this->presentTables();
         if (count($present) === 0) {

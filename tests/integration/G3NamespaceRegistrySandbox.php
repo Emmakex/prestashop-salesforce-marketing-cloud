@@ -141,7 +141,7 @@ final class G3NamespaceRegistrySandbox
             || !is_string($merchant)
             || !preg_match('/^[A-Z][A-Z0-9_]{1,31}$/D', $merchant)
             || ($provider !== 'marketing_cloud_growth'
-                && $provider !== 'marketing_cloud_engagement')
+                && $provider !== 'unsupported_external_product')
             || ($merchant === 'ABH' && $provider !== 'marketing_cloud_growth')) {
             throw new RuntimeException('g3_namespace_invalid_or_provider_mismatch');
         }

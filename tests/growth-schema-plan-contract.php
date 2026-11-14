@@ -95,11 +95,11 @@ foreach (['', 'x-', '../', 'ps;DROP', str_repeat('p', 33), "\0bad"] as $prefix) 
 }
 schemaReject(function () {
     schemaPreview('ps_', '8.2.8', 'OTHER_MERCHANT',
-        'marketing_cloud_engagement', 'growth_ci_test');
+        'unsupported_external_product', 'growth_ci_test');
 }, 'growth_router_growth_only');
 schemaReject(function () {
     schemaPreview('ps_', '8.2.8', 'ABH',
-        'marketing_cloud_engagement', 'growth_ci_test');
+        'unsupported_external_product', 'growth_ci_test');
 }, 'growth_router_growth_only');
 schemaReject(function () {
     schemaPreview('ps_', '8.2.8', 'ABH',

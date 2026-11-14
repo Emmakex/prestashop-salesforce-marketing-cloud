@@ -126,7 +126,7 @@ final class G3InstallationProofSandbox
             || !is_string($installationId)
             || !preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/D', $installationId)
             || !is_string($merchant) || !preg_match('/^[A-Z][A-Z0-9_]{1,31}$/D', $merchant)
-            || !in_array($provider, ['marketing_cloud_growth', 'marketing_cloud_engagement'], true)
+            || !in_array($provider, ['marketing_cloud_growth', 'unsupported_external_product'], true)
             || ($merchant === 'ABH' && $provider !== 'marketing_cloud_growth')
             || !is_string($nonce) || !preg_match('/^[0-9a-f]{64}$/D', $nonce)
             || !is_int($expiry) || $expiry <= 0) {
