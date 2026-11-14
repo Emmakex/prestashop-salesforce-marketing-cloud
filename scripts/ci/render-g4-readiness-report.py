@@ -385,7 +385,7 @@ def markdown(report):
         + ("verificado" if report["schema_candidate"]["hash_verified"] else "NO verificado")
         + "; no publicable |",
         "| Barcelona Confort | 0.7.1 Test; motor SQL real no observado |",
-        "| PrestaShop CI 1.7/8/9 | 3/3 en ejecución histórica #43624367487; "
+        "| PrestaShop CI 1.7/8/9 | 3/3 aprobadas en run #43624367487; "
         "MySQL 5.7 bloquea el nuevo DDL Growth |",
         "| Catálogo Data 360 en esta ejecución | "
         + report["data_360"]["state"] + "; mapping NO aprobado |",
