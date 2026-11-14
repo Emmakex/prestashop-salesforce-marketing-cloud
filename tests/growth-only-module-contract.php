@@ -58,7 +58,7 @@ $old = [
     'PS_SFMC_CLIENT_ID' => 'SENSITIVE_OLD_CLIENT',
     'PS_SFMC_CLIENT_SECRET' => 'SENSITIVE_OLD_SECRET',
     'PS_SFMC_AUTH_BASE_URI' => 'https://legacy.example.invalid',
-    'PS_SFMC_CUSTOMER_DE_KEY' => 'SENSITIVE_OLD_DATA_EXTENSION',
+    'PS_SFMC_CUSTOMER_DE_KEY' => 'SENSITIVE_OLD_RETIRED_STORE',
     'PS_SFMC_RETENTION_QUEUE_DAYS' => 'SENSITIVE_OLD_SETTING',
     'PS_SFMC_MODE' => 'production',
 ];
@@ -157,7 +157,7 @@ growthAssert($health['provider'] === 'marketing_cloud_growth'
     && $cron['data_cloud_ingestion']['skipped'] === 'schema_required',
     'runtime_did_not_block_outbound');
 growthAssert(!array_key_exists('customer_delivery', $cron)
-    && !array_key_exists('journey_delivery', $cron), 'old_delivery_still_exposed');
+    && !array_key_exists('retired_flow_delivery', $cron), 'old_delivery_still_exposed');
 
 growthAssert($module->uninstall() === true, 'uninstall_failed');
 growthAssert(Configuration::$deleted === [

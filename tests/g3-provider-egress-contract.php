@@ -25,10 +25,10 @@ g3GateCheck(G3CandidateProviderGate::legacyOutboundReason(
 ) === 'g3_provider_unbound', 'missing_binding_not_closed');
 
 $bad = $growth;
-$bad['provider'] = 'marketing_cloud_engagement';
+$bad['provider'] = 'unsupported_external_product';
 g3GateCheck(G3CandidateProviderGate::legacyOutboundReason(
     $bad, 'production'
-) === 'g3_abh_provider_mismatch', 'abh_engagement_fallback');
+) === 'g3_abh_provider_mismatch', 'abh_retired_provider_fallback');
 
 foreach (['', 'ready', 'unknown', 'sending'] as $badStatus) {
     $bad = $growth;
@@ -46,10 +46,10 @@ foreach (['', 'bad:namespace', 'x', str_repeat('a', 33)] as $badNamespace) {
 }
 $other = $growth;
 $other['merchant'] = 'ANOTHER';
-$other['provider'] = 'marketing_cloud_engagement';
+$other['provider'] = 'unsupported_external_product';
 g3GateCheck(G3CandidateProviderGate::legacyOutboundReason(
     $other, 'production'
-) === 'g3_tenant_delivery_not_certified', 'unauthorized_engagement_tenant');
+) === 'g3_tenant_delivery_not_certified', 'unauthorized_retired_provider_tenant');
 $other['provider'] = 'unsupported_provider';
 g3GateCheck(G3CandidateProviderGate::legacyOutboundReason(
     $other, 'production'
