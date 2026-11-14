@@ -42,7 +42,7 @@ function fixtures()
             ],
         ],
         'ssot__AccountContact__dlm' => [
-            'name' => 'ssot__AccountContact__dlm', 'category' => 'PROFILE',
+            'name' => 'ssot__AccountContact__dlm', 'category' => 'UNASSIGNED',
             'dataSpaceName' => 'default',
             'fields' => [
                 ['name' => 'ssot__Id__c', 'isPrimaryKey' => true],
