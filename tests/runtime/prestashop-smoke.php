@@ -153,7 +153,24 @@ foreach ($hooks as $hook) {
 }
 
 $customer = runtimeCustomer();
-runtimeAssert($module->hookActionCustomerAccountUpdate(['customer' => $customer]) !== false, 'customer hook returned failure');
+
+// New safe default: a freshly installed bridge cannot infer Engagement
+// from legacy configuration keys, even if a customer hook is fired.
+runtimeAssert((string) Configuration::get('PS_SFMC_PROVIDER') === 'unselected'
+    && (string) Configuration::get('PS_SFMC_MERCHANT') === '',
+    'new module provider default must be unselected');
+runtimeAssert($module->hookActionCustomerAccountUpdate(['customer' => $customer]) === false,
+    'unselected provider was allowed to capture customer');
+runtimeAssert((int) Db::getInstance()->getValue(
+    'SELECT COUNT(*) FROM `' . _DB_PREFIX_ . "sfmc_queue` WHERE entity_type = 'customer'"
+) === 0, 'default provider unexpectedly wrote legacy queue');
+
+// Explicit LEGACY tenant in synthetic CI only: confirm the existing 0.7.1
+// hooks still function for merchants who actually select Engagement.
+Configuration::updateValue('PS_SFMC_MERCHANT', 'OTHER_CI');
+Configuration::updateValue('PS_SFMC_PROVIDER', 'marketing_cloud_engagement');
+runtimeAssert($module->hookActionCustomerAccountUpdate(['customer' => $customer]) !== false,
+    'explicit legacy customer hook returned failure');
 $customerEvents = (int) Db::getInstance()->getValue(
     'SELECT COUNT(*) FROM `' . _DB_PREFIX_ . "sfmc_queue` WHERE entity_type = 'customer' AND entity_id = '" . (int) $customer->id . "'"
 );
@@ -214,6 +231,16 @@ $cartDetection = $module->processCartAbandonmentCandidates(100);
 runtimeAssert(is_array($cartDetection), 'cart abandonment cron component did not return an array');
 $retention = $module->processRetention(false);
 runtimeAssert(is_array($retention), 'retention cron component did not return an array');
+
+// Restore ABH Growth Test for subsequent certification phases. There
+// must be no hidden Engagement capture or egress after changing provider.
+Configuration::updateValue('PS_SFMC_MERCHANT', 'ABH');
+Configuration::updateValue('PS_SFMC_PROVIDER', 'marketing_cloud_growth');
+runtimeAssert($module->hookActionCustomerAccountUpdate(['customer' => $customer]) === false,
+    'ABH Growth unexpectedly invoked legacy capture');
+$blocked = $module->processCustomerQueue(10);
+runtimeAssert(isset($blocked['skipped']) && $blocked['skipped'] === 'provider_not_legacy',
+    'ABH Growth unexpectedly invoked Engagement delivery');
 
 $health = $module->healthReport();
 runtimeAssert(is_array($health), 'health report did not return an array');
