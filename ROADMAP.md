@@ -22,6 +22,7 @@
 - [ ] **G4**: publicar esquema y activar Data Streams/mapeos SOLO después de aprobación separada.
 - [ ] **G5**: /actions/test sintético, luego ingesta sintética autorizada y conciliada.
 - [ ] **G6**: identidad estable, consentimiento actual y supresión específica Growth/Core/Data Cloud, revalidación antes de cada campaña.
+- [x] **Preparación G7 sin envíos:** comprobación local doble de compras para carritos, con consultas acotadas por tienda y carrito, diferenciación `found`/`none`/`unknown`, bloqueos de consentimiento/supresión/frecuencia y pruebas negativas. Nunca equivale a permiso de campaña.
 - [ ] **G7**: Flow/campaña Growth: cliente, pedido y carrito abandonado, frecuencia, conversiones, cancelación y recuperación.
 - [ ] **G8**: adaptador completo, almacenamiento/reintentos/ledger, despliegue reversible y go-live autorizado para BC, verificado en 1.7/8/9.
 
