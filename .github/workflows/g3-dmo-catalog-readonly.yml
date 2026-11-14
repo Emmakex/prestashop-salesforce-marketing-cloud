@@ -7,6 +7,7 @@ on:
       - '.github/workflows/g3-dmo-catalog-readonly.yml'
       - 'tests/live/g3-tenant-dmo-catalog.php'
       - 'tests/review/G3TenantDmoCatalogProbe.php'
+      - 'scripts/ci/render-g3-dmo-review-summary.py'
   workflow_dispatch:
 
 permissions:
@@ -53,6 +54,10 @@ jobs:
           SF_GROWTH_CLIENT_SECRET: ${{ secrets.SF_GROWTH_CLIENT_SECRET }}
           SF_G3_DMO_EVIDENCE_PATH: g3-abh-dmo-catalog-sanitized.json
         run: php tests/live/g3-tenant-dmo-catalog.php
+      - name: Summarize G3 metadata safely for owner review
+        if: ${{ always() }}
+        shell: bash
+        run: python3 scripts/ci/render-g3-dmo-review-summary.py
       - name: Store sanitized metadata flags only
         if: ${{ always() }}
         uses: actions/upload-artifact@v4
