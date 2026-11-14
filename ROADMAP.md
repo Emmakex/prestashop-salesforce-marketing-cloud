@@ -23,6 +23,7 @@
 - [ ] G5: validación y pruebas sintéticas Data 360, después escritura sintética aprobada.
 - [ ] G6: seleccionar y certificar identidad/contacto, bajas, restricciones y supresiones de **Growth/Core/Data 360**, no las listas SOAP de Engagement.
 - [ ] G7: comprobar Flow y capacidad de campañas Growth; test de abandono → recuperación → pedido con destinatario sintético.
+- [x] **G8 preparación local (sin habilitar G8):** puente real y dormido `GrowthBlockedHookAdapter` que reconoce hooks existentes de cliente/creación de pedido y alimenta exclusivamente `BlockedOutboxCoordinator` en Test, exigiendo IDs/tienda explícitos y dedupe local. Laboratorio con store transaccional MySQL/MariaDB y runtime PrestaShop 1.7/8/9; no registra hooks, no envía, no instala BC. Ver [contrato](docs/GROWTH_BLOCKED_HOOK_ADAPTER_REVIEW.md).
 - [ ] G8: implementar adaptador Growth reusable, compatibilidad PS 1.7/8/9, release, rollback y go-live autorizado.
 
 **Guardas:** no publicar schema ni enviar datos reales todavía. Nunca aconsejar Installed Packages de Engagement para ABH. Los pasos marcados hechos son evidencias puntuales, no el circuito end-to-end.
