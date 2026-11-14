@@ -180,6 +180,17 @@ if [ "$ACTUAL_VERSION" != "$PS_VERSION" ]; then
 fi
 
 
+
+echo "==> Phase 0: first-time 0.8.0 install on a shop with no legacy module tables"
+copy_module /tmp/pssfmc-runtime-growth/pssalesforcebridge
+console prestashop:module install pssalesforcebridge --no-interaction
+test "$(sql "SELECT version FROM ps_module WHERE name='pssalesforcebridge' LIMIT 1")" = '0.8.0'
+test "$(sql "SELECT value FROM ps_configuration WHERE name='PS_SFMC_MODE' ORDER BY id_configuration DESC LIMIT 1")" = 'test'
+test "$(sql "SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='ps_sfmc_log'")" = '0'
+test "$(sql "SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='ps_sfmc_queue'")" = '0'
+console prestashop:module uninstall pssalesforcebridge --no-interaction
+test "$(sql "SELECT COUNT(*) FROM ps_module WHERE name='pssalesforcebridge'")" = '0'
+
 echo "==> Phase A: install 0.7.1 fixture and historical CI marker"
 copy_module /tmp/pssfmc-runtime-old/pssalesforcebridge
 console prestashop:module install pssalesforcebridge --no-interaction
