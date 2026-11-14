@@ -176,9 +176,13 @@ final class G3TenantDmoCatalogProbe
             'account_contact_relationship_scan_complete' => false,
             'contact_email_relationship_scan_complete' => false,
             'sales_order_to_account_contact_bill_to_relation_seen' => false,
+            'active_sales_order_to_account_contact_bill_to_relation_seen' => false,
             'account_contact_to_individual_relation_seen' => false,
+            'active_account_contact_to_individual_relation_seen' => false,
             'sales_order_to_contact_email_bill_to_relation_seen' => false,
+            'active_sales_order_to_contact_email_bill_to_relation_seen' => false,
             'contact_email_to_individual_party_relation_seen' => false,
+            'active_contact_email_to_individual_party_relation_seen' => false,
             'account_contact_bridge_approved' => false,
             'contact_email_bridge_approved' => false,
         ];
@@ -320,6 +324,12 @@ final class G3TenantDmoCatalogProbe
         if (isset($entry[$fieldSide]['name'])
             && $entry[$fieldSide]['name'] === $foreignKey) {
             $out[$flag] = true;
+            // Visibility, including an INACTIVE or unknown status, is not
+            // evidence that a standard relationship is active for ABH.
+            // All flag names come from our fixed internal allowlist.
+            if (isset($entry['status']) && $entry['status'] === 'ACTIVE') {
+                $out['active_' . $flag] = true;
+            }
         }
     }
 
