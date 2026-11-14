@@ -16,6 +16,7 @@
 - [x] **Corte de arquitectura 0.8.0 integrado y certificado**: retirados transportes, procesadores y credenciales del paquete anterior; no se reintroducen alternativas ni se tocan datos históricos. Test obligatorio, cron seguro y BO solo Growth + Data Cloud.
 - [x] Certificar **CI exact-head y runtime real PS 1.7.8.11, 8.2.8 y 9.1.5**, incluida instalación y actualización no destructiva.
 - [x] **Vista previa sintética Growth → PST v0.2 (CI, sin ingesta):** dos envelopes customer/order con 22 campos, validación multitienda/negativos y conflicto de claves v0.2 vs router tipado documentado. [Contrato](docs/GROWTH_PST_SYNTHETIC_PREVIEW.md). No cambia el SHA del esquema ni resuelve G3.
+- [x] **G3 · Identidad cliente–pedido tipada, propuesta local v0.4 (NO aprobada):** PK de cliente/pedido sin colisión por tipo y FK local same-shop; pruebas sintéticas 1.7/8/9, esquema candidato separado y controles negativos. El YAML v0.2 y su SHA siguen congelados. [Evidencia](docs/G3_PST_TYPED_IDENTITY_PROPOSAL.md). Falta la aceptación PK/FK y DMO real del arquitecto antes de G4.
 - [ ] **G3 BLOQUEANTE**: aprobación responsable de namespace único, PSCustomer/PSOrder, categorización, relación cliente-pedido, fecha fuente UTC/DST, finalidades, consentimiento, conservación, borrado y selección final de PST.
 - [ ] **G4**: publicar esquema y activar Data Streams/mapeos SOLO después de aprobación separada.
 - [ ] **G5**: /actions/test sintético, luego ingesta sintética autorizada y conciliada.

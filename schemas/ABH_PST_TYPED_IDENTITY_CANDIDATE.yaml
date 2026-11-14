@@ -1,0 +1,73 @@
+# G3-only ALTERNATIVE identity proposal for ABH PST, NOT approved for upload.
+# Frozen schemas/ABH_PST_SCHEMA_REVIEW.yaml v0.2 MUST remain unchanged.
+# Same 22 fields. Different key values only: namespace:shop:type:id.
+# Local parent→child match is testable; Salesforce DMO mapping NOT approved.
+# Cart reference has NO approved PSCart stream. No consent, UTC or paid inference.
+openapi: 3.0.3
+info:
+  title: ABH PrestaShop PST Typed Identity G3 Candidate (DO NOT PUBLISH)
+  version: "0.4.0-review-only"
+paths: {}
+components:
+  schemas:
+    PSCustomer:
+      type: object
+      required: [source_key, source_namespace, shop_id, customer_id]
+      properties:
+        source_key:
+          type: string
+          pattern: '^[a-z][a-z0-9_]{5,31}:[1-9][0-9]*:customer:[1-9][0-9]*$'
+          description: Candidate typed PK, isolated by installation, shop and customer.
+        source_namespace:
+          type: string
+        shop_id:
+          type: number
+        customer_id:
+          type: number
+        email:
+          type: string
+          format: email
+        first_name:
+          type: string
+        last_name:
+          type: string
+        newsletter_flag:
+          type: boolean
+        partner_optin_flag:
+          type: boolean
+        active_flag:
+          type: boolean
+        source_updated_local:
+          type: string
+    PSOrder:
+      type: object
+      required: [source_key, source_namespace, shop_id, order_id]
+      properties:
+        source_key:
+          type: string
+          pattern: '^[a-z][a-z0-9_]{5,31}:[1-9][0-9]*:order:[1-9][0-9]*$'
+          description: Candidate typed order PK, disjoint from PSCustomer.
+        source_namespace:
+          type: string
+        shop_id:
+          type: number
+        order_id:
+          type: number
+        customer_source_key:
+          type: string
+          pattern: '^$|^[a-z][a-z0-9_]{5,31}:[1-9][0-9]*:customer:[1-9][0-9]*$'
+          description: Candidate local FK to same-installation, same-shop PSCustomer.source_key. DMO relation still pending.
+        cart_source_key:
+          type: string
+          pattern: '^$|^[a-z][a-z0-9_]{5,31}:[1-9][0-9]*:cart:[1-9][0-9]*$'
+          description: Source reference only; no PSCart stream or DMO relation is approved.
+        currency:
+          type: string
+        total_paid:
+          type: number
+        paid_flag:
+          type: boolean
+        state_id:
+          type: number
+        source_updated_local:
+          type: string
