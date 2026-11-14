@@ -56,7 +56,7 @@ The 0.7.0 runtime release gate executes:
 
 For every pinned version it tests the real 0.6.1 → 0.7.0 upgrade, a clean 0.7.0 install, connector tables/configuration/hooks, local customer/cart/order paths, test-mode outbound blocking, backfill, abandoned-cart detection, retention, health, protected cron and Front Office availability.
 
-Live Salesforce Marketing Cloud/Journey delivery is a separate deployment certification and is not implied by this local runtime matrix.
+Live Salesforce Marketing Cloud/orquestadores discontinuados delivery is a separate deployment certification and is not implied by this local runtime matrix.
 
 ## CI policy
 

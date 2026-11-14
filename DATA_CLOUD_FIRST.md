@@ -15,7 +15,7 @@ Objects -> optionally segments / activation ONLY with verified marketing rights.
 
 The existing OAuth with api scope and Core REST sObject Describe certifications
 do not prove access to the Data Cloud Ingestion API. No live record writes have
-been attempted, and the existing Engagement adapter remains isolated.
+been attempted, and the existing producto discontinuado adapter remains isolated.
 
 ## Offline draft delivered
 
@@ -23,7 +23,7 @@ been attempted, and the existing Engagement adapter remains isolated.
   PrestaShop customer and order arrays into flat candidate records. No
   network code, secrets, queue hookup, emailing or data writes.
 - schemas/data-cloud-ingestion-DRAFT.yaml proposes PSCustomer (Profile),
-  PSOrder (Other), PSCartEvent (Engagement) using OpenAPI 3.0.3. The cart
+  PSOrder (Other), PSCartEvent (producto discontinuado) using OpenAPI 3.0.3. The cart
   event mapper is intentionally NOT implemented until revalidation,
   conversion suppression and UTC event-time rules are approved.
 - tests/data-cloud-mapping-contract.php checks deterministic keys,
