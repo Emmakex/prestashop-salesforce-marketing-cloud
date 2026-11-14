@@ -198,6 +198,7 @@ jobs:
           python -m unittest discover -s tests -p 'test_g3_dlo_dmo_mapping_candidate.py'
           python scripts/ci/verify-g3-business-goal-coverage.py
           python -m unittest discover -s tests -p 'test_g3_business_goal_coverage.py'
+          python -m unittest discover -s tests -p 'test_g3_dmo_review_summary.py'
           python scripts/ci/verify-bc-timestamp-sql-readonly.py
           python -m unittest discover -s tests -p 'test_bc_timestamp_sql_readonly.py'
 
