@@ -1,7 +1,7 @@
 # G3-03 / G3-04 · Decisión de fechas, Record Modified y Refresh Mode — ABH/PST
 
 **Fecha:** 2026-11-13 · **Estado: REVIEW ONLY / ninguna decisión G3 aprobada.**  
-**Producto:** Salesforce **Marketing Cloud Growth (Next) + Data 360** por el conector Ingestion API `PST`. **No Marketing Cloud Engagement**.
+**Producto:** Salesforce **Marketing Cloud Growth (Next) + Data 360** por el conector Ingestion API `PST`. **solo Growth + Data Cloud**.
 
 ## Distinguir hechos de hipótesis
 

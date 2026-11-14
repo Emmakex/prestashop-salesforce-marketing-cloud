@@ -1,6 +1,6 @@
 # G3 · Dossier para aprobar PSCustomer / PSOrder — ABH (PST)
 
-**Estado: PENDIENTE DE APROBACIÓN. Uso: revisión humana y pruebas offline únicamente.** Fecha: 13/11/2026. Proyecto multiproveedor PrestaShop → **Marketing Cloud Growth + Data 360**, no Engagement.
+**Estado: PENDIENTE DE APROBACIÓN. Uso: revisión humana y pruebas offline únicamente.** Fecha: 13/11/2026. Proyecto multiproveedor PrestaShop → **Marketing Cloud Growth + Data 360**, solo Growth + Data Cloud.
 
 **Hoja de decisión para responsables:** [8 opciones, evidencias, responsables y respuestas pendientes](G3_OWNER_DECISION_READY.md). No supone consentimiento, firma ni autorización de Data 360.
 
@@ -67,7 +67,7 @@ procedencia de fechas y esquema PST.
 
 El [plan G3 de outbox Growth v1](G3_GROWTH_OUTBOX_V1_MIGRATION_REVIEW.md)
 separa el diario/cola Growth de `sfmc_queue` y de sus ledgers de
-Engagement. Prueba un esquema con
+producto discontinuado. Prueba un esquema con
 `UNIQUE(source_namespace,dedupe_fingerprint)`, transacciones
 InnoDB, bloqueos de salida por restricciones SQL y migración
 reversible **solo cuando las dos tablas están vacías**.
@@ -176,7 +176,7 @@ Para cerrar G3 se requieren **todas** las decisiones con evidencia trazable y un
 1. Congelar archivo, confirmar hash SHA256 y previsualizar objetos/campos en la interfaz PST **sin guardar**.
 2. Solo mediante autorización específica: subir schema a `PST`, configurar PK/categoría/refresh y crear hasta un stream por objeto.
 3. Ejecutar una validación `/api/v1/ingest/sources/{name}/{object-name}/actions/test` con registros **sintéticos**, sin persistirlos. Salesforce exige todos los campos del esquema en el payload; su validación no equivale a ingesta. Una respuesta 202 al endpoint de escritura es aceptación asíncrona, no certificación de procesamiento.
-4. Diseñar reconciliación/retención e ingesta sintética por separado, con aprobación. Después consentimiento/supresión y Flow **Growth**, no SOAP/Journey Engagement.
+4. Diseñar reconciliación/retención e ingesta sintética por separado, con aprobación. Después consentimiento/supresión y Flow **Growth**, no protocolo discontinuado/orquestadores discontinuados producto discontinuado.
 
 ## Fuentes oficiales contrastadas
 

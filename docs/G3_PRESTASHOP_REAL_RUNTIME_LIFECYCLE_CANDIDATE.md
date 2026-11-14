@@ -1,6 +1,6 @@
 # G3 — PrestaShop real: lifecycle candidate in CI only
 
-**13 November 2026. Merchant ABH / Barcelona Confort. Provider Marketing Cloud Growth (Next) + Data 360, not Engagement.**
+**13 November 2026. Merchant ABH / Barcelona Confort. Provider Marketing Cloud Growth (Next) + Data 360, solo Growth + Data Cloud.**
 
 **State:** executable test fixture in disposable PrestaShop, not a shipped migration, release or owner approval.
 
@@ -20,7 +20,7 @@ The new tests execute **after** the existing real 0.6.1 to 0.7.1 upgrade, clean 
 
 ## Lifecycle behavior under test
 
-1. Require explicit ABH merchant, marketing_cloud_growth provider, immutable installation namespace, real platform version and Test mode. Reject Engagement for ABH and refuse silent provider changes.
+1. Require explicit ABH merchant, marketing_cloud_growth provider, immutable installation namespace, real platform version and Test mode. Reject producto discontinuado for ABH and refuse silent provider changes.
 2. Require dedicated disposable GitHub Actions flags, fixed database name, fixed prefix and pinned exact version. The tests are not packaged into the PrestaShop module.
 3. Create three prefixed CI-owned candidate tables: ps_g3_provider_binding_v1, ps_g3_growth_outbox_v1, and ps_g3_growth_entity_ledger_v1. The outbox + ledger DDL is derived from the isolated G3 v1 schema, with only PrestaShop table-prefix rewriting.
 4. Enforce identical re-install as a no-op; reject differing provider, merchant or namespace. Detect partial DDL and stop without automatic destructive cleanup.

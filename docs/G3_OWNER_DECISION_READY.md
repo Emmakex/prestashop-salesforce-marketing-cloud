@@ -1,7 +1,7 @@
 # G3 · Hoja de decisión de propietario — PSCustomer / PSOrder (ABH)
 
 **Estado: PENDIENTE DE APROBACIÓN · REVIEW ONLY · NO PUBLICAR.**  
-**Comercio:** ABH / Barcelona Confort. **Destino:** Salesforce Marketing Cloud **Growth/Next + Data 360** (no Engagement).  
+**Comercio:** ABH / Barcelona Confort. **Destino:** Salesforce Marketing Cloud **Growth/Next + Data 360** (solo Growth + Data Cloud).  
 **Referencia operativa:** [issue #45](https://github.com/Emmakex/prestashop-salesforce-marketing-cloud/issues/45).  
 **Fuente contractual:** [dossier campo por campo](G3_PST_DATA_OWNER_APPROVAL_PACK.md), [inventario versionado](../config/g3-pst-schema-review.json) y [snapshot de integridad](G3_REVIEW_FINGERPRINT_SNAPSHOT.md).
 
