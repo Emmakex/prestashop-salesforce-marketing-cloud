@@ -63,12 +63,12 @@ def yes_no(value):
 
 def fail_summary():
     return (
-        "## ABH G3-06 · Data 360 (solo metadatos)\\n\\n"
+        "## ABH G3-06 · Data 360 (solo metadatos)\n\n"
         "**No hay evidencia validada de esta ejecución.** Revisar el job "
         "protegido y el artifact saneado. Un error no demuestra que los "
-        "DMO o sus relaciones no existan.\\n\\n"
+        "DMO o sus relaciones no existan.\n\n"
         "**G3 pendiente.** No guardar mappings, crear streams, "
-        "ingerir datos ni activar campañas.\\n"
+        "ingerir datos ni activar campañas.\n"
     )
 
 
@@ -168,7 +168,7 @@ def render(evidence):
         "Data Streams, ingesta, backfill, Flows, mensajes y Production.",
         "",
     ]
-    return "\\n".join(lines)
+    return "\n".join(lines)
 
 
 def main():
