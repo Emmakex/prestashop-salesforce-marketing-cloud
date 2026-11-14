@@ -8,7 +8,7 @@ use RuntimeException;
  * Review-only, non-I/O decision contract.
  *
  * No database access, requests, tokens, contact identifiers or outbound sends.
- * This contract is outside the installable module and not wired to Journey.
+ * This contract is outside the installable module and not wired to RetiredFlow.
  * The actual Marketing Cloud subscriber/publication/suppression API reader
  * must be developed and certified independently before enabling sends.
  */

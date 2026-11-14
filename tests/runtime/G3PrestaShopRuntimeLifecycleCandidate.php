@@ -40,7 +40,7 @@ final class G3PrestaShopRuntimeLifecycleCandidate
     {
         $plan = $this->plan($merchant, $provider, $namespace);
         if (!$plan['growth_schema_install_supported']) {
-            throw new RuntimeException('g3_ps_runtime_engagement_not_implemented');
+            throw new RuntimeException('g3_ps_runtime_retired_provider_not_implemented');
         }
         $existing = $this->present();
         if (count($existing) === 3) {

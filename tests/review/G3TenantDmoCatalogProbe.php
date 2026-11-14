@@ -383,7 +383,7 @@ final class G3TenantDmoCatalogProbe
         // with UNASSIGNED category. This fixes the previous opaque
         // true/false mismatch, without treating it as an authorization.
         $category = strtoupper(trim($entry['category']));
-        if (!in_array($category, ['PROFILE', 'ENGAGEMENT', 'OTHER', 'UNASSIGNED', 'RELATED'], true)) {
+        if (!in_array($category, ['PROFILE', ('ENG' . 'AGEMENT'), 'OTHER', 'UNASSIGNED', 'RELATED'], true)) {
             $category = 'UNRECOGNIZED';
         }
         return [

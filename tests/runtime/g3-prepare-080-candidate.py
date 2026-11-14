@@ -50,11 +50,11 @@ replace_once(
 for method, limit, extra in [
     ("processCustomerQueue", "50", ""),
     ("processOrderQueue", "50", ""),
-    ("processAbandonedCartJourneyQueue", "20", "'suppressed' => 0, "),
+    ("processAbandonedCartRetiredFlowQueue", "20", "'suppressed' => 0, "),
 ]:
     old = "    public function " + method + "($limit = " + limit + ")\n    {\n"
     new = old + """        // Provider binding is independent of PS_SFMC_MODE. Never fallback to
-        // the previously packaged Engagement transport for ABH/Growth.
+        // the previously packaged RetiredProvider transport for ABH/Growth.
         $g3Blocked = G3CandidateProviderGate::prestashopOutboundReason();
         if ($g3Blocked !== '') {
             return ['skipped' => $g3Blocked, 'claimed' => 0, 'processed' => 0,

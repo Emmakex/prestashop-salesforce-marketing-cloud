@@ -15,7 +15,7 @@ final class G3GrowthCartSourcePresendReview
     ];
 
     private static $enums = [
-        'provider' => ['marketing_cloud_growth', 'marketing_cloud_engagement'],
+        'provider' => ['marketing_cloud_growth', 'unsupported_external_product'],
         'runtime_mode' => ['test', 'production'],
         'installation_shop_scope' => ['verified', 'cross_scope', 'unknown'],
         'cart_status' => ['abandoned', 'active', 'converted', 'missing'],

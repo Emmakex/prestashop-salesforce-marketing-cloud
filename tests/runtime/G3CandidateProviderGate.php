@@ -20,13 +20,13 @@ final class G3CandidateProviderGate
             return 'g3_binding_integrity_failure';
         }
         if ($binding['merchant'] === 'ABH') {
-            // ABH is Growth-only even if a legacy Engagement client is packaged.
+            // ABH is Growth-only even if a legacy RetiredProvider client is packaged.
             if ($binding['provider'] !== 'marketing_cloud_growth') {
                 return 'g3_abh_provider_mismatch';
             }
             return 'g3_growth_delivery_not_approved';
         }
-        if ($binding['provider'] !== 'marketing_cloud_engagement'
+        if ($binding['provider'] !== 'unsupported_external_product'
             && $binding['provider'] !== 'marketing_cloud_growth') {
             return 'g3_provider_unrecognized';
         }

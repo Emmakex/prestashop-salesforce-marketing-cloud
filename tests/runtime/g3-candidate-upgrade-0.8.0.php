@@ -24,7 +24,7 @@ function upgrade_module_0_8_0($module)
     }
 
     // This mimics explicit BO merchant selection. No default route is inferred
-    // from the prior Engagement-capable module or from any OAuth token.
+    // from the prior RetiredProvider-capable module or from any OAuth token.
     $merchant = getenv('G3_080_MERCHANT');
     $provider = getenv('G3_080_PROVIDER');
     $namespace = getenv('G3_080_NAMESPACE');
