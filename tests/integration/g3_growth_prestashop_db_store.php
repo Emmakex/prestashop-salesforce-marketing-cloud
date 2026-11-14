@@ -122,6 +122,13 @@ function psStoreCount(PDO $db, $table)
 {
     psStoreAssert(preg_match('/^[a-z0-9_]{1,64}$/D', $table) === 1,
         'table_identifier_invalid');
+    if (strpos($table, 'g3_sfmc_') === 0) {
+        $q = $db->query("SELECT COUNT(*) FROM information_schema.TABLES "
+            . "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = '" . $table . "'");
+        if ((int) $q->fetchColumn() === 0) {
+            return null; // preserve absence as well as existing row count
+        }
+    }
     return (int) $db->query('SELECT COUNT(*) FROM ' . $table)->fetchColumn();
 }
 function psStoreCreate(PDO $db, $prefix, $namespace, $merchant = 'ABH')
@@ -322,6 +329,7 @@ function psStoreRun(PDO $pdo)
     }, 'unscoped_customer_hook_reached_store');
     psStoreAssert(psStoreCount($pdo, $tables['outbox']) === 7,
         'unscoped_hook_created_row');
+
 
     psStoreReject(function () use ($pdo) {
         new Store(new PrestaShopDbFixture($pdo), '8.2.8',

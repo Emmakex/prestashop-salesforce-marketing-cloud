@@ -190,12 +190,12 @@ blockedHookReject(function () use ($router, $privateCustomer, $spy) {
         ['customer' => $privateCustomer],
         'customer:1:42:' . str_repeat('G', 40), $spy);
 }, 'g3_legacy_dedupe_key_invalid');
-$engagement = new Router('8.2.8', 'OTHER', Router::ENGAGEMENT_LEGACY,
-    'growth_ci_other', 'test');
-blockedHookReject(function () use ($engagement, $privateCustomer, $ha, $spy) {
-    Hook::capture($engagement, 'actionCustomerAccountAdd',
-        ['customer' => $privateCustomer], 'customer:1:42:' . $ha, $spy);
-}, 'growth_outbox_provider_not_growth');
+// Growth is the only valid provider. Reject alternatives at constructor
+// time, before any hook can reach the blocked outbox.
+blockedHookReject(function () {
+    new Router('8.2.8', 'OTHER', 'unsupported_provider',
+        'growth_ci_other', 'test');
+}, 'growth_router_growth_only');
 
 blockedHookAssert($spyCalls === 0, 'invalid_source_called_atomic_store');
 $module = file_get_contents(dirname(__DIR__) . '/pssalesforcebridge/pssalesforcebridge.php');

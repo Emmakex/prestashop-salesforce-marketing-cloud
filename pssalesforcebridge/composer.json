@@ -1,6 +1,6 @@
 {
   "name": "emmakex/prestashop-salesforce-marketing-cloud",
-  "description": "PrestaShop bridge for Salesforce Marketing Cloud Engagement",
+  "description": "PrestaShop bridge for Salesforce Marketing Cloud Growth + Data Cloud only",
   "type": "prestashop-module",
   "license": "MIT",
   "require": {

@@ -47,6 +47,13 @@ function prefixedCount(PDO $db, $name)
 {
     prefixedAssert(is_string($name)
         && preg_match('/^[a-z0-9_]{1,64}$/D', $name), 'unsafe_table_identifier');
+    if (strpos($name, 'g3_sfmc_') === 0) {
+        $p = $db->query("SELECT COUNT(*) FROM information_schema.TABLES "
+            . "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = '" . $name . "'");
+        if ((int) $p->fetchColumn() === 0) {
+            return null; // absence is preserved, not silently recreated
+        }
+    }
     return (int) $db->query('SELECT COUNT(*) FROM ' . $name)->fetchColumn();
 }
 function prefixedInventory(PDO $db, array $plan)

@@ -1,260 +1,34 @@
-# Roadmap
+# Roadmap — Marketing Cloud Growth + Data Cloud
 
-## Piloto ABH Growth + Data 360 — plan vigente (13/11/2026)
+**Dirección vigente (14/11/2026):** únicamente Growth + Data Cloud para PrestaShop 1.7.8.x, 8.x y 9.x; no existen proveedores alternativos. Barcelona Confort es el piloto. Consulta [AGENTS.md](AGENTS.md), [contrato](config/project-contract.json), [canon](docs/ABH_GROWTH_CANONICAL_TARGET.md) y [gates](docs/PROJECT_DEVELOPMENT_RULES.md).
 
-**Normas:** [AGENTS.md](AGENTS.md), [docs/PROJECT_DEVELOPMENT_RULES.md](docs/PROJECT_DEVELOPMENT_RULES.md) y [contrato](config/project-contract.json) son obligatorios. **Este apartado manda sobre los hitos 0.1–0.7 históricos de Engagement situados más abajo**, que certifican capacidades del módulo legado, NO campañas ABH.
+## Conexión ya certificada; no repetir
 
-- [x] G0: identificación correcta **Marketing Cloud Growth (Next) + Data Cloud (Data 360)**, no Engagement; conexión existente.
-- [x] G1: External Client App, Salesforce Core OAuth Client Credentials y metadata API v68.0 certificados.
-- [x] G2: intercambio de token Data 360 certificado (sin escritura); conector `ABH_PrestaShop_Data_Cloud` / `PST` observado.
-- [x] BC instalado 0.7.1, activo, `test`, `marketing_optin`, umbral 60 min; no envíos.
-- [x] Historia local auditada: 99 direcciones con algún flag positivo, 8 contradicciones; **no** audiencia legal Growth.
-- [x] G3 preparación técnica: snapshots SHA-256 de los borradores v0.2/v0.3 y manifiesto de 24 campos, verificados en CI, **sin firma ni aprobación** ([revisión](docs/G3_REVIEW_FINGERPRINT_SNAPSHOT.md)).
-- [x] G3-03/G3-04 **diseño de revisión, no aprobación**: contrato sintético de frescura causal y distinción Full/Partial; bloquea Partial+bulk (upsert de campos omitidos), `date_upd` y `captured_at_utc` como Record Modified. [Matriz de decisión](docs/G3_RECORD_MODIFIED_REFRESH_MODE_DECISION.md). El propietario y arquitecto deben aprobar un modo por objeto antes del primer Data Stream.
-- [x] G3-05/G3-06 **candidato técnico offline, no aprobación**: comprobar claves `source_key` y referencias `customer_source_key` con mismo namespace/tienda, cuarentena de huérfanos y cross-shop; revisión DLO `PSCustomer`→`Individual` y `PSOrder`→`Sales Order` sin publicar ni guardar. [Matriz de relación](docs/G3_DLO_DMO_RELATIONSHIP_REVIEW.md). Falta certificar DMO y campos en el tenant.
-- [x] G3-05/G3-06 **herramienta de verificación real preparada, no aprobada**: inspección GET protegida del catálogo DMO Individual/Sales Order y sus relaciones, con artifact sanitizado y sin lecturas de registros. [Procedimiento](docs/G3_ABH_DMO_TENANT_READONLY_DISCOVERY.md). Faltan resultado efectivo del tenant y decisión del arquitecto de Data 360.
-- [x] G3-06 **evidencia real parcial del tenant, no aprobación**: `Individual` Profile, `SalesOrder` Unassigned, ambas PK y Data Space default confirmados; no relación directa certificada. [Topologías y opciones A/B/C/D](docs/G3_CUSTOMER_ORDER_RELATION_TOPOLOGY_DECISION.md). Comprobación Account en metadata solo lectura; sigue pendiente elección y firma humana.
-- [x] G3-06 **corrección de preflight, no aprobación**: Salesforce devuelve solo 20 relaciones por defecto; los runs 20/20/20 no demostraban ausencia de enlaces. Preflight de metadata con `limit=100`, offsets acotados, validación de `totalSize`, completitud y detección de páginas repetidas. [Informe](docs/G3_ABH_DMO_TENANT_READONLY_DISCOVERY.md). No seleccionar DMO/Account hasta leer el resultado real y aprobarlo.
-- [x] G3-08 **control de cobertura funcional (no firma ni publicación)**: CI cruza v0.2 (22 campos)/v0.3 (24 campos), 8 decisiones pendientes, 24 campos sin permisos, mapeo DMO no aprobado y ausencia de PSCart. Confirma que aprobar PSCustomer/PSOrder no entrega por sí solo campañas Growth ni recuperación de carritos. [Informe](docs/G3_08_BUSINESS_GOAL_COVERAGE.md).
-**Preparación G4 (sin aprobar G3 ni publicar):** informe unificado de solo lectura (`scripts/ci/render-g4-readiness-report.py`, `docs/G4_ABH_UNIFIED_READINESS_REVIEW.md`) consolidando hash v0.2/22 campos, las tres conformidades humanas pendientes, catálogo DMO saneado opcional del workflow protegido y alcance del motor SQL certificado **solo en CI**. La versión real de MySQL de BC aún no ha sido inspeccionada; no inferirla a partir de Docker ni habilitar Data Streams.
+- [x] **G0**: destino correcto, Marketing Cloud Growth + Data Cloud.
+- [x] **G1**: aplicación externa y OAuth de Salesforce Core, sin escrituras.
+- [x] **G2**: intercambio de token Data Cloud y conector PST (`ABH_PrestaShop_Data_Cloud`) identificados; schema en `Schema Required`.
+- [x] ABH/BC mantiene instalado `pssalesforcebridge 0.7.1`, Test, `marketing_optin`, 60 minutos. **No es un circuito Growth de envío**.
+- [x] Auditoría de esquema/campos, muestras de clientes/carritos y timestamps sin convertir flags históricos en audiencia aprobada.
+- [x] Preparación técnica G3: candidato PSCustomer/PSOrder v0.2 (22 campos, SHA verificado), análisis de PK/FK, opciones de actualización, minimización y decisiones pendientes.
 
-- [ ] **G3 BLOQUEANTE AHORA:** aprobación explícita del esquema `PSCustomer` / `PSOrder`, IDs con namespace, Data Space, retención, fechas UTC/DST, finalidad/consentimiento.
-- [ ] G4: publicar esquema e iniciar streams/mapeos con autorización separada.
-- [ ] G5: validación y pruebas sintéticas Data 360, después escritura sintética aprobada.
-- [ ] G6: seleccionar y certificar identidad/contacto, bajas, restricciones y supresiones de **Growth/Core/Data 360**, no las listas SOAP de Engagement.
-- [ ] G7: comprobar Flow y capacidad de campañas Growth; test de abandono → recuperación → pedido con destinatario sintético.
-- [x] **G8 preparación local (sin habilitar G8):** puente real y dormido `GrowthBlockedHookAdapter` que reconoce hooks existentes de cliente/creación de pedido y alimenta exclusivamente `BlockedOutboxCoordinator` en Test, exigiendo IDs/tienda explícitos y dedupe local. Laboratorio con store transaccional MySQL/MariaDB y runtime PrestaShop 1.7/8/9; no registra hooks, no envía, no instala BC. Ver [contrato](docs/GROWTH_BLOCKED_HOOK_ADAPTER_REVIEW.md).
-- [ ] G8: implementar adaptador Growth reusable, compatibilidad PS 1.7/8/9, release, rollback y go-live autorizado.
+## Entrega del producto Growth-only
 
-**Guardas:** no publicar schema ni enviar datos reales todavía. Nunca aconsejar Installed Packages de Engagement para ABH. Los pasos marcados hechos son evidencias puntuales, no el circuito end-to-end.
+- [x] **Corte de arquitectura 0.8.0 integrado y certificado**: retirados transportes, procesadores y credenciales del paquete anterior; no se reintroducen alternativas ni se tocan datos históricos. Test obligatorio, cron seguro y BO solo Growth + Data Cloud.
+- [x] Certificar **CI exact-head y runtime real PS 1.7.8.11, 8.2.8 y 9.1.5**, incluida instalación y actualización no destructiva.
+- [ ] **G3 BLOQUEANTE**: aprobación responsable de namespace único, PSCustomer/PSOrder, categorización, relación cliente-pedido, fecha fuente UTC/DST, finalidades, consentimiento, conservación, borrado y selección final de PST.
+- [ ] **G4**: publicar esquema y activar Data Streams/mapeos SOLO después de aprobación separada.
+- [ ] **G5**: /actions/test sintético, luego ingesta sintética autorizada y conciliada.
+- [ ] **G6**: identidad estable, consentimiento actual y supresión específica Growth/Core/Data Cloud, revalidación antes de cada campaña.
+- [ ] **G7**: Flow/campaña Growth: cliente, pedido y carrito abandonado, frecuencia, conversiones, cancelación y recuperación.
+- [ ] **G8**: adaptador completo, almacenamiento/reintentos/ledger, despliegue reversible y go-live autorizado para BC, verificado en 1.7/8/9.
 
----
+## Evidencias G3/G4 conservadas de main
 
-## Histórico de implementación del adaptador Engagement (NO es el plan de despliegue ABH)
+- [x] [Expediente G3 con las tres conformidades pendientes](docs/G3_ABH_FINAL_SIGNOFF_HANDOFF.md), control verificable sin inventar firmas.
+- [x] [Informe unificado G4 sin escritura](docs/G4_ABH_UNIFIED_READINESS_REVIEW.md), metadatos DMO saneados y pruebas negativas.
+- [x] [Adaptador sintético dormido Growth](docs/GROWTH_BLOCKED_HOOK_ADAPTER_REVIEW.md) para pruebas locales de deduplicación y tienda, no cableado a hooks operativos 0.8.0.
+- [x] Instalación inicial, actualización 0.7.1→0.8.0, reinstalación y rollback 3/3 en PS 1.7.8.11, 8.2.8, 9.1.5.
 
+## Límites que no se pueden saltar
 
-## 0.1.0 — Bootstrap
-
-- [x] PrestaShop module skeleton
-- [x] installation/uninstallation
-- [x] Salesforce configuration screen
-- [x] OAuth 2.0 server-to-server client
-- [x] Test connection action
-- [x] queue/log persistence foundations
-- [x] package ZIP CI artifact
-
-## 0.1.1 — Cross-version compatibility foundation
-
-- [x] support target defined for PrestaShop 1.7.8.x, 8.x and 9.x
-- [x] centralized PrestaShop compatibility contract
-- [x] module installation range widened to 1.7.8.0–9.x
-- [x] compatibility/adaptor architecture rule documented
-- [x] PHP syntax CI expanded across representative legacy/current runtimes
-- [x] runtime certification against real PrestaShop fixtures/containers on pinned representatives: 1.7.8.11, 8.2.8 and 9.1.5
-
-## 0.2.0 — Customer event foundation
-
-- [x] customer create/update hooks
-- [x] canonical ContactKey: `ps_{shop_id}_{customer_id}`
-- [x] local idempotency ledger
-- [x] normalized customer Data Extension contract
-- [x] newsletter/opt-in source mapping
-- [x] customer hook compatibility adapter for PrestaShop 1.7.8, 8 and 9
-
-## 0.2.1 — Customer delivery worker
-
-- [x] Salesforce REST client
-- [x] Data Extension upsert by External Key
-- [x] configurable customer Data Extension key
-- [x] protected cron endpoint
-- [x] queue claiming with concurrency lock
-- [x] exponential retry and terminal failure after five attempts
-- [x] test mode blocks outbound customer writes
-- [x] upgrade path from 0.2.0
-
-## 0.2.2 — Customer backfill
-
-- [x] resumable per-shop backfill cursor
-- [x] multishop historical customer scan
-- [x] configurable 10–500 customer batch size
-- [x] shared live/backfill normalization and queue pipeline
-- [x] backfill progress summary in module configuration
-- [x] upgrade path from 0.2.1
-
-## 0.3.0 — Orders
-
-- [x] `actionValidateOrder` capture across supported PrestaShop families
-- [x] `actionOrderStatusPostUpdate` capture across supported PrestaShop families
-- [x] normalized order contract and stable `OrderKey`
-- [x] `ORDER_CREATED`, `ORDER_UPDATED`, `ORDER_PAID`, `ORDER_CANCELLED`
-- [x] order Data Extension upsert by External Key
-- [x] local order ledger with cart-to-order conversion tracking
-- [x] cart conversion lookup prepared for abandoned-cart suppression
-- [x] queue locking/retry through the shared queue infrastructure
-- [x] upgrade path from 0.2.2
-- [x] queue worker claims every supported order event type
-- [ ] order historical backfill (only if required by first production deployment)
-
-## 0.4.0 — Abandoned carts
-
-- [x] cart activity capture
-- [x] configurable inactivity threshold (default 60 minutes)
-- [x] cart + cart item snapshot
-- [x] configurable eligibility checks
-- [x] fail-closed order conversion check through connector ledger and native orders
-- [x] snapshot-based deduplication
-- [x] local `CART_ABANDONED` queue events
-- [x] cart adapter contract shared by supported PrestaShop families
-- [x] upgrade path from 0.3.0
-
-## 0.5.0 — Journey Builder
-
-- [x] API Entry Event integration through `POST /interaction/v1/events`
-- [x] configurable `PRESTASHOP_ABANDONED_CART` Event Definition Key
-- [x] just-in-time snapshot/order/eligibility revalidation before send
-- [x] local Journey event audit trail
-- [x] `eventInstanceId` persistence
-- [x] suppression reasons for stale/converted/ineligible carts
-- [x] retry/backoff and terminal failure handling
-- [x] test mode blocks Journey delivery
-- [x] upgrade path from 0.4.0
-- [ ] live Marketing Cloud Journey certification
-
-## 0.6.0 — Cart recovery
-
-- [x] cryptographically random opaque recovery tokens
-- [x] SHA-256-only token persistence; raw tokens are not stored
-- [x] configurable expiration, default 168 hours and range 1–720 hours
-- [x] atomic one-time-use token claim
-- [x] snapshot/shop/cart binding and stale-link rejection
-- [x] fail-closed conversion check before recovery
-- [x] multishop-aware `RecoveryUrl` population in Journey events
-- [x] recovery endpoint with no-store / noindex behavior
-- [x] cart duplication and session restoration
-- [x] recovery does not implicitly authenticate a customer
-- [x] customer/address/carrier sanitization before exposing recovered cart
-- [x] source cart → recovered cart relation persisted
-- [x] local `CART_RECOVERED` event
-- [x] upgrade path from 0.5.0
-- [x] recovered cart → order(s) → revenue attribution (`0.6.1`)
-- [ ] live end-to-end recovery certification with a real Marketing Cloud Journey
-
-## 0.6.1 — Recovery attribution
-
-- [x] map `recovered_cart_id` to every resulting PrestaShop order
-- [x] support one recovered cart producing multiple orders/packages
-- [x] persist a separate idempotent attribution row per `(shop, order)`
-- [x] persist recovery conversion timestamp per order
-- [x] persist authoritative order total, currency, state and paid/valid state
-- [x] update each attribution row again on later order-status events
-- [x] calculate paid recovered revenue from authoritative PrestaShop order totals
-- [x] keep revenue separated by currency
-- [x] expose recovered carts / attributed orders / paid orders / revenue metrics in Back Office
-- [x] reuse the normal order event pipeline; no parallel attribution hook path
-- [x] isolate attribution failures so they cannot block order synchronization
-- [x] fresh install and 0.6.0 → 0.6.1 upgrade create the same attribution schema
-- [ ] optionally synchronize recovery/conversion attribution fields back to Marketing Cloud
-
-## 0.7.0 — Production hardening
-
-### 0.7.0-C0 — Sync correctness invariants
-
-- [x] customer worker claims all `entity_type=customer` events, including `CUSTOMER_BACKFILL`
-- [x] customer sync completion is conditional on the exact payload hash that was delivered
-- [x] order sync completion is conditional on the exact payload hash that was delivered
-- [x] stale events can no longer overwrite a newer pending ledger state
-- [x] PHP 7.1 and PHP 8.5 sync correctness contract coverage in CI
-
-### 0.7.0-A — Health & queue observability
-
-- [x] local health service with `healthy` / `warning` / `critical` severity
-- [x] protected no-cache JSON health endpoint
-- [x] queue counts for pending / processing / retry / failed / processed
-- [x] queue breakdown by event type and status
-- [x] oldest outstanding event age
-- [x] stale processing-lock detection
-- [x] production configuration completeness checks without exposing secret values
-- [x] test mode treats intentionally unsent backlog as informational
-- [x] HTTP 503 for critical health so external monitors can alert
-- [x] PHP 7.1 and PHP 8.5 runtime contract tests in CI
-
-### 0.7.0-B — Back Office health dashboard
-
-- [x] Back Office dashboard consumes the same `HealthService` report as the JSON endpoint
-- [x] queue counts, outstanding age, stale locks and active event breakdown
-- [x] operational issue list and production configuration readiness
-- [x] customer backfill, cart snapshot and Journey delivery summaries
-- [x] recovery attribution and paid recovered revenue by currency
-- [x] output escaping for dynamic event/status values
-- [x] dashboard rendering remains local and performs no Salesforce network call
-- [x] PHP 7.1 and PHP 8.5 dashboard contract coverage in CI
-
-### 0.7.0-C — Privacy & retention
-
-- [x] configurable retention windows from 1–3650 days
-- [x] processed queue cleanup never deletes pending / processing / retry / failed work
-- [x] local log retention
-- [x] Journey audit cleanup restricted to sent / suppressed rows
-- [x] old empty / ineligible / converted / recovered cart snapshots and items are removable
-- [x] old abandoned snapshots are removable only without active recovery tokens or unresolved/failed `CART_ABANDONED` queue work
-- [x] active snapshots and operationally required abandoned snapshots are retained
-- [x] expired or unusable recovery token cleanup
-- [x] recovered-token anonymization preserves order/revenue attribution without customer identity
-- [x] automatic retention at most once per day from the protected cron
-- [x] manual retention action and last-run status in Back Office
-- [x] retention failure isolated from commerce-event delivery
-- [x] cron error responses sanitized; raw exception messages are no longer exposed
-- [x] PHP 7.1 and PHP 8.5 retention contract coverage in CI
-
-### 0.7.0-D — Release hardening
-
-- [x] public module version bumped to `0.7.0`
-- [x] Composer PHP floor aligned with the declared PHP 7.1 source-compatibility contract
-- [x] `0.6.1 -> 0.7.0` upgrade script materializes missing retention defaults without DDL
-- [x] existing merchant retention values are preserved during upgrade
-- [x] fresh install and upgrade defaults are checked for contract parity
-- [x] versioned `pssalesforcebridge-0.7.0.zip` release artifact
-- [x] package validates embedded module version, Composer floor and required upgrade script
-- [x] package excludes `vendor/` and local development files
-- [x] SHA-256 checksum generated alongside the exact ZIP
-- [x] PHP 7.1 and PHP 8.5 release/upgrade contract coverage in CI
-- [x] exact-head and post-merge release gate policy documented
-
-### 0.7.0-E — Runtime certification
-
-- [x] reproducible Docker runtime workflow added as a release gate
-- [x] pull requests explicitly check out the exact head SHA, not GitHub's synthetic merge ref
-- [x] real `0.6.1 -> 0.7.0` module upgrade exercised on each pinned PrestaShop version
-- [x] clean 0.7.0 install exercised on each pinned PrestaShop version
-- [x] connector tables, defaults and hook registrations verified in real PrestaShop runtimes
-- [x] local customer, cart and order hook paths verified with real PrestaShop core objects
-- [x] test mode verified to block customer/order/Journey Salesforce writes
-- [x] backfill, abandoned-cart detection, retention, health and protected cron exercised
-- [x] Front Office remains reachable after connector smoke
-- [x] PrestaShop 1.7.8.11 runtime certified
-- [x] PrestaShop 8.2.8 runtime certified
-- [x] PrestaShop 9.1.5 runtime certified
-- [x] runtime-discovered `Db::getRow()` / `Db::getValue()` limit semantics protected by CI contract
-- [x] runtime-discovered global `Db` namespace imports protected by CI contract
-- [x] runtime certification scope and non-goals documented in `RUNTIME_CERTIFICATION.md`
-
-### 0.7.0-F — Salesforce live certification harness
-
-- [x] manual-only `workflow_dispatch` live certification workflow
-- [x] dedicated GitHub environment boundary for tenant credentials and approval controls
-- [x] default auth-only stage performs no Data Extension or Journey writes
-- [x] Data Extension and Journey stages require explicit live-write confirmation
-- [x] harness reuses production `AuthClient`, `RestClient`, Data Extension writers and `JourneyClient`
-- [x] OAuth certification verifies configured REST Base URI against Salesforce `rest_instance_url`
-- [x] Data Extension stage writes recognizable synthetic customer/order rows using the production field contracts
-- [x] Journey stage requires a dedicated active test ContactKey and persists only sanitized evidence
-- [x] exact dispatched SHA is verified before certification
-- [x] live gate scope and final end-to-end recovery procedure documented in `SFMC_LIVE_CERTIFICATION.md`
-
-### Remaining release/deployment gates
-
-- [ ] run `auth` certification against the target Marketing Cloud tenant
-- [ ] run `data_extensions` certification against the target customer/order Data Extensions
-- [ ] run `journey` certification against the active `PRESTASHOP_ABANDONED_CART` API Entry Event and dedicated test contact
-- [ ] complete live end-to-end abandoned-cart recovery on controlled PrestaShop staging, including one-time link use and recovered-order attribution
-- [ ] publish the final `v0.7.0` Git tag and GitHub Release only after exact-main CI + runtime certification is green
+La 0.8.0 de desarrollo **no** concede permiso de subir esquemas, leer PII remota, ingerir clientes, ejecutar backfill, ni enviar campañas. Los datos históricos 0.7.1 se preservan hasta decisión expresa del propietario; jamás borrarlos para aparentar una limpieza. Sin repetición de OAuth/Data Cloud y sin solicitar SQL de producción. PRs con CI verde, revisión y resultados reales antes de integración.

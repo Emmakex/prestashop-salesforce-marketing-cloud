@@ -201,7 +201,7 @@ def local_contract_verified(closure, freeze, packet, privacy, mapping, project, 
     pilot = project.get("pilot")
     if not isinstance(pilot, dict) or any(pilot.get(k) != v for k, v in {
         "merchant": "ABH", "provider": "marketing_cloud_growth",
-        "data_platform": "data_cloud_data_360", "engagement_for_pilot": False,
+        "data_platform": "data_cloud_data_360",
         "data_cloud_connector_alias": "PST",
         "data_cloud_source_api_name": "ABH_PrestaShop_Data_Cloud",
         "installed_module_version_observed": "0.7.1",
@@ -210,7 +210,10 @@ def local_contract_verified(closure, freeze, packet, privacy, mapping, project, 
         "customer_data_live_ingestion_authorized": False,
         "historical_backfill_authorized": False,
         "live_campaign_sends_authorized": False,
-    }.items()) or project.get("current_delivery_gate") != "pst_schema_data_owner_approval":
+    }.items()) or project.get("current_delivery_gate") != "pst_schema_data_owner_approval" \
+            or project.get("architecture") != "growth_only_multi_shop" \
+            or set(project.get("provider_registry", {})) != {"marketing_cloud_growth"} \
+            or project.get("delivery_policy") != "growth_only_no_other_salesforce_product":
         return False
     return True
 

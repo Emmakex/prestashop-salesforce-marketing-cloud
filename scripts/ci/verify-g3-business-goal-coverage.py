@@ -32,7 +32,6 @@ def review(packet, freeze, field_owner, mapping, contract, schema_docs, blobs):
         "merchant": "ABH",
         "provider": "marketing_cloud_growth",
         "data_platform": "data_cloud_data_360",
-        "engagement_for_pilot": False,
         "prestashop_runtime_mode_observed": "test",
         "data_cloud_schema_status": "schema_required_unapproved",
         "customer_data_live_ingestion_authorized": False,

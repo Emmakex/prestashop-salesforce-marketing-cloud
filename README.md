@@ -1,128 +1,40 @@
-# PrestaShop Salesforce Marketing Cloud
+# Puente PrestaShop ↔ Salesforce Marketing Cloud Growth + Data Cloud
 
-> **Reglas del proyecto:** leer [AGENTS.md](AGENTS.md), [desarrollo y gates](docs/PROJECT_DEVELOPMENT_RULES.md) y [contrato de proveedor](config/project-contract.json) antes de implementar. El piloto ABH/BC **usa Growth + Data 360**, no Engagement. El objetivo de negocio es campañas de clientes y recuperación de carritos con identidad/consentimiento verificables, sin saltarse G3 de esquema PST.
+**Producto único:** integración reusable para **PrestaShop 1.7.8.x, 8.x y 9.x** con **Salesforce Marketing Cloud Growth (Next)** y **Data Cloud**. No hay selección de proveedor, transporte alternativo ni motor de campañas propio. Las reglas vinculantes están en [AGENTS.md](AGENTS.md), [normas de desarrollo](docs/PROJECT_DEVELOPMENT_RULES.md), [contrato](config/project-contract.json) y [roadmap](ROADMAP.md).
 
-> **ABH / Barcelona Confort pilot: Marketing Cloud Growth (Next) + Data Cloud/Data 360, NOT Engagement.** The existing 0.7.1 module's Engagement delivery paths are legacy/provider-specific and are NOT a working ABH marketing-send route. The existing ABH Core OAuth and Data Cloud token exchange have already passed; do not request Engagement Installed Packages, All Subscribers or `/interaction/v1/events` for this merchant. See [`docs/ABH_GROWTH_CANONICAL_TARGET.md`](docs/ABH_GROWTH_CANONICAL_TARGET.md) for the verified integration, outstanding schema/consent/Flow gates and why BC remains Test.
+## Estado verificado y objetivo de negocio
 
-A reusable PrestaShop commerce-event bridge with provider-separated destinations. The current 0.7.1 code includes a historical Engagement destination; the Growth/Data 360 delivery adapter required by ABH is **not** yet certified or active.
+El piloto es **ABH / Barcelona Confort**. OAuth de Salesforce Core y el intercambio de token Data Cloud **están certificados sin escrituras**; el conector **PST** (`ABH_PrestaShop_Data_Cloud`) existe y se observó con `Schema Required`. Barcelona Confort mantiene el módulo **0.7.1 Test**, consentimiento local `marketing_optin` y abandono 60 minutos. No se ha certificado una campaña Growth ni ingesta real.
 
-## Goal
+El objetivo es llevar clientes, pedidos y señales de carrito **con permisos correctos** a Data Cloud, para activar **segmentos, campañas y Flows de Growth** y detener la recuperación cuando aparece una compra. Los identificadores deben tener namespace de instalación/tienda, consentimiento y supresión por finalidad y control de actualización/reintentos.
 
-Keep PrestaShop as the source of truth for commerce data and use Salesforce Marketing Cloud as the orchestration layer for customer campaigns and journeys.
+## Módulo fuente 0.8.0 (Growth-only)
 
-The connector is intentionally asynchronous: storefront hooks only persist local events. Salesforce calls are processed outside the customer request so Marketing Cloud availability never blocks checkout.
+Se ha retirado del código empaquetado el transporte anterior, sus writers, colas, endpoints de recuperación y workers. Esta versión **no está instalada en BC** y no hereda permiso de envío alguno. Incluye:
 
-## Compatibility target
+- Registro de tres hooks estándar de cliente y pedido; actualmente ejecutan **preflight sin persistencia**, sin tocar datos personales ni hacer peticiones a Salesforce.
+- Back Office exclusivamente Growth + Data Cloud con revisión de metadata/timezone local; fuente PST y modo Test visibles, sin campos de otro producto.
+- Health y cron protegidos: reportan Test/bloqueo de transmisión; ninguna llamada remota, ningún backfill ni envío.
+- Upgrade `0.7.1 → 0.8.0` **no destructivo**: fuerza Test y no borra tablas, tokens, configuraciones ni datos históricos. El uninstall tampoco borra tablas preexistentes; su limpieza requeriría un proceso independiente aprobado.
 
-One module targets PrestaShop **1.7.8.x, 8.x and 9.x**. Version-specific behavior must stay behind the compatibility/adaptor boundary; Salesforce-facing contracts remain identical across PrestaShop generations.
+**Importante:** `0.8.0` es una refactorización de arquitectura, **no el producto operativo end-to-end**. El siguiente incremento funcional implementará la cola Growth duradera y el mapeo de PST después de superar los gates. No se ha aprobado escribir ni enviar datos reales.
 
-The 0.7.1 target runtime reference matrix is **PrestaShop 1.7.8.11, 8.2.8 and 9.1.5**. These are exact pinned certifications, not a blanket claim that every patch release in each family has been executed.
+## Puertas de entrega
 
-The source and Composer compatibility floor is PHP **7.1**. Runtime certification against real PrestaShop installations is tracked separately from syntax/contract CI.
+| Paso | Estado |
+| --- | --- |
+| G0 producto Growth + Data Cloud | Confirmado |
+| G1 Salesforce Core OAuth | Probado, sin escritura |
+| G2 token exchange Data Cloud | Probado, sin escritura |
+| G3 esquema PSCustomer/PSOrder, privacidad, namespace, retención, mapeo | **Pendiente de conformidad** |
+| G4 publicar PST / Data Streams | No autorizado |
+| G5 pruebas sintéticas Data Cloud | Pendiente |
+| G6 consentimiento y supresión | Pendiente |
+| G7 campañas y Flow Growth | Pendiente |
+| G8 rollout de BC y recuperación end-to-end | Pendiente |
 
-See `COMPATIBILITY.md` and `RUNTIME_CERTIFICATION.md` for the certification policy, exact matrix and reproducible runtime gate.
+El diseño G3 v0.2 de 22 campos es **un candidato técnico**, no licencia para publicar; ver [issue #45](https://github.com/Emmakex/prestashop-salesforce-marketing-cloud/issues/45). No inferir UTC de fechas locales, ni usar `newsletter` como consentimiento universal.
 
-## Current scope
+## Desarrollo y certificación
 
-Version `0.7.1` provides all 0.7.0 capabilities, plus a safety patch requiring first-party newsletter rather than partner opt-in and re-checking current PrestaShop customer status before abandoned-cart Journey sends. The historical 0.7.0 feature list is:
-
-- module installation/uninstallation and sequential upgrade scripts;
-- Salesforce OAuth 2.0 server-to-server configuration and connection test;
-- customer create/update capture with stable `ContactKey` (`ps_{shop_id}_{customer_id}`);
-- resumable multishop customer backfill;
-- normalized customer Data Extension upserts;
-- order creation and order-status capture through cross-version adapters;
-- stable order identity (`ps_{shop_id}_{order_id}`);
-- `ORDER_CREATED`, `ORDER_UPDATED`, `ORDER_PAID` and `ORDER_CANCELLED` delivery;
-- local cart-to-order conversion ledger;
-- `actionCartSave` cart snapshots with normalized cart items;
-- configurable abandoned-cart inactivity and eligibility policies;
-- fail-closed cart conversion checks against both connector ledger and native PrestaShop orders;
-- local `CART_ABANDONED` event generation with snapshot deduplication;
-- Journey Builder API Entry Event delivery through `/interaction/v1/events`;
-- configurable Journey Event Definition Key, defaulting to `PRESTASHOP_ABANDONED_CART`;
-- just-in-time abandoned-cart revalidation before every Journey send;
-- local Journey audit with `eventInstanceId`, suppression reasons and retry/failure state;
-- cryptographically random one-time cart recovery links;
-- SHA-256-only token persistence; raw recovery tokens are never stored;
-- configurable recovery-link lifetime from 1 to 720 hours, default 168 hours;
-- multishop-aware `RecoveryUrl` generation;
-- recovery without implicit customer authentication;
-- duplicated/sanitized recovery carts with source → recovered-cart linkage;
-- local `CART_RECOVERED` events;
-- recovered-cart → one-or-more-orders attribution on the same order event pipeline;
-- authoritative recovered order totals, currencies, states and paid/valid states persisted locally;
-- multi-package/multi-order-safe attribution: one recovered cart never overwrites another order from the same cart;
-- paid recovered revenue reported separately per currency;
-- queue locking, stale-lock recovery, retry/backoff and terminal failure handling;
-- customer backfill delivery through the same entity worker as live customer events;
-- stale-state-safe customer and order synchronization ledgers;
-- protected local health endpoint and Back Office health dashboard;
-- queue/backlog, configuration, Journey and recovery observability without Salesforce network calls;
-- configurable privacy retention for processed queue rows, logs, Journey audit, cart snapshots and recovery tokens;
-- fail-closed retention that preserves unresolved queue work and recovered-order revenue attribution;
-- safe `test` mode that captures locally but performs no outbound Salesforce writes;
-- versioned installable ZIP and SHA-256 checksum generated by CI;
-- `0.6.1 -> 0.7.0` upgrade path that preserves existing merchant retention values;
-- reproducible exact-head runtime certification on PrestaShop 1.7.8.11, 8.2.8 and 9.1.5.
-
-Customer and order Data Extension schemas are documented in `DATA_EXTENSION_CUSTOMERS.md` and `DATA_EXTENSION_ORDERS.md`. Journey Builder setup is documented in `JOURNEY_BUILDER.md`; secure cart recovery and attribution are documented in `RECOVERY.md`; privacy retention is documented in `RETENTION.md`; release and upgrade policy is documented in `RELEASE.md`; runtime evidence and scope are documented in `RUNTIME_CERTIFICATION.md`.
-
-## Customer backfill
-
-From the module configuration, choose **Start / resume customer backfill**. A progress row is created per active shop. The protected cron advances each running shop using `id_customer > cursor` rather than increasingly expensive OFFSET queries.
-
-The default batch is 50 customers per shop and cron run. The size can be changed from 10 to 500. Re-running the cron is safe: the synchronization ledger and queue deduplication prevent unchanged customer states from being enqueued twice.
-
-Backfill may run while the connector remains in `test` mode. In that mode customer events are captured locally but no Data Extension writes are sent to Salesforce.
-
-## Journey delivery
-
-`CART_ABANDONED` events are created locally first. In Production mode the protected cron revalidates the current cart state immediately before calling Journey Builder. Stale snapshots, converted carts, empty carts, ineligible contacts and changed abandonment windows are suppressed locally instead of being sent.
-
-Immediately before a valid Journey send, the module generates a one-time `RecoveryUrl` bound to the exact cart snapshot and shop. The token is stored only as a SHA-256 hash and expires according to the configured lifetime.
-
-## Cart recovery and attribution
-
-Clicking `RecoveryUrl` atomically consumes the token, confirms that the original cart is still unconverted and unchanged, duplicates the cart, sanitizes identity/address/carrier state and attaches the duplicate to the current browser session. The link never authenticates the customer by itself.
-
-If the browser is already authenticated as the same customer, the recovered cart can remain associated with that authenticated customer. Otherwise it is detached from the original customer before being exposed to the browser.
-
-The connector persists `source cart → recovered cart`. If that recovered cart later becomes one or more PrestaShop orders, the normal order event pipeline records each resulting order independently in `sfmc_recovery_order`, including authoritative total, currency, state and paid/valid state. This accommodates PrestaShop flows where one cart is split into multiple orders and prevents later orders from overwriting earlier attribution.
-
-Back Office recovery metrics distinguish used links, recovered carts, attributed orders and paid recovered orders. Revenue is grouped by currency; values from different currencies are never added together into a misleading global total. The metrics are based on PrestaShop order state and totals, not email-open tracking.
-
-## Production hardening
-
-The protected health endpoint and Back Office dashboard expose local operational state without revealing secret values or making Salesforce network calls. Critical health can return HTTP 503 for monitoring.
-
-Privacy retention runs locally, never deletes unresolved queue work and never removes recovered-order attribution merely to delete token identity. Recovery records that must remain for attribution are anonymized instead.
-
-The 0.7.1 release artifact is versioned as `pssalesforcebridge-0.7.1.zip` and is accompanied by a SHA-256 checksum. CI verifies the embedded module version, Composer PHP floor, upgrade script and package contents before upload.
-
-Runtime Certification provisions real PrestaShop installations for 1.7.8.11, 8.2.8 and 9.1.5. Each job tests the real 0.6.1 → 0.7.0 upgrade path, a clean 0.7.0 install, tables/configuration/hooks, local customer/cart/order behavior, test-mode delivery safety, backfill/detection/retention, health, protected cron and Front Office reachability. Live Salesforce/Journey delivery remains a separate deployment certification.
-
-## Engineering rules
-
-1. PrestaShop is authoritative for customers, carts and orders.
-2. Marketing Cloud is authoritative for journeys and campaign delivery.
-3. Hooks must never wait for Salesforce.
-4. All outbound events go through the local queue.
-5. Queue processing must be idempotent, lock-safe and retryable.
-6. Secrets, access tokens and raw recovery tokens must never be logged or persisted.
-7. A cart that has produced an order must fail closed for abandoned-cart eligibility and recovery.
-8. Abandoned-cart events must be revalidated immediately before Journey delivery.
-9. Recovery tokens must be single-use, expiring and bound to the exact cart snapshot.
-10. A recovery link must never become an implicit customer login.
-11. Recovery attribution must support one recovered cart producing multiple PrestaShop orders.
-12. Recovered revenue must come from authoritative PrestaShop order totals and must not mix currencies.
-13. Attribution failures must never block the authoritative order synchronization path.
-14. Production sending is opt-in; configuration defaults to `test` mode.
-15. Version-specific PrestaShop behavior belongs behind compatibility adapters, never in Salesforce services.
-16. Runtime compatibility is certified by real integration tests, not inferred from PHP lint alone.
-17. Historical backfills must reuse the same normalized event pipeline as live storefront hooks.
-18. Privacy cleanup must never discard undelivered commerce events.
-19. Release artifacts must come from the exact certified SHA and embed the same public module version as their filename.
-20. Runtime compatibility claims must name the exact PrestaShop versions executed; family-level targets do not imply every patch release was certified.
-
-See `ROADMAP.md`, `COMPATIBILITY.md`, `RUNTIME_CERTIFICATION.md`, `CUSTOMER_CONTRACT.md`, `DATA_EXTENSION_CUSTOMERS.md`, `DATA_EXTENSION_ORDERS.md`, `JOURNEY_BUILDER.md`, `RECOVERY.md`, `RETENTION.md` and `RELEASE.md` for details.
+CI evalúa PHP >=7.1, contrato Growth-only, preflight/seguridad, PST y pruebas MySQL/MariaDB sintéticas. Runtime valida 1.7.8.11/8.2.8/9.1.5. No crear ZIP para BC ni tocar la instalación sin comprobación y autorización específicas. El historial de código anterior queda visible en Git pero **no se distribuye ni ejecuta**.

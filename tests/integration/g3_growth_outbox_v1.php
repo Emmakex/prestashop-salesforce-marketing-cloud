@@ -43,6 +43,16 @@ function g3GrowthCount(PDO $db, $table)
         'g3_growth_outbox_v1', 'g3_growth_entity_ledger_v1',
         'g3_sfmc_queue', 'g3_sfmc_customer_sync', 'g3_sfmc_order_sync',
     ], true), 'count_invalid_table');
+    // Historical tables are NOT created in the new Growth-only CI job.
+    // Preserve both table existence and row count (null = absent): a
+    // migration unexpectedly creating an old table must fail.
+    if (strpos($table, 'g3_sfmc_') === 0) {
+        $probe = $db->query("SELECT COUNT(*) FROM information_schema.TABLES "
+            . "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = '" . $table . "'");
+        if ((int) $probe->fetchColumn() === 0) {
+            return null;
+        }
+    }
     return (int) $db->query('SELECT COUNT(*) FROM ' . $table)->fetchColumn();
 }
 function g3GrowthAccept(PDO $db, $id, $hashChar, $namespace = 'growth_ci_a',
