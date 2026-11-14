@@ -19,9 +19,11 @@ chdir('/var/www/html');
 require_once '/var/www/html/config/config.inc.php';
 require_once '/var/www/html/modules/pssalesforcebridge/src/Provider/ExplicitProviderRouter.php';
 require_once '/var/www/html/modules/pssalesforcebridge/src/Growth/GrowthOutboxSchemaPlan.php';
+require_once '/var/www/html/modules/pssalesforcebridge/src/Growth/GrowthSqlEngineGate.php';
 require_once '/var/www/html/modules/pssalesforcebridge/src/Growth/PrestaShopDbBlockedOutboxStore.php';
 
 use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\PrestaShopDbBlockedOutboxStore;
+use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthSqlEngineGate;
 
 function growthDbRuntimeAssert($ok, $reason)
 {
@@ -40,6 +42,19 @@ function growthDbRuntimeRun()
     $db = Db::getInstance();
     growthDbRuntimeAssert((string) $db->getValue('SELECT DATABASE()', false)
         === 'prestashop', 'not_disposable_database');
+
+    // Actual runtime Docker is pinned to MySQL 5.7 for all three PrestaShop
+    // versions. This must be recognized as CHECK-incompatible, not silently
+    // blessed because the PHP module runs on the shop.
+    $nativeReport = GrowthSqlEngineGate::inspectPrestaShop($db);
+    growthDbRuntimeAssert(
+        $nativeReport['engine'] === 'mysql'
+        && $nativeReport['status'] === 'blocked'
+        && $nativeReport['check_constraints_enforced'] === false
+        && $nativeReport['schema_migration_authorized'] === false
+        && $nativeReport['growth_outbound_authorized'] === false,
+        'mysql57_allowed_unsafe_growth_schema'
+    );
 
     $legacy = [];
     foreach (['sfmc_queue', 'sfmc_customer_sync', 'sfmc_order_sync'] as $suffix) {
