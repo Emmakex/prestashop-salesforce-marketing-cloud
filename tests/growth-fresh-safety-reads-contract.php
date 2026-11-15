@@ -53,7 +53,8 @@ class Db
         } elseif (strpos($sql, 'FROM `ps_ci_sfmc_order_sync`') !== false) {
             $result = self::$ledger;
         } elseif (strpos($sql, 'FROM `ps_ci_customer`') !== false) {
-            $result = self::$customer;
+            // Db::executeS returns an array OF rows, not one raw row.
+            $result = self::$customer === [] ? [] : [self::$customer];
         } else {
             throw new RuntimeException('unexpected_query');
         }
