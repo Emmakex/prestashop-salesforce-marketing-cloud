@@ -1,0 +1,25 @@
+{
+  "contract_version": 1,
+  "merchant": "ABH",
+  "product": "marketing_cloud_growth_data_cloud",
+  "recorded_date": "2026-11-15",
+  "evidence_kind": "explicit_owner_statement_in_project_conversation",
+  "record": "El propietario afirma expresamente que ya ha aceptado los tres puntos G3; no solicitar de nuevo su aceptacion general.",
+  "owner_accepts_g3_decisions": {
+    "data_privacy_direction": true,
+    "typed_customer_order_architecture_direction": true,
+    "schema_review_direction": true
+  },
+  "next_development_gate": "g4_typed_pst_schema_preview_offline",
+  "schema_prepared_for_preview": "v0.4",
+  "schema_source_sha256": "2a0eb79ebb664c9465374584a033b75828f0b180e2a28af5558e7cbb1ba8dd0f",
+  "limits": {
+    "third_party_signatures_inferred": false,
+    "field_level_lawful_bases_invented": false,
+    "pst_preview_performed_in_salesforce": false,
+    "schema_upload_authorized": false,
+    "data_cloud_ingestion_authorized": false,
+    "marketing_sends_authorized": false,
+    "prestashop_production_mode_authorized": false
+  }
+}
