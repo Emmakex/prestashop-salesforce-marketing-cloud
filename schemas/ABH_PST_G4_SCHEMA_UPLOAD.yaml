@@ -1,0 +1,64 @@
+# G4 schema handoff for EXISTING Ingestion API source: ABH_PrestaShop_Data_Cloud
+# PSCustomer and PSOrder only. Keys MUST use namespace:shop:entity:id.
+# No Data Stream, ingestion or marketing campaign is deployed by this file.
+# Data streams require separate selection of PK/category/refresh/data space.
+openapi: 3.0.3
+info:
+  title: ABH PrestaShop Data Cloud PST Typed Identity v0.4
+  version: "0.4.0"
+paths: {}
+components:
+  schemas:
+    PSCustomer:
+      type: object
+      required: [source_key, source_namespace, shop_id, customer_id]
+      properties:
+        source_key:
+          type: string
+        source_namespace:
+          type: string
+        shop_id:
+          type: number
+        customer_id:
+          type: number
+        email:
+          type: string
+          format: email
+        first_name:
+          type: string
+        last_name:
+          type: string
+        newsletter_flag:
+          type: boolean
+        partner_optin_flag:
+          type: boolean
+        active_flag:
+          type: boolean
+        source_updated_local:
+          type: string
+    PSOrder:
+      type: object
+      required: [source_key, source_namespace, shop_id, order_id]
+      properties:
+        source_key:
+          type: string
+        source_namespace:
+          type: string
+        shop_id:
+          type: number
+        order_id:
+          type: number
+        customer_source_key:
+          type: string
+        cart_source_key:
+          type: string
+        currency:
+          type: string
+        total_paid:
+          type: number
+        paid_flag:
+          type: boolean
+        state_id:
+          type: number
+        source_updated_local:
+          type: string
