@@ -19,6 +19,10 @@ Se ha retirado del código empaquetado el transporte anterior, sus writers, cola
 
 **Importante:** `0.8.0` es una refactorización de arquitectura, **no el producto operativo end-to-end**. El siguiente incremento funcional implementará la cola Growth duradera y el mapeo de PST después de superar los gates. No se ha aprobado escribir ni enviar datos reales.
 
+## Aceptación del propietario y siguiente corte
+
+El **15/11/2026** el propietario ha confirmado que acepta los tres puntos G3 y no desea nuevas rondas de la misma pregunta. [Registro de aceptación](config/g3-owner-acceptance.json). Pasamos a preparación G4 con el esquema tipado v0.4, que el CI convierte en un **artefacto OpenAPI de preview sin conexión a Salesforce**. Esa aceptación no se falsifica como firma independiente de privacidad/arquitectura, ni autoriza implícitamente publicación, ingesta o campañas. La instalación BC continúa en 0.7.1 Test.
+
 ## Puertas de entrega
 
 | Paso | Estado |
