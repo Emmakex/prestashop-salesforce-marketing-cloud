@@ -334,6 +334,81 @@ final class G3TenantDmoCatalogProbe
     }
 
     /**
+     * ABH PST: one fixed, filtered Data Streams GET. No stream records or
+     * mapping writes. No response names, metadata IDs, or PII in evidence.
+     * A filtered empty page is NOT global proof that no stream exists.
+     */
+    public function inspectPstStreamPresence($transport = null)
+    {
+        if ($transport !== null && !is_callable($transport)) {
+            throw new RuntimeException('g3_dmo_invalid_transport');
+        }
+        // Salesforce Connect REST API v60+: GET /ssot/data-streams supports
+        // connectionName, limit and offset. Filter is pinned to known PST.
+        $path = '/services/data/' . self::API_VERSION
+            . '/ssot/data-streams?connectionName=ABH_PrestaShop_Data_Cloud'
+            . '&limit=200&offset=0';
+        $data = $this->fetch($path, $transport, true);
+        $out = [
+            'status' => 'pst_filtered_stream_metadata_review_only',
+            'connection_filter' => 'ABH_PrestaShop_Data_Cloud',
+            'state' => 'unverified',
+            'http_status_code' => null,
+            'first_page_count' => null,
+            'exact_connector_detail_match_count' => null,
+            'any_dlo_metadata_visible' => false,
+            'full_tenant_stream_inventory_certified' => false,
+            'pst_stream_absence_certified' => false,
+            'pst_stream_schema_approved' => false,
+            'data_stream_creation_authorized' => false,
+            'dlo_dmo_mapping_save_authorized' => false,
+            'data_360_ingestion_authorized' => false,
+            'marketing_sends_authorized' => false,
+        ];
+        if (!is_array($data)) {
+            return $out;
+        }
+        if (isset($data['_pst_stream_http_status'])
+            && in_array($data['_pst_stream_http_status'], [403, 404], true)) {
+            $out['state'] = 'unverified_http_' . $data['_pst_stream_http_status'];
+            $out['http_status_code'] = $data['_pst_stream_http_status'];
+            return $out;
+        }
+        if (!isset($data['dataStreams']) || !is_array($data['dataStreams'])
+            || count($data['dataStreams']) > 200) {
+            $out['state'] = 'unverified_response_shape';
+            return $out;
+        }
+        $matched = 0;
+        $lake = false;
+        foreach ($data['dataStreams'] as $entry) {
+            if (!is_array($entry)) {
+                $out['state'] = 'unverified_response_shape';
+                return $out;
+            }
+            if (isset($entry['connectorInfo']['connectorDetails']['name'])
+                && is_string($entry['connectorInfo']['connectorDetails']['name'])
+                && $entry['connectorInfo']['connectorDetails']['name']
+                    === 'ABH_PrestaShop_Data_Cloud') {
+                ++$matched;
+            }
+            if (isset($entry['dataLakeObjectInfo'])
+                && is_array($entry['dataLakeObjectInfo'])
+                && count($entry['dataLakeObjectInfo']) > 0) {
+                $lake = true;
+            }
+        }
+        $out['http_status_code'] = 200;
+        $out['first_page_count'] = count($data['dataStreams']);
+        $out['exact_connector_detail_match_count'] = $matched;
+        $out['any_dlo_metadata_visible'] = $lake;
+        $out['state'] = $out['first_page_count'] === 0
+            ? 'filtered_page_empty_review_only'
+            : 'filtered_page_items_observed_review_only';
+        return $out;
+    }
+
+    /**
      * One additional fixed GET per known DMO. Unlike relationship visibility,
      * this reports actual visible DLO->DMO field mapping metadata in ABH.
      * Names of DLOs, fields outside the allowlist, and mapping identifiers
@@ -636,6 +711,8 @@ final class G3TenantDmoCatalogProbe
                 . '/ssot/data-model-object-mappings?dmoDeveloperName=ssot__AccountContact__dlm',
             '/services/data/' . self::API_VERSION
                 . '/ssot/data-model-object-mappings?dmoDeveloperName=ssot__ContactPointEmail__dlm',
+            '/services/data/' . self::API_VERSION
+                . '/ssot/data-streams?connectionName=ABH_PrestaShop_Data_Cloud&limit=200&offset=0',
         ];
         if (!in_array($path, $allowed, true)) {
             throw new RuntimeException('g3_dmo_path_not_allowlisted');
@@ -669,6 +746,9 @@ final class G3TenantDmoCatalogProbe
             if (strpos($path, '/ssot/data-model-object-mappings?') !== false) {
                 return ['_mapping_http_status' => $response['status']];
             }
+            if (strpos($path, '/ssot/data-streams?') !== false) {
+                return ['_pst_stream_http_status' => $response['status']];
+            }
             return null;
         }
         if ($response['status'] !== 200) {
@@ -689,6 +769,14 @@ final class G3TenantDmoCatalogProbe
                 || !isset($shape->objectSourceTargetMaps)
                 || !is_array($shape->objectSourceTargetMaps)) {
                 return ['_invalid_mapping_shape' => true];
+            }
+        }
+        if (strpos($path, '/ssot/data-streams?') !== false) {
+            // A JSON object as the dataStreams value is NOT an empty list.
+            $shape = json_decode($response['body']);
+            if (!is_object($shape) || !isset($shape->dataStreams)
+                || !is_array($shape->dataStreams)) {
+                return ['_invalid_stream_shape' => true];
             }
         }
         $decoded = json_decode($response['body'], true);
