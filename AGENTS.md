@@ -17,6 +17,10 @@
 - Mantener la **reversibilidad sin pérdida de datos**: una actualización desde 0.7.1 conserva tablas históricas y configuraciones; no hace `DROP`, no reenvía eventos antiguos y fuerza Test. La limpieza física de datos productivos exige backup y autorización aparte.
 - Compatibilidad real PS 1.7/8/9 con CI exact-head y pruebas de actualización; no confundir lint, token o preview con ejecución end-to-end.
 
+## 3. Aceptación del propietario y puertas de entrega
+
+**15/11/2026 — aceptación reiterada del propietario:** el usuario ha confirmado expresamente que los tres grupos G3 ya están aceptados. Se registra en `config/g3-owner-acceptance.json`. **No volver a pedir su aceptación general de esos tres grupos ni repetir los diagnósticos resueltos.** Avanzar directamente con la preparación técnica G4, usando v0.4 tipada para el preview offline. La declaración del propietario no inventa firmas externas, base jurídica individual por campo, mapeo DMO observado o preview realizado en Salesforce. Estos hechos solo se pueden marcar verificados con evidencia independiente. No inferir permiso para escrituras, ingesta ni envíos.
+
 ## 3. Puertas obligatorias, sin excepciones
 
 **Sin aprobación específica y pruebas separadas**: NO publicar el esquema PST, crear Data Streams, guardar mapeos, ingerir clientes/pedidos, activar backfill, resolver identidad, enviar campañas, lanzar recovery, ni cambiar BC a Production. No revelar tokens/PII, ni considerar `newsletter=1` permiso de email. El código Growth actual no puede enviar.
