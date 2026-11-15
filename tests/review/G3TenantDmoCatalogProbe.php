@@ -397,6 +397,7 @@ final class G3TenantDmoCatalogProbe
             'state' => 'unverified',
             'visible_mapping_count' => null,
             'visible_active_mapping_count' => null,
+            'http_status_code' => null,
             'active_target_field_mapped_observed' =>
                 array_fill_keys($allowedFields, false),
             'all_active_mappings_have_field_detail' => false,
@@ -405,6 +406,14 @@ final class G3TenantDmoCatalogProbe
             'dmo_relation_approved' => false,
         ];
         if ($data === null) {
+            return $empty;
+        }
+        // Fixed diagnostics are not credentials, record data, or proof of
+        // absence. 403 and 404 have distinct remediation paths in G3.
+        if (isset($data['_mapping_http_status'])
+            && in_array($data['_mapping_http_status'], [403, 404], true)) {
+            $empty['http_status_code'] = $data['_mapping_http_status'];
+            $empty['state'] = 'unverified_http_' . $data['_mapping_http_status'];
             return $empty;
         }
         if (!isset($data['objectSourceTargetMaps'])
@@ -454,6 +463,7 @@ final class G3TenantDmoCatalogProbe
             'state' => 'mapping_metadata_observed',
             'visible_mapping_count' => count($data['objectSourceTargetMaps']),
             'visible_active_mapping_count' => $active,
+            'http_status_code' => 200,
             'active_target_field_mapped_observed' => $fields,
             'all_active_mappings_have_field_detail' => $detailsComplete,
             'full_tenant_mapping_catalog_certified' => false,
@@ -653,6 +663,12 @@ final class G3TenantDmoCatalogProbe
         }
         if ($relationshipsOptional
             && in_array($response['status'], [403, 404], true)) {
+            // The mapping API distinguishes access denied (403) from
+            // "mapping not found" (404). Preserve only the allowlisted
+            // HTTP code; discard response body, origin and tenant names.
+            if (strpos($path, '/ssot/data-model-object-mappings?') !== false) {
+                return ['_mapping_http_status' => $response['status']];
+            }
             return null;
         }
         if ($response['status'] !== 200) {

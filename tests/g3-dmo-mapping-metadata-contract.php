@@ -74,6 +74,7 @@ foreach ($names as $i => $name) {
         && $out['visible_mapping_count'] === 2
         && $out['visible_active_mapping_count'] === 1
         && $out['all_active_mappings_have_field_detail'] === true
+        && $out['http_status_code'] === 200
         && $out['active_target_field_mapped_observed']['ssot__Id__c'],
         'mapping_evidence_not_counted');
     foreach (['full_tenant_mapping_catalog_certified',
@@ -102,16 +103,23 @@ $failed = $probe->inspectObjectMappings(function ($url, $token) {
     return ['status' => 403, 'body' => '{"secret":"do-not-log"}'];
 });
 foreach ($names as $name) {
-    mappingAssert($failed['objects'][$name]['state'] === 'unverified'
+    mappingAssert($failed['objects'][$name]['state'] === 'unverified_http_403'
+        && $failed['objects'][$name]['http_status_code'] === 403
         && $failed['objects'][$name]['visible_mapping_count'] === null
-        && $failed['objects'][$name]['visible_active_mapping_count'] === null,
-        '403_should_not_mean_no_mappings');
+        && $failed['objects'][$name]['visible_active_mapping_count'] === null
+        && $failed['objects'][$name]['pst_dlo_source_mapping_certified'] === false,
+        '403_should_be_access_denied_without_mapping_claim');
 }
 $notFound = $probe->inspectObjectMappings(function ($url, $token) {
     return ['status' => 404, 'body' => 'not found'];
 });
-mappingAssert($notFound['objects']['SalesOrder']['state'] === 'unverified',
-    '404_falsely_certified_absence');
+mappingAssert($notFound['objects']['SalesOrder']['state'] === 'unverified_http_404'
+    && $notFound['objects']['SalesOrder']['http_status_code'] === 404
+    && $notFound['objects']['SalesOrder']['visible_mapping_count'] === null
+    && $notFound['objects']['SalesOrder']['pst_dlo_source_mapping_certified'] === false,
+    '404_is_not_verified_absence_or_permission_denial');
+mappingAssert(strpos(json_encode($notFound), 'not found') === false,
+    'unexpected response body exposed');
 
 $malformed = $probe->inspectObjectMappings(function ($url, $token) {
     return ['status'=>200, 'body'=>'{"objectSourceTargetMaps":{}}'];
