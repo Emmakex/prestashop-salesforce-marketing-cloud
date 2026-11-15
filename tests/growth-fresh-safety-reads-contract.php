@@ -96,8 +96,12 @@ function freshCheckCalls($count)
             && strpos($sql, ' WHERE `id_shop` = 2 AND ') !== false
             && strpos($sql, ' LIMIT ') !== false,
             'unscoped_or_nonselect_sql');
+        // The selected column `deleted` must not be confused with
+        // SQL DELETE. Check the statement verb separately.
+        freshAssert(!preg_match('/^\\s*(INSERT|UPDATE|DELETE|REPLACE|ALTER|DROP)\\s/i',
+            $sql), 'write_sql_verb');
         foreach (['email', 'firstname', 'lastname', 'passwd', 'INSERT',
-            'UPDATE', 'DELETE', 'SELECT *'] as $bad) {
+            'UPDATE', 'SELECT *'] as $bad) {
             freshAssert(stripos($sql, $bad) === false,
                 'private_data_or_write_' . $bad);
         }
