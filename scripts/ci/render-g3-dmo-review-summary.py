@@ -151,7 +151,50 @@ def render(evidence):
             + " |"
         )
 
+    mapping = catalog.get("object_mappings")
+    mapping = mapping if isinstance(mapping, dict) else {}
+    mapping_objects = mapping.get("objects")
+    mapping_objects = mapping_objects if isinstance(mapping_objects, dict) else {}
+    mapping_safe = (mapping.get("status") == "fixed_dmo_mapping_metadata_review_only"
+                    and all(mapping.get(k) is False for k in (
+                        "field_mapping_activation_approved",
+                        "dlo_dmo_mapping_save_authorized",
+                        "identity_stitching_authorized",
+                        "schema_upload_authorized",
+                        "data_360_ingestion_authorized",
+                        "marketing_sends_authorized",
+                    )))
+    lines.extend([
+        "",
+        "### Mapeos DLO→DMO observados (GET, sin guardar ni mostrar fuentes privadas)",
+        "",
+        "| DMO | Respuesta | Mapeos visibles | ACTIVE visibles | Campo PK en ACTIVE |",
+        "|---|---|---|---|---|",
+    ])
+    for name in OBJECTS:
+        entry = mapping_objects.get(name) if mapping_safe else None
+        entry = entry if isinstance(entry, dict) else {}
+        state = entry.get("state")
+        state_label = ("Observado" if state == "mapping_metadata_observed"
+                       else "Sin verificar")
+        count = entry.get("visible_mapping_count")
+        active = entry.get("visible_active_mapping_count")
+        def safe_count(value):
+            return str(value) if type(value) is int and 0 <= value <= 500 else "Sin verificar"
+        field_flags = entry.get("active_target_field_mapped_observed")
+        field_flags = field_flags if isinstance(field_flags, dict) else {}
+        lines.append(
+            "| " + name + " | " + state_label
+            + " | " + safe_count(count) + " | " + safe_count(active)
+            + " | " + yes_no(field_flags.get("ssot__Id__c"))
+            + " |"
+        )
+
     lines += [
+        "",
+        "**Importante:** estas cuentas no certifican un mapeo desde PST."
+        " Un campo observado en un mapeo activo NO verifica automáticamente"
+        " la FK de cliente/pedido, ni implica permiso de escritura.",
         "",
         "**Interpretación:** incluso dos tramos visibles `ACTIVE` NO "
         "demuestran mapeo PST, identidad de comprador, consentimiento "
