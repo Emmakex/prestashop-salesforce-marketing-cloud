@@ -24,6 +24,7 @@
 - [ ] **G3 BLOQUEANTE**: aprobación responsable de namespace único, PSCustomer/PSOrder, categorización, relación cliente-pedido, fecha fuente UTC/DST, finalidades, consentimiento, conservación, borrado y selección final de PST.
 - [ ] **G4**: publicar esquema y activar Data Streams/mapeos SOLO después de aprobación separada.
 - [ ] **G5**: /actions/test sintético, luego ingesta sintética autorizada y conciliada.
+- [x] **Preparación G6 sin envíos:** lector de estado local de cliente de PrestaShop por tienda/ID (activo, eliminado, invitado y bajas de newsletter/optin), fail-closed ante error, datos cruzados o columnas inesperadas. Compuesto con control de carrito, siempre bloquea sin consentimiento por finalidad Growth certificado. CI PHP 7.1/8.5 y runtimes 1.7/8/9. [Evidencia](docs/G3_08_BUSINESS_GOAL_COVERAGE.md).
 - [ ] **G6**: identidad estable, consentimiento actual y supresión específica Growth/Core/Data Cloud, revalidación antes de cada campaña.
 - [x] **Preparación G7 sin envíos:** comprobación local doble de compras para carritos, con consultas acotadas por tienda y carrito, diferenciación `found`/`none`/`unknown`, bloqueos de consentimiento/supresión/frecuencia y pruebas negativas. Nunca equivale a permiso de campaña.
 - [ ] **G7**: Flow/campaña Growth: cliente, pedido y carrito abandonado, frecuencia, conversiones, cancelación y recuperación.
