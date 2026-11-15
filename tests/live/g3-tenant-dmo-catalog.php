@@ -54,6 +54,21 @@ try {
         $core['instance_url'], $core['access_token']
     );
     $metadata = $probe->inspect();
+    // Separate fixed GET catalog for DLO->DMO mapping metadata. Missing
+    // permissions, unsupported list shapes or endpoint errors never imply
+    // there are zero mappings, nor invalidate the existing DMO metadata.
+    try {
+        $metadata['object_mappings'] = $probe->inspectObjectMappings();
+    } catch (Throwable $mappingError) {
+        $metadata['object_mappings'] = [
+            'status' => 'mapping_metadata_unverified',
+            'objects' => [],
+            'dlo_dmo_mapping_save_authorized' => false,
+            'schema_upload_authorized' => false,
+            'data_360_ingestion_authorized' => false,
+            'marketing_sends_authorized' => false,
+        ];
+    }
     unset($core, $auth, $probe);
     $evidence['status'] = 'metadata_read_success_review_only';
     $evidence['catalog'] = $metadata;

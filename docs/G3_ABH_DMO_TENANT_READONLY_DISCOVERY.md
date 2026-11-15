@@ -97,3 +97,11 @@ El artifact mantiene **solo** categorías permitidas, campos fijos `ssot__Id__c`
 
 **Pruebas:** `tests/g3-tenant-dmo-catalog-contract.php` genera fixtures y relaciones sintéticas de los nuevos caminos, otros PartyId no Individual, paginación, datos confidenciales descartados y garantías GET-only. Compatible PHP 7.1/8.5. La ejecución en CI de PR no usa secretos; solo el workflow protegido de `main` puede leer catálogo real.
 
+
+## Corte adicional G3-06: lectura del mapping DLO→DMO existente (15/11/2026)
+
+Para reducir el único bloqueo arquitectónico pendiente sin crear streams, el workflow protegido incorpora **cinco GET adicionales**, con los nombres estáticos `Individual`, `SalesOrder`, `Account`, `AccountContact` y `ContactPointEmail`: `/services/data/v68.0/ssot/data-model-object-mappings?dmoDeveloperName=ssot__{Nombre}__dlm` (filtro literal, Data Space por defecto). Este recurso **de lectura** está documentado por Salesforce desde la versión 61.0. No se llama a operaciones de creación/edición ni se cambian permisos. [API oficial de mapeos](https://developer.salesforce.com/docs/data/connectapi/references/spec?meta=type%3AOutput+D360+Node+Input).
+
+El lector admite únicamente un array JSON real `objectSourceTargetMaps` (un objeto vacío `{}` no se interpreta como `[]`), hasta 500 elementos por objeto. Cuenta los mapeos visibles, los de estado literal `ACTIVE` y la observación de determinados **campos destino** ya mapeados en ellos; no copia nombres de DLO fuente, identificadores de mapping, campos ajenos al allowlist ni respuestas HTTP. Si la API devuelve 403/404, un cuerpo inesperado o un error del endpoint, el estado es **sin verificar**, nunca ausencia demostrada. Tampoco se afirma que el catálogo de mapeos sea íntegro o pertenezca a PST.
+
+La salida se añade a la tabla Summary del run y al JSON sanitizado preexistente. Puede mostrar pistas para la revisión del arquitecto, pero **no demuestra que PSCustomer o PSOrder estén mapeados**, ni que exista una relación activa y válida de compradores en ABH. Hasta la conformidad del responsable, G3 permanece pendiente; G4/ingesta/marketing bloqueados. El lector solo se ejecuta en el entorno GitHub protegido sobre `main`, sin afectar el módulo BC 0.7.1 Test.

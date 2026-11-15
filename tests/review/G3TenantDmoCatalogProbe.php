@@ -333,6 +333,135 @@ final class G3TenantDmoCatalogProbe
         }
     }
 
+    /**
+     * One additional fixed GET per known DMO. Unlike relationship visibility,
+     * this reports actual visible DLO->DMO field mapping metadata in ABH.
+     * Names of DLOs, fields outside the allowlist, and mapping identifiers
+     * are never copied into artifacts or logs. A 403/404 is UNVERIFIED.
+     *
+     * No automatic field mapping, stream creation or ownership approval.
+     */
+    public function inspectObjectMappings($transport = null)
+    {
+        if ($transport !== null && !is_callable($transport)) {
+            throw new RuntimeException('g3_dmo_invalid_transport');
+        }
+        $base = '/services/data/' . self::API_VERSION
+            . '/ssot/data-model-object-mappings?dmoDeveloperName=';
+        $objectFields = [
+            'Individual' => [
+                'ssot__Id__c',
+            ],
+            'SalesOrder' => [
+                'ssot__Id__c', 'ssot__BillToAccountId__c',
+                'ssot__SoldToCustomerId__c', 'ssot__BillToContactId__c',
+                'ssot__BilltoEmailId__c',
+            ],
+            'Account' => [
+                'ssot__Id__c', 'ssot__IndividualId__c',
+            ],
+            'AccountContact' => [
+                'ssot__Id__c', 'ssot__IndividualId__c',
+            ],
+            'ContactPointEmail' => [
+                'ssot__Id__c', 'ssot__PartyId__c',
+            ],
+        ];
+        $out = [
+            'status' => 'fixed_dmo_mapping_metadata_review_only',
+            'dataspace' => 'default',
+            'objects' => [],
+            'field_mapping_activation_approved' => false,
+            'dlo_dmo_mapping_save_authorized' => false,
+            'identity_stitching_authorized' => false,
+            'schema_upload_authorized' => false,
+            'data_360_ingestion_authorized' => false,
+            'marketing_sends_authorized' => false,
+        ];
+        foreach ($objectFields as $name => $fields) {
+            // API accepts only these five literal DMO names. The fixed GET
+            // filter is never built from tenant JSON, object IDs or user input.
+            $dmo = 'ssot__' . $name . '__dlm';
+            $data = $this->fetch($base . $dmo, $transport, true);
+            $out['objects'][$name] = self::summarizeObjectMappings(
+                $data, $dmo, $fields
+            );
+        }
+        return $out;
+    }
+
+    private static function summarizeObjectMappings($data, $expectedDmo,
+        array $allowedFields)
+    {
+        $empty = [
+            'state' => 'unverified',
+            'visible_mapping_count' => null,
+            'visible_active_mapping_count' => null,
+            'active_target_field_mapped_observed' =>
+                array_fill_keys($allowedFields, false),
+            'all_active_mappings_have_field_detail' => false,
+            'full_tenant_mapping_catalog_certified' => false,
+            'pst_dlo_source_mapping_certified' => false,
+            'dmo_relation_approved' => false,
+        ];
+        if ($data === null) {
+            return $empty;
+        }
+        if (!isset($data['objectSourceTargetMaps'])
+            || !is_array($data['objectSourceTargetMaps'])
+            || count($data['objectSourceTargetMaps']) > 500) {
+            $empty['state'] = 'unverified_response_shape';
+            return $empty;
+        }
+        $fields = array_fill_keys($allowedFields, false);
+        $active = 0;
+        $detailsComplete = true;
+        foreach ($data['objectSourceTargetMaps'] as $item) {
+            if (!is_array($item)
+                || !isset($item['targetEntityDeveloperName'])
+                || $item['targetEntityDeveloperName'] !== $expectedDmo
+                || !isset($item['sourceEntityDeveloperName'])
+                || !is_string($item['sourceEntityDeveloperName'])) {
+                $empty['state'] = 'unverified_response_shape';
+                return $empty;
+            }
+            if (!isset($item['status']) || $item['status'] !== 'ACTIVE') {
+                // A visible or CREATING mapping is NOT active evidence.
+                continue;
+            }
+            ++$active;
+            if (!isset($item['fieldMappings'])
+                || !is_array($item['fieldMappings'])
+                || count($item['fieldMappings']) > 200) {
+                $detailsComplete = false;
+                continue;
+            }
+            foreach ($item['fieldMappings'] as $mapping) {
+                if (!is_array($mapping)
+                    || !isset($mapping['targetFieldDeveloperName'])
+                    || !is_string($mapping['targetFieldDeveloperName'])) {
+                    $detailsComplete = false;
+                    continue;
+                }
+                // Exactly allowlisted DMO target fields, no DLO source names.
+                $target = $mapping['targetFieldDeveloperName'];
+                if (array_key_exists($target, $fields)) {
+                    $fields[$target] = true;
+                }
+            }
+        }
+        return [
+            'state' => 'mapping_metadata_observed',
+            'visible_mapping_count' => count($data['objectSourceTargetMaps']),
+            'visible_active_mapping_count' => $active,
+            'active_target_field_mapped_observed' => $fields,
+            'all_active_mappings_have_field_detail' => $detailsComplete,
+            'full_tenant_mapping_catalog_certified' => false,
+            'pst_dlo_source_mapping_certified' => false,
+            'dmo_relation_approved' => false,
+        ];
+    }
+
     private static function summarizeOptional($entry, $expectedName,
         $expectedCategory, array $candidateFields)
     {
@@ -487,6 +616,16 @@ final class G3TenantDmoCatalogProbe
                 . '/ssot/data-model-objects/ssot__ContactPointEmail__dlm',
             '/services/data/' . self::API_VERSION
                 . '/ssot/data-model-objects/ssot__ContactPointEmail__dlm/relationships',
+            '/services/data/' . self::API_VERSION
+                . '/ssot/data-model-object-mappings?dmoDeveloperName=ssot__Individual__dlm',
+            '/services/data/' . self::API_VERSION
+                . '/ssot/data-model-object-mappings?dmoDeveloperName=ssot__SalesOrder__dlm',
+            '/services/data/' . self::API_VERSION
+                . '/ssot/data-model-object-mappings?dmoDeveloperName=ssot__Account__dlm',
+            '/services/data/' . self::API_VERSION
+                . '/ssot/data-model-object-mappings?dmoDeveloperName=ssot__AccountContact__dlm',
+            '/services/data/' . self::API_VERSION
+                . '/ssot/data-model-object-mappings?dmoDeveloperName=ssot__ContactPointEmail__dlm',
         ];
         if (!in_array($path, $allowed, true)) {
             throw new RuntimeException('g3_dmo_path_not_allowlisted');
@@ -525,6 +664,16 @@ final class G3TenantDmoCatalogProbe
         }
         if (strlen($response['body']) > self::MAX_BODY_BYTES) {
             throw new RuntimeException('g3_dmo_response_too_large');
+        }
+        // JSON objects and arrays both decode to PHP arrays. For mapping
+        // listings, reject object-shaped {} as a fake empty [] result.
+        if (strpos($path, '/ssot/data-model-object-mappings?') !== false) {
+            $shape = json_decode($response['body']);
+            if (!is_object($shape)
+                || !isset($shape->objectSourceTargetMaps)
+                || !is_array($shape->objectSourceTargetMaps)) {
+                return ['_invalid_mapping_shape' => true];
+            }
         }
         $decoded = json_decode($response['body'], true);
         if (!is_array($decoded)) {
