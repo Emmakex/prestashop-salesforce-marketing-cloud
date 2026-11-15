@@ -23,6 +23,8 @@ Se ha retirado del código empaquetado el transporte anterior, sus writers, cola
 
 El **15/11/2026** el propietario ha confirmado que acepta los tres puntos G3 y no desea nuevas rondas de la misma pregunta. [Registro de aceptación](config/g3-owner-acceptance.json). Pasamos a preparación G4 con el esquema tipado v0.4, que el CI convierte en un **artefacto OpenAPI de preview sin conexión a Salesforce**. Esa aceptación no se falsifica como firma independiente de privacidad/arquitectura, ni autoriza implícitamente publicación, ingesta o campañas. La instalación BC continúa en 0.7.1 Test.
 
+**G4 — compatibilidad de payload:** el nuevo constructor `pssalesforcebridge/src/DataCloud/GrowthTypedPstPayloadBuilder.php` valida los registros tipados v0.4 y `scripts/ci/build-g4-pst-typed-preview.py` exige paridad del YAML con los payloads sintéticos de PHP para PrestaShop 1.7/8/9. El archivo OpenAPI es un contrato de **campos y tipos**; la semántica tipada de PK/FK se comprueba en el constructor (el esquema no codifica esa restricción). No se ha publicado en PST ni existe aún ingesta autorizada.
+ 
 ## Puertas de entrega
 
 | Paso | Estado |

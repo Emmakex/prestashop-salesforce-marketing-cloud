@@ -3,6 +3,8 @@ import copy
 import hashlib
 import importlib.util
 import json
+import os
+import subprocess
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -50,6 +52,44 @@ class G4TypedPstPreviewTests(unittest.TestCase):
             obj["components"]["schemas"]["PSOrder"]["properties"]["customer_source_key"],
             {"type": "string"},
         )
+
+    def test_php_typed_payload_matches_upload_shape_for_each_ps_family(self):
+        generated, _ = g4.build_preview(self.baseline, self.typed, self.acceptance)
+        fixtures = []
+        for version in ("1.7.8.11", "8.2.8", "9.1.5"):
+            env = dict(os.environ, G4_PST_FIXTURE_PS_VERSION=version)
+            raw = subprocess.check_output(
+                ["php", str(ROOT / "tests/g4-pst-typed-payload-fixture.php")],
+                cwd=str(ROOT), env=env,
+            )
+            fixture = json.loads(raw)
+            self.assertTrue(g4.validate_synthetic_payload(generated, fixture))
+            fixtures.append(fixture)
+        self.assertEqual(fixtures[0], fixtures[1])
+        self.assertEqual(fixtures[1], fixtures[2])
+
+    def test_payload_parity_rejects_old_key_cross_shop_and_schema_drift(self):
+        generated, _ = g4.build_preview(self.baseline, self.typed, self.acceptance)
+        raw = subprocess.check_output(
+            ["php", str(ROOT / "tests/g4-pst-typed-payload-fixture.php")],
+            cwd=str(ROOT),
+        )
+        fixture = json.loads(raw)
+        bad_cases = [
+            lambda f: f["PSCustomer"]["data"][0].update(source_key="growth_ci_abhtwo:ps_2_44"),
+            lambda f: f["PSOrder"]["data"][0].update(customer_source_key="growth_ci_abhtwo:3:customer:44"),
+            lambda f: f["PSOrder"]["data"][0].update(paid_flag=True),
+            lambda f: f["PSCustomer"]["data"][0].update(email="PRIVATE_EMAIL"),
+            lambda f: f["PSOrder"]["data"][0].update(shop_id="2"),
+            lambda f: f["PSOrder"]["data"][0].update(marketing_consent=True),
+            lambda f: f.update(PSCart={"data": []}),
+        ]
+        for mutation in bad_cases:
+            with self.subTest(mutation=mutation):
+                bad = copy.deepcopy(fixture)
+                mutation(bad)
+                with self.assertRaises(ValueError):
+                    g4.validate_synthetic_payload(generated, bad)
 
     def test_acceptance_is_recorded_without_forged_certification(self):
         self.assertEqual(

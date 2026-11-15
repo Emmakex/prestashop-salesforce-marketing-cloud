@@ -8,6 +8,9 @@ It does not turn owner acceptance into missing field-level/legal or tenant proof
 import copy
 import hashlib
 import json
+import os
+import re
+import subprocess
 from pathlib import Path
 
 import yaml
@@ -133,11 +136,80 @@ def build_preview(frozen_bytes, typed_bytes, acceptance):
     return generated, manifest
 
 
+def validate_synthetic_payload(preview_bytes, fixture):
+    """Proof that the actual PHP v0.4 payload matches the preview field contract.
+
+    This is local synthetic parity, not an API roundtrip or consent approval.
+    """
+    schema = yaml.safe_load(preview_bytes)
+    definitions = schema["components"]["schemas"]
+    if not isinstance(fixture, dict) or set(fixture) != set(OBJECTS):
+        raise ValueError("g4_payload_object_set_drift")
+    for name in OBJECTS:
+        payload = fixture[name]
+        if not isinstance(payload, dict) or set(payload) != {"data"} or (
+            not isinstance(payload["data"], list) or len(payload["data"]) != 1
+            or not isinstance(payload["data"][0], dict)
+        ):
+            raise ValueError("g4_payload_envelope_invalid")
+        row = payload["data"][0]
+        fields = definitions[name]["properties"]
+        if list(row) != list(fields):
+            raise ValueError("g4_payload_field_order_or_names_mismatch")
+        for key, spec in fields.items():
+            value = row[key]
+            typ = spec["type"]
+            if not ((typ == "string" and isinstance(value, str))
+                    or (typ == "boolean" and type(value) is bool)
+                    or (typ == "number" and type(value) in (int, float))):
+                raise ValueError("g4_payload_field_type_mismatch")
+        namespace = row["source_namespace"]
+        shop = row["shop_id"]
+        entity = "customer" if name == "PSCustomer" else "order"
+        identifier = row["customer_id"] if entity == "customer" else row["order_id"]
+        if not (re.fullmatch(r"[a-z][a-z0-9_]{5,31}", namespace)
+                and type(shop) is int and shop > 0
+                and type(identifier) is int and identifier > 0
+                and row["source_key"] == f"{namespace}:{shop}:{entity}:{identifier}"):
+            raise ValueError("g4_payload_not_typed_or_scoped")
+        if name == "PSCustomer" and (
+            row["email"] != "synthetic@fixture.example.invalid"
+            or row["first_name"] != "Synthetic"
+            or row["last_name"] != "Fixture"
+        ):
+            raise ValueError("g4_payload_not_synthetic")
+        if name == "PSOrder":
+            parent = fixture["PSCustomer"]["data"][0]
+            if row["customer_source_key"] != parent["source_key"] or (
+                row["cart_source_key"] != f"{namespace}:{shop}:cart:91"
+            ) or row["paid_flag"] is not False:
+                raise ValueError("g4_payload_fk_or_paid_semantics_invalid")
+        if "source_updated_utc" in row or "marketing_consent" in row:
+            raise ValueError("g4_payload_fabricated_utc_or_consent")
+    return True
+
+
 def main():
     frozen = (ROOT / BASE_PATH).read_bytes()
     typed = (ROOT / TYPED_PATH).read_bytes()
     owner = json.loads((ROOT / ACCEPTANCE_PATH).read_text("utf-8"))
     generated, manifest = build_preview(frozen, typed, owner)
+    # The actual PHP v0.4 encoder must match this YAML on every supported
+    # PrestaShop family; metadata-only comparisons are not enough.
+    fixtures = []
+    for ps_version in ("1.7.8.11", "8.2.8", "9.1.5"):
+        env = dict(os.environ)
+        env["G4_PST_FIXTURE_PS_VERSION"] = ps_version
+        raw = subprocess.check_output(
+            ["php", str(ROOT / "tests/g4-pst-typed-payload-fixture.php")],
+            cwd=str(ROOT), env=env
+        )
+        fixture = json.loads(raw)
+        validate_synthetic_payload(generated, fixture)
+        fixtures.append(fixture)
+    if fixtures[0] != fixtures[1] or fixtures[0] != fixtures[2]:
+        raise ValueError("g4_payload_prestashop_family_drift")
+    manifest["typed_payload_parity"] = "verified_synthetic_3_prestashop_families"
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     (OUTPUT_DIR / "pst-v04-g4-preview-only.yaml").write_bytes(generated)
     (OUTPUT_DIR / "manifest.json").write_text(
