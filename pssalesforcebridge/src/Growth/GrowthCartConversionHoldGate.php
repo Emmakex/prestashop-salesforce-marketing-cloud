@@ -128,6 +128,42 @@ final class GrowthCartConversionHoldGate
         ];
     }
 
+    /**
+     * Compose fresh, shop-scoped local customer safety evidence with the
+     * existing double-order-read hold. Still NO sending, no consent approval.
+     *
+     * This cannot infer affirmative Growth consent from newsletter/optin,
+     * even if every asserted signal was "verified" by the caller.
+     * No email, customer ID, or source row is returned.
+     */
+    public static function inspectWithLocalCustomer(
+        $shopId, $cartId, $customerId, $selectRows, $prefix, array $signals
+    ) {
+        self::validateSignals($signals);
+        $local = GrowthLocalCustomerHoldReader::inspect(
+            $shopId, $customerId, $selectRows, $prefix
+        );
+        if ($local['local_customer_source_state']
+            !== 'no_local_negative_observed') {
+            $signals['current_customer_state'] = 'unknown';
+        }
+        // Explicitly invalidate caller-supplied "verified" assumptions:
+        // shop optin/newsletter never certify the separate Growth purpose.
+        $signals['growth_consent_for_purpose'] = 'unknown';
+        $result = self::inspect(
+            $shopId, $cartId, $selectRows, $prefix, $signals
+        );
+        $result['reasons'] = array_values(array_unique(array_merge(
+            $result['reasons'], $local['reasons']
+        )));
+        $result['status'] = 'hold_for_review';
+        $result['local_customer_source_state'] =
+            $local['local_customer_source_state'];
+        $result['growth_purpose_consent_certified'] = false;
+        $result['other_suppression_sources_checked'] = false;
+        return $result;
+    }
+
     private static function validateSignals(array $signals)
     {
         $keys = array_keys($signals);
