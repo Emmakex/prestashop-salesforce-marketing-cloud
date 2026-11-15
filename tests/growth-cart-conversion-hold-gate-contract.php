@@ -185,9 +185,13 @@ $source = file_get_contents(dirname(__DIR__)
     . '/pssalesforcebridge/src/Growth/GrowthCartConversionHoldGate.php');
 cartHoldAssert(strpos($module, 'GrowthCartConversionHoldGate') === false,
     'not-yet-approved gate was activated in module');
-foreach (['curl_', 'file_get_contents(', 'Db::', '->execute(',
+foreach (['curl_', 'file_get_contents(', 'Db::getInstance()->execute(', '->execute(',
     '->insert(', '->enqueue(', '->issueUrl(', '/api/v1/ingest/'] as $danger) {
     cartHoldAssert(strpos($source, $danger) === false,
         'unsafe side effect in gate: ' . $danger);
 }
+// The only permitted Db call is the explicit uncached read-only adapter.
+// All actual decision logic remains injectable and side-effect-free.
+cartHoldAssert(substr_count($source, 'Db::getInstance()->executeS($sql, true, false)') === 1,
+    'native_adapter_must_use_fresh_read_only_select');
 echo "Growth cart conversion double-check PASS: conversion/unknown always hold; no sends.\n";
