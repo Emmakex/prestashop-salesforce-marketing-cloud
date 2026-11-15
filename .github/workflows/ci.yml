@@ -163,10 +163,17 @@ jobs:
           python -m unittest discover -s tests -p 'test_g3_signoff_handoff.py'
           python scripts/ci/render-g4-readiness-report.py
           python -m unittest discover -s tests -p 'test_g4_unified_readiness.py'
+          python scripts/ci/build-g4-pst-typed-preview.py
+          python -m unittest discover -s tests -p 'test_g4_pst_typed_preview.py'
           python -m unittest discover -s tests -p 'test_g3_business_goal_coverage.py'
           python -m unittest discover -s tests -p 'test_g3_dmo_review_summary.py'
           python scripts/ci/verify-bc-timestamp-sql-readonly.py
           python -m unittest discover -s tests -p 'test_bc_timestamp_sql_readonly.py'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: g4-pst-v04-offline-preview-only
+          path: build/g4-pst-typed-preview/
+          if-no-files-found: error
 
   g3-mysql-sandbox:
     name: G3 atomic DB sandbox (${{ matrix.database }})
