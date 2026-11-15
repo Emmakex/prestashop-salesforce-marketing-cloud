@@ -69,6 +69,20 @@ try {
             'marketing_sends_authorized' => false,
         ];
     }
+    // PST-only Data Stream inventory, with one fixed connectionName-filtered
+    // GET. Empty results are scoped evidence, NOT approval or global absence.
+    try {
+        $metadata['pst_stream_presence'] = $probe->inspectPstStreamPresence();
+    } catch (Throwable $streamError) {
+        $metadata['pst_stream_presence'] = [
+            'status' => 'pst_filtered_stream_metadata_review_only',
+            'state' => 'unverified_request_error',
+            'data_stream_creation_authorized' => false,
+            'dlo_dmo_mapping_save_authorized' => false,
+            'data_360_ingestion_authorized' => false,
+            'marketing_sends_authorized' => false,
+        ];
+    }
     unset($core, $auth, $probe);
     $evidence['status'] = 'metadata_read_success_review_only';
     $evidence['catalog'] = $metadata;

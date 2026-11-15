@@ -100,6 +100,7 @@ jobs:
           php tests/g3-dlo-dmo-relationship-contract.php
           php tests/g3-tenant-dmo-catalog-contract.php
           php tests/g3-dmo-mapping-metadata-contract.php
+          php tests/g3-pst-stream-presence-contract.php
           php tests/data-cloud-batch-contract.php
           php tests/data-cloud-timestamp-contract.php
           php tests/data-cloud-timestamp-quality-contract.php

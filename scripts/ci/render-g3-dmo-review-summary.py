@@ -195,6 +195,49 @@ def render(evidence):
             + " |"
         )
 
+    pst = catalog.get("pst_stream_presence")
+    pst = pst if isinstance(pst, dict) else {}
+    pst_safe = (
+        pst.get("status") == "pst_filtered_stream_metadata_review_only"
+        and all(pst.get(k) is False for k in (
+            "full_tenant_stream_inventory_certified",
+            "pst_stream_absence_certified",
+            "pst_stream_schema_approved",
+            "data_stream_creation_authorized",
+            "dlo_dmo_mapping_save_authorized",
+            "data_360_ingestion_authorized",
+            "marketing_sends_authorized",
+        ))
+    )
+    state = pst.get("state") if pst_safe else None
+    state_label = {
+        "filtered_page_empty_review_only": "GET 200: primera página vacía (filtro PST)",
+        "filtered_page_items_observed_review_only": "GET 200: elementos de stream observados",
+        "unverified_http_403": "GET 403: acceso no autorizado",
+        "unverified_http_404": "GET 404: recurso no encontrado o no expuesto",
+    }.get(state, "Sin verificar")
+    stream_count = pst.get("first_page_count")
+    stream_count_label = (
+        str(stream_count) if type(stream_count) is int
+        and 0 <= stream_count <= 200 and state in (
+            "filtered_page_empty_review_only",
+            "filtered_page_items_observed_review_only"
+        ) else "Sin verificar"
+    )
+    lines += [
+        "",
+        "### Conector PST → Data Streams (solo GET filtrado por connectionName)",
+        "",
+        "| Origen | Respuesta | Streams visibles en página | ¿Inventario global certificado? |",
+        "|---|---|---:|---|",
+        "| ABH_PrestaShop_Data_Cloud | " + state_label + " | "
+        + stream_count_label + " | No |",
+        "",
+        "**Interpretación:** una primera página vacía indica únicamente que el"
+        " filtro exacto no devolvió streams en esa consulta; no certifica"
+        " ausencia en otros Data Spaces ni autoriza crear streams.",
+    ]
+
     lines += [
         "",
         "**Importante:** estas cuentas no certifican un mapeo desde PST."

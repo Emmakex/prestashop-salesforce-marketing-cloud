@@ -8,6 +8,7 @@ on:
       - 'tests/live/g3-tenant-dmo-catalog.php'
       - 'tests/review/G3TenantDmoCatalogProbe.php'
       - 'tests/g3-dmo-mapping-metadata-contract.php'
+      - 'tests/g3-pst-stream-presence-contract.php'
       - 'scripts/ci/render-g3-dmo-review-summary.py'
       - 'scripts/ci/render-g4-readiness-report.py'
       - 'config/g3-abh-technical-closure-candidate.json'
@@ -56,6 +57,7 @@ jobs:
           php -l tests/live/g3-tenant-dmo-catalog.php
           php tests/g3-tenant-dmo-catalog-contract.php
           php tests/g3-dmo-mapping-metadata-contract.php
+          php tests/g3-pst-stream-presence-contract.php
       - name: Inspect fixed DMO metadata allowlist (GET only)
         env:
           G3_TENANT_DMO_READ_ONLY: yes_metadata_only

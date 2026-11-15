@@ -153,6 +153,54 @@ class G3DmoOwnerReviewSummaryTests(unittest.TestCase):
         self.assertNotIn("secret@invalid.local", actual)
         self.assertIn("Sin verificar", actual)
 
+    def test_pst_stream_filtered_empty_never_becomes_global_absence(self):
+        candidate = evidence()
+        candidate["catalog"]["pst_stream_presence"] = {
+            "status": "pst_filtered_stream_metadata_review_only",
+            "state": "filtered_page_empty_review_only",
+            "first_page_count": 0,
+            "full_tenant_stream_inventory_certified": False,
+            "pst_stream_absence_certified": False,
+            "pst_stream_schema_approved": False,
+            "data_stream_creation_authorized": False,
+            "dlo_dmo_mapping_save_authorized": False,
+            "data_360_ingestion_authorized": False,
+            "marketing_sends_authorized": False,
+            "label": "private@example.invalid",
+        }
+        rendered = MODULE.render(candidate)
+        self.assertIn("GET 200: primera página vacía", rendered)
+        self.assertIn("No |", rendered)
+        self.assertNotIn("private@example.invalid", rendered)
+        candidate["catalog"]["pst_stream_presence"]["pst_stream_absence_certified"] = True
+        rendered = MODULE.render(candidate)
+        self.assertIn("Sin verificar", rendered)
+        self.assertNotIn("primera página vacía", rendered)
+
+    def test_pst_stream_http_denied_and_untrusted_counts(self):
+        candidate = evidence()
+        pst = candidate["catalog"]["pst_stream_presence"] = {
+            "status": "pst_filtered_stream_metadata_review_only",
+            "state": "unverified_http_403",
+            "first_page_count": "private@example.invalid",
+            "full_tenant_stream_inventory_certified": False,
+            "pst_stream_absence_certified": False,
+            "pst_stream_schema_approved": False,
+            "data_stream_creation_authorized": False,
+            "dlo_dmo_mapping_save_authorized": False,
+            "data_360_ingestion_authorized": False,
+            "marketing_sends_authorized": False,
+        }
+        rendered = MODULE.render(candidate)
+        self.assertIn("GET 403: acceso no autorizado", rendered)
+        self.assertNotIn("private@example.invalid", rendered)
+        pst["state"] = "unverified_http_404"
+        rendered = MODULE.render(candidate)
+        self.assertIn("GET 404: recurso no encontrado", rendered)
+        pst["state"] = "private@example.invalid"
+        rendered = MODULE.render(candidate)
+        self.assertNotIn("private@example.invalid", rendered)
+
     def test_source_is_read_only_no_external_calls(self):
         source = PATH.read_text(encoding="utf-8")
         for forbidden in (
