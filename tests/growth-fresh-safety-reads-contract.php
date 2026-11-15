@@ -121,9 +121,20 @@ function freshSignals()
 }
 function freshSafeguards($out)
 {
-    freshAssert($out['marketing_sends_authorized'] === false
-        && $out['data_cloud_ingestion_authorized'] === false,
+    // Legacy local readers and the cart gate name the same denied
+    // capability differently. Require the name that each output exposes.
+    freshAssert(isset($out['marketing_sends_authorized'])
+        && $out['marketing_sends_authorized'] === false,
         'unapproved_dispatch');
+    $ingestionKeys = 0;
+    foreach (['data_360_ingestion_authorized',
+        'data_cloud_ingestion_authorized'] as $key) {
+        if (array_key_exists($key, $out)) {
+            ++$ingestionKeys;
+            freshAssert($out[$key] === false, 'unapproved_ingestion');
+        }
+    }
+    freshAssert($ingestionKeys > 0, 'missing_ingestion_denial');
     $dump = json_encode($out);
     foreach (['private@example.invalid', 'secret', '777',
         'id_customer', 'customer_id', 'source_namespace'] as $s) {
