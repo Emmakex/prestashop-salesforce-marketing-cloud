@@ -175,8 +175,13 @@ def render(evidence):
         entry = mapping_objects.get(name) if mapping_safe else None
         entry = entry if isinstance(entry, dict) else {}
         state = entry.get("state")
-        state_label = ("Observado" if state == "mapping_metadata_observed"
-                       else "Sin verificar")
+        # Do not echo arbitrary tenant strings, URLs or mapping identifiers.
+        # 404 is not proof of the absence of *all* possible mapping paths.
+        state_label = {
+            "mapping_metadata_observed": "GET 200: observado",
+            "unverified_http_403": "GET 403: acceso no autorizado",
+            "unverified_http_404": "GET 404: mapeo no encontrado o recurso no expuesto",
+        }.get(state, "Sin verificar")
         count = entry.get("visible_mapping_count")
         active = entry.get("visible_active_mapping_count")
         def safe_count(value):

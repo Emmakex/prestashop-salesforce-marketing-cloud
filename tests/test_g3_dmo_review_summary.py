@@ -118,6 +118,41 @@ class G3DmoOwnerReviewSummaryTests(unittest.TestCase):
         self.assertIn("Visible; ACTIVE no confirmado", summary)
         self.assertNotIn("aprobado automáticamente", summary)
 
+    def test_mapping_http_status_is_bounded_and_never_authorizes(self):
+        candidate = evidence()
+        objs = candidate["catalog"]["object_mappings"] = {
+            "status": "fixed_dmo_mapping_metadata_review_only",
+            "objects": {
+                "Individual": {
+                    "state": "unverified_http_403",
+                    "http_status_code": 403,
+                    "visible_mapping_count": None,
+                    "visible_active_mapping_count": None,
+                },
+                "SalesOrder": {
+                    "state": "unverified_http_404",
+                    "http_status_code": 404,
+                    "visible_mapping_count": None,
+                    "visible_active_mapping_count": None,
+                },
+            },
+            "field_mapping_activation_approved": False,
+            "dlo_dmo_mapping_save_authorized": False,
+            "identity_stitching_authorized": False,
+            "schema_upload_authorized": False,
+            "data_360_ingestion_authorized": False,
+            "marketing_sends_authorized": False,
+        }
+        actual = MODULE.render(candidate)
+        self.assertIn("GET 403: acceso no autorizado", actual)
+        self.assertIn("GET 404: mapeo no encontrado o recurso no expuesto", actual)
+        self.assertNotIn("mapeo aprobado", actual)
+        self.assertIn("NO aprobación", actual)
+        objs["objects"]["Individual"]["state"] = "secret@invalid.local"
+        actual = MODULE.render(candidate)
+        self.assertNotIn("secret@invalid.local", actual)
+        self.assertIn("Sin verificar", actual)
+
     def test_source_is_read_only_no_external_calls(self):
         source = PATH.read_text(encoding="utf-8")
         for forbidden in (
