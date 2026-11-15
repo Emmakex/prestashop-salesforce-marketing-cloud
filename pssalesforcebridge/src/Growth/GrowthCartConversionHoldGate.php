@@ -164,6 +164,28 @@ final class GrowthCartConversionHoldGate
         return $result;
     }
 
+    /**
+     * Native PrestaShop 1.7/8/9 read-only bridge for the complete hold
+     * composition. Every query bypasses executeS cache, including the second
+     * purchase check; no hooks, sender, token, queue, email or writes.
+     *
+     * A fresh SELECT is NOT a transactional dispatch fence. Purchase or
+     * opt-out may still happen after these reads, so sends remain forbidden.
+     */
+    public static function inspectPrestaShopWithLocalCustomer(
+        $shopId, $cartId, $customerId, array $signals
+    ) {
+        self::validateSignals($signals);
+        if (!defined('_DB_PREFIX_') || !class_exists('Db')) {
+            throw new RuntimeException('growth_cart_prestashop_unavailable');
+        }
+        return self::inspectWithLocalCustomer(
+            $shopId, $cartId, $customerId, function ($sql) {
+                return \Db::getInstance()->executeS($sql, true, false);
+            }, _DB_PREFIX_, $signals
+        );
+    }
+
     private static function validateSignals(array $signals)
     {
         $keys = array_keys($signals);

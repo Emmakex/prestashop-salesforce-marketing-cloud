@@ -112,6 +112,7 @@ jobs:
           php tests/growth-local-order-presence-contract.php
           php tests/growth-cart-conversion-hold-gate-contract.php
           php tests/growth-local-customer-hold-contract.php
+          php tests/growth-fresh-safety-reads-contract.php
           php tests/growth-explicit-provider-routing-contract.php
           php tests/growth-provider-outbox-bridge-contract.php
           php tests/growth-blocked-hook-adapter-contract.php

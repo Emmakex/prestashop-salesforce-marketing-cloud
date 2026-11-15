@@ -90,7 +90,9 @@ final class LocalOrderPresenceReader
             throw new RuntimeException('growth_order_prestashop_unavailable');
         }
         return self::inspect($shopId, $cartId, function ($sql) {
-            return \Db::getInstance()->executeS($sql);
+            // PrestaShop executeS($sql, $array, $use_cache) defaults to
+            // a cached read. Pre-send evidence must observe a fresh SELECT.
+            return \Db::getInstance()->executeS($sql, true, false);
         }, _DB_PREFIX_);
     }
 
