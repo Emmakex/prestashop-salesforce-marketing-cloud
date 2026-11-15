@@ -175,7 +175,7 @@ class G3DmoOwnerReviewSummaryTests(unittest.TestCase):
         candidate["catalog"]["pst_stream_presence"]["pst_stream_absence_certified"] = True
         rendered = MODULE.render(candidate)
         self.assertIn("Sin verificar", rendered)
-        self.assertNotIn("primera página vacía", rendered)
+        self.assertIn("| ABH_PrestaShop_Data_Cloud | Sin verificar | Sin verificar | No |", rendered)
 
     def test_pst_stream_http_denied_and_untrusted_counts(self):
         candidate = evidence()
