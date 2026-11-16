@@ -33,22 +33,29 @@ final class GrowthCartLastLocalExclusionReview
         $purchaseUnknown = $nativeOrder === 'unknown'
             || $ledgerOrder === 'unknown';
 
-        // A purchase always has priority even if a customer read also fails.
+        // Prioritize a purchase as the state, but preserve ALL independent
+        // exclusion reasons even if another source is unavailable.
+        $reasons = [];
         if ($purchaseFound) {
             $state = 'purchase_found_in_last_local_review';
-            $reasons = ['purchase_found_in_last_local_review'];
+            $reasons[] = 'purchase_found_in_last_local_review';
         } elseif ($purchaseUnknown) {
             $state = 'last_local_purchase_source_unverified';
-            $reasons = ['last_local_purchase_source_unverified'];
+            $reasons[] = 'last_local_purchase_source_unverified';
         } elseif ($customerState === 'known_negative') {
             $state = 'last_local_customer_negative';
-            $reasons = ['last_local_customer_negative'];
         } elseif ($customerState !== 'no_local_negative_observed') {
             $state = 'last_local_customer_source_unverified';
-            $reasons = ['last_local_customer_source_unverified'];
         } else {
             $state = 'last_local_no_negative_observed_review_only';
-            $reasons = ['last_local_check_not_atomic_with_external_delivery'];
+        }
+        if ($customerState === 'known_negative') {
+            $reasons[] = 'last_local_customer_negative';
+        } elseif ($customerState !== 'no_local_negative_observed') {
+            $reasons[] = 'last_local_customer_source_unverified';
+        }
+        if (!$reasons) {
+            $reasons[] = 'last_local_check_not_atomic_with_external_delivery';
         }
 
         // No raw customer details, source ID, SQL, email, consent state,
