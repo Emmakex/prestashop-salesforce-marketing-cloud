@@ -98,6 +98,7 @@ jobs:
           php tests/growth-pst-synthetic-preview-contract.php
           php tests/g3-growth-typed-identity-contract.php
           php tests/g4-typed-pst-payload-contract.php
+          php tests/g5-synthetic-actions-test-contract.php
           php tests/g3-dlo-dmo-relationship-contract.php
           php tests/g3-tenant-dmo-catalog-contract.php
           php tests/g3-dmo-mapping-metadata-contract.php
