@@ -115,10 +115,22 @@ foreach(['https://evil.example.com','http://tenant.my.salesforce.com',
 topologyReject(function()use($origin,$fake){
     G6ConsentSourceTopologyProbe::inspect($origin,'short',$fake);
 },'g6_topology_invalid_token');
-topologyReject(function()use($origin,$token){
-    G6ConsentSourceTopologyProbe::inspect($origin,$token,
-        function(){return ['status'=>'200','body'=>'{}'];});
-},'g6_topology_invalid_http_response');
+// Invalid response types are also per-GET failures, never exceptions
+// that erase the other source's result.
+$invalidHttpCalls=0;
+$invalidHttp=G6ConsentSourceTopologyProbe::inspect($origin,$token,
+    function()use(&$invalidHttpCalls) {
+        ++$invalidHttpCalls;
+        return ['status'=>'200','body'=>'{"private":"raw"}'];
+    });
+topologyAssert($invalidHttpCalls===2
+    && $invalidHttp['csc_mapping']['state']==='mapping_transport_unverified'
+    && $invalidHttp['consent_related_streams']['state']==='stream_transport_unverified'
+    && $invalidHttp['csc_mapping']['transport_error_class']==='other'
+    && $invalidHttp['consent_related_streams']['transport_error_class']==='other'
+    && strpos(json_encode($invalidHttp),'raw')===false
+    && $invalidHttp['marketing_sends_authorized']===false,
+    'invalid_http_shape_not_quarantined');
 // One cURL timeout or unsafe exception must not erase the other fixed GET.
 // Diagnostics reveal only bounded classes, never exception text.
 $oneTimeoutCalls=[];
