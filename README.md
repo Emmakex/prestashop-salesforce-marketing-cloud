@@ -27,6 +27,8 @@ El **15/11/2026** el propietario ha confirmado que acepta los tres puntos G3 y n
 
 **G4 — compatibilidad de payload:** el nuevo constructor `pssalesforcebridge/src/DataCloud/GrowthTypedPstPayloadBuilder.php` valida los registros tipados v0.4 y `scripts/ci/build-g4-pst-typed-preview.py` exige paridad del YAML con los payloads sintéticos de PHP para PrestaShop 1.7/8/9. El archivo OpenAPI es un contrato de **campos y tipos**; la semántica tipada de PK/FK se comprueba en el constructor (el esquema no codifica esa restricción). No se ha publicado en PST ni existe aún ingesta autorizada.
  
+**Estado en Salesforce a 16/11/2026:** G4 estructural finalizado (PST + dos streams activos + dos mapeos LISTO + relación `PSOrder → Individual` N:1). Evidencia [UI G4](config/g4-abh-tenant-ui-evidence.json). **Siguiente paso: G5 sintético no persistente** mediante [GitHub Actions `/actions/test` manual](docs/G5_ABH_PST_SYNTHETIC_VALIDATION.md), reutilizando las credenciales protegidas existentes. No instalar todavía 0.8.0 en Barcelona Confort ni activar ingesta/envíos.
+
 ## Puertas de entrega
 
 | Paso | Estado |

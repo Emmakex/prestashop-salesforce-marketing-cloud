@@ -1,5 +1,8 @@
 # G4 — Publicación del esquema PST v0.4 en Salesforce Data Cloud
 
+**ACTUALIZACIÓN de estado (16/11/2026):** las pantallas reales aportadas por el propietario verifican que el esquema ya está guardado, los dos streams están activos y ambos mapeos DLO→DMO aparecen `LISTO`; la relación `PST-PSOrder.customer_source_key` ManyToOne `Individual.Individual Id` está guardada. Referencia: `config/g4-abh-tenant-ui-evidence.json`. **No repetir los pasos de publicación descritos abajo**: quedan como runbook histórico reproducible para otras tiendas. El siguiente paso del proyecto es G5 validación sintética `/actions/test`. Sin ingesta real ni campañas.
+
+
 **Conector existente:** `ABH_PrestaShop_Data_Cloud` (alias PST).
 **Producto exclusivo:** Salesforce Marketing Cloud Growth + Data Cloud.
 **Decisión del propietario:** los tres grupos G3 están aceptados; ver `config/g3-owner-acceptance.json`. No volver a solicitar esa aceptación genérica.
