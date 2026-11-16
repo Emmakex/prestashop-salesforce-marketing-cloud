@@ -35,6 +35,8 @@ El **15/11/2026** el propietario ha confirmado que acepta los tres puntos G3 y n
 
 **Siguiente corte G6:** inventario protegido de suscripciones Core con **dos GET de configuración, sin datos personales**, y confirmación separada del canal Email en Growth. Ver [G6 inventario de suscripciones](docs/G6_ABH_CORE_SUBSCRIPTION_INVENTORY.md). No ejecuta G5, que sigue bloqueado para POST, ni habilita marketing.
 
+**G6, evidencia 16/11/2026:** la interfaz ABH Growth muestra una suscripción **Marketing** con canal **Correo electrónico**. Se añade una comprobación protegida de metadatos del DMO CSC, exclusivamente GET, sin contactos ni envíos. [Evidencia y procedimiento G6](docs/G6_ABH_MARKETING_EMAIL_CSC_HANDOFF.md). G5 sigue en cuarentena para POST y BC 0.7.1 Test no se modifica.
+
 ## Puertas de entrega
 
 | Paso | Estado |
