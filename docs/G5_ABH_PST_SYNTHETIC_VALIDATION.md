@@ -26,22 +26,28 @@ Son 11 campos planos por objeto, con los nombres del esquema PST publicado, **no
 El trabajo técnico de G5 se reparte en dos evidencias distintas:
 
 1. **CI exact-head:** usa transporte simulado para demostrar contrato, payloads y rutas. Sin conexión al tenant.
-2. **G5 Actions Test manual:** usa OAuth Core + intercambio token Data Cloud YA configurados, hace exactamente 2 llamadas `/actions/test` y registra únicamente código HTTP y nombres de objeto. No imprime el token, el host del tenant, el JSON de entrada, el cuerpo de error ni PII.
+2. **G5 Actions Test manual (en cuarentena por 202):** el antiguo workflow intentó validar, devolvió 202 en PSCustomer y se bloqueó. El dispatch actual permite **únicamente** comprobar el host con OAuth; sin payload y sin llamadas al endpoint de datos.
 
-## Una ejecución manual, sin solicitar credenciales
+## Incidente HTTP 202 y modo seguro vigente (16/11/2026)
 
-Una vez fusionado el PR y con CI/runtime verde, abrir:
+La ejecución manual [#43849592253](https://github.com/Emmakex/prestashop-salesforce-marketing-cloud/actions/runs/43849592253) **NO pasó**. En el primer `/actions/test` (PSCustomer) se recibió **202 Accepted** y el ejecutor hizo fail-closed; PSOrder no se llegó a llamar. Salesforce documenta 200 como éxito de validación síncrona, y 202 como aceptación de una ingesta asíncrona. **No convalidar 202, no reintentar el POST**, no afirmar que se ingirió ningún cliente. En las capturas del propietario los dos DLO y los DLO de problemas mostraban 0 registros, pero su última actualización observada era anterior al workflow. Evidencia saneada en `config/g5-pst-incident-202.json`.
 
-[**GitHub Actions · G5 PST Synthetic Salesforce Actions Test Only**](https://github.com/Emmakex/prestashop-salesforce-marketing-cloud/actions/workflows/g5-pst-actions-test-only.yml)
+El archivo oficial *Object Endpoints* descargado del conector PST enumera `POST /PSCustomer` y `POST /PSOrder` con 202 para **upsert real**. No enumera `/actions/test` porque el YAML solo representa la ruta de ingesta. Un error 202 en la ruta de validación **sigue sin estar explicado**; el YAML no justifica aceptar el status.
 
-Seleccionar **Run workflow → main → confirm_validation_only: yes_synthetic_actions_test_only → Run workflow**.
+## Siguiente acción permitida: attestation del host, sin datos ni solicitudes al endpoint
 
-Se reutiliza el entorno protegido existente `salesforce-growth-certification` y sus variables/secretos. No abrir el archivo de secretos ni copiarlos al chat. El workflow **no se ejecuta automáticamente en push o PR**; la conexión de GitHub disponible en esta sesión no tiene acción para lanzar `workflow_dispatch`.
+Se ha sustituido temporalmente el dispatch de validación por una comparación read-only del hostname. Abrir la [acción G5 PST Host Diagnostic (No Data)](https://github.com/Emmakex/prestashop-salesforce-marketing-cloud/actions/workflows/g5-pst-actions-test-only.yml) después de integrar el PR correctivo; seleccionar:
 
-Resultado esperado:
-- Job completo **success** si ambos endpoints devuelven HTTP 200 y no hay informe de errores.
-- Artifact `g5-pst-actions-test-sanitized-...` con `PSCustomer` y `PSOrder`, código 200 y estado, sin datos privados.
-- Si falla, status y código de error saneado. El cuerpo de validación puede contener datos y nunca se publica.
+**Run workflow → main → `action: diagnose_host_no_payload` → Run workflow**.
+
+El job hace exclusivamente **Core OAuth + Data Cloud token exchange** (G1/G2 ya configurados), compara la URL normalizada del token de Data Cloud con el **SHA-256 del origen exacto** descargado del conector PST, y reconstruye por código las rutas estrictas con `/actions/test`. No hace HTTP POST de datos, no solicita al endpoint `/actions/test` y **no ejecuta ni siquiera una petición de validación**. No muestra ni almacena host, tokens, respuesta de Salesforce ni datos personales. El artifact `g5-pst-host-diagnostic-...` solo contiene `tenant_host_matches_official_pst_yaml: true/false`, `test_paths_verified_offline: true/false`, y códigos de estado saneados.
+
+**Interpretación**:
+- `host_matches=false`: posible discrepancia entre el tenant que devuelve OAuth y el origen del conector PST; no continuar, revisar la configuración de integración y permisos.
+- `host_matches=true`: host coincide; queda una anomalía de enrutamiento/respuesta en Salesforce. No se arregla aceptando 202. El siguiente paso será un diagnóstico con soporte Salesforce y evidencia de respuesta **sin valores sensibles**, o un ensayo explícitamente aislado con aprobación adicional, no un nuevo POST a ciegas.
+- Ambos resultados **mantienen G5 sin validar** hasta recibir evidencia real de 200 de `/actions/test`.
+
+El antiguo ejecutor `tests/live/g5-pst-actions-test-only.php` se conserva para auditoría de contrato, pero el workflow manual ya **no lo invoca**, y el gate exige que no quede ningún modo de dispatch para hacer POST sintéticos mientras permanezca el incidente.
 
 ## Limitación deliberada y siguiente corte
 
