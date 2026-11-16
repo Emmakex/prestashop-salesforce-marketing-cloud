@@ -118,6 +118,7 @@ jobs:
           php tests/g7-cart-inactivity-60m-contract.php
           php tests/g7-snapshot-equivalence-contract.php
           php tests/g7-legacy-cart-snapshot-sha1-contract.php
+          php tests/g7-fresh-native-legacy-snapshot-contract.php
           php tests/growth-local-customer-hold-contract.php
           php tests/g6-growth-csc-suppression-contract.php
           php tests/g6-core-subscription-inventory-contract.php
