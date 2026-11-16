@@ -2,6 +2,8 @@
 
 **Decisión del propietario 14/11/2026:** se elimina la arquitectura multiproveedor. Este proyecto conecta tiendas PrestaShop **1.7.8.x, 8.x y 9.x exclusivamente** con Salesforce **Marketing Cloud Growth sobre Salesforce Core + Data Cloud**. No ofrecer otros destinos Salesforce, selector de proveedores, transportes alternativos ni rutas de fallback.
 
+**Avance observado 16/11/2026 — G4 completado en Salesforce:** el propietario mostró el esquema PST guardado, streams PSCustomer/PSOrder activos, mapeos LISTO y relación de pedidos N:1 a Individual. Referencia de evidencia: `config/g4-abh-tenant-ui-evidence.json`. Los párrafos históricos de G2/G3 más abajo son fotografías del estado anterior y **no deben reabrir esas tareas**. La fase actual es **G5: validación `/actions/test` con fixtures sintéticos**; solo ese endpoint no persistente, sin activar ingesta ni campañas. Ver `docs/G5_ABH_PST_SYNTHETIC_VALIDATION.md`.
+
 ## 1. Fuente de verdad
 
 - Piloto: **ABH / Barcelona Confort**. El módulo instalado y verificado allí es **0.7.1 Test**. Este repositorio prepara **0.8.0 Growth-only**, **no instalado todavía**.
