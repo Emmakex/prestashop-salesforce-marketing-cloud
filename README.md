@@ -31,6 +31,8 @@ El **15/11/2026** el propietario ha confirmado que acepta los tres puntos G3 y n
 
 **Estado en Salesforce a 16/11/2026:** G4 estructural finalizado (PST + dos streams activos + dos mapeos LISTO + relación `PSOrder → Individual` N:1). Evidencia [UI G4](config/g4-abh-tenant-ui-evidence.json). **Siguiente paso: G5 sintético no persistente** mediante [GitHub Actions `/actions/test` manual](docs/G5_ABH_PST_SYNTHETIC_VALIDATION.md), reutilizando las credenciales protegidas existentes. No instalar todavía 0.8.0 en Barcelona Confort ni activar ingesta/envíos.
 
+**G6 · Sin envíos:** [control read-only de consentimiento y supresión](docs/G6_GROWTH_CSC_CONSENT_SUPPRESSION.md). Salesforce Growth usa Communication Subscription Consent, no los flags `newsletter`/`optin` como permiso de campaña. El nuevo componente comprueba scope/frescura de evidencia CSC inyectada, da prioridad a las bajas y no habilita envíos, incluso con una señal positiva sintética. G5 continúa sin POST por HTTP 202 no aclarado.
+
 ## Puertas de entrega
 
 | Paso | Estado |
