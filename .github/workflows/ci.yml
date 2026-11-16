@@ -114,6 +114,7 @@ jobs:
           php tests/g3-growth-order-evidence-contract.php
           php tests/growth-local-order-presence-contract.php
           php tests/growth-cart-conversion-hold-gate-contract.php
+          php tests/g7-native-cart-recovery-hold-contract.php
           php tests/growth-local-customer-hold-contract.php
           php tests/g6-growth-csc-suppression-contract.php
           php tests/g6-core-subscription-inventory-contract.php
