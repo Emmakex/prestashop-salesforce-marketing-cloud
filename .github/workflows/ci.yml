@@ -118,6 +118,7 @@ jobs:
           php tests/g6-growth-csc-suppression-contract.php
           php tests/g6-core-subscription-inventory-contract.php
           php tests/g6-csc-dmo-metadata-contract.php
+          php tests/g6-consent-topology-contract.php
           php tests/growth-fresh-safety-reads-contract.php
           php tests/growth-explicit-provider-routing-contract.php
           php tests/growth-provider-outbox-bridge-contract.php
