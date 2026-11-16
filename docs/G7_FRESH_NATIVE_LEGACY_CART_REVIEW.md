@@ -36,4 +36,6 @@ El adaptador nativo lee el `PS_TIMEZONE` de la tienda específica usando `ShopTi
 - **Consentimiento:** `newsletter` y `optin` **no equivalen** al CSC vigente de Marketing Cloud Growth para canal y finalidad. El lector real CSC y el consentimiento de emisión siguen pendientes por G6.
 - **Transporte:** G5 `/actions/test` permanece bloqueado por HTTP 202. Ningún Flow, envío, Data Stream PSCart, recovery URL ni ingesta.
 
+**Corte posterior completado en revisión:** [última exclusión local tras el snapshot](G7_LAST_LOCAL_EXCLUSION_RECHECK.md), tres SELECT frescos más para compra/baja; no confundirlo con atomicidad externa ni un envío habilitado.
+
 **Siguiente trabajo:** revisar la validez de datos históricos y el *fence* justo antes del despacho mediante pruebas de una operación local atómica y de la supresión del canal Growth. Cualquier transición a envíos necesita aprobación explícita, contrato de datos y el servicio oficial de consentimiento de Salesforce.

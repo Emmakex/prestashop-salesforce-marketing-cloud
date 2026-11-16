@@ -375,6 +375,56 @@ final class GrowthCartConversionHoldGate
         return $gate;
     }
 
+    /**
+     * G7 last local exclusion review. Existing 7 uncached SELECTs and native
+     * SHA-1 snapshot reconstruction FIRST, followed by exactly 3 fresh
+     * SELECTs (customer, orders, order ledger) as the last local operation.
+     *
+     * This does not claim a transactional pre-send fence: SQL and native
+     * object reads are non-atomic, while Growth send is remote and disabled.
+     */
+    public static function inspectPrestaShopWithFreshLegacyCartFinalReview(
+        $shopId, $cartId, $customerId, array $signals, $capturedHash
+    ) {
+        self::validateSignals($signals);
+        $report = self::inspectPrestaShopWithFreshLegacyCartReview(
+            $shopId, $cartId, $customerId, $signals, $capturedHash
+        );
+        $last = GrowthCartLastLocalExclusionReview::inspectPrestaShop(
+            $shopId, $cartId, $customerId
+        );
+        $report['status'] = 'hold_for_review';
+        $report['last_local_exclusion_state'] =
+            $last['last_local_exclusion_state'];
+        $report['last_local_purchase_observed'] =
+            $last['purchase_observed_in_last_check'];
+        $report['last_local_source_uncertain'] =
+            $last['last_local_source_uncertain'];
+        $report['last_local_check_count'] = $last['last_local_checks'];
+        $report['last_local_customer_state'] =
+            $last['last_customer_source_state'];
+        $report['last_local_native_order_state'] =
+            $last['last_native_order_state'];
+        $report['last_local_ledger_order_state'] =
+            $last['last_connector_order_state'];
+        $report['reasons'] = array_values(array_unique(array_merge(
+            $report['reasons'], $last['reasons']
+        )));
+        $report['purchase_found_locally'] =
+            $report['purchase_found_locally']
+            || $last['purchase_observed_in_last_check'];
+        $report['purchase_state_unknown'] =
+            $report['purchase_state_unknown']
+            || $last['last_purchase_source_uncertain'];
+        $report['final_send_exclusion_fence_certified'] = false;
+        $report['race_with_future_dispatch_closed'] = false;
+        $report['salesforce_send_time_consent_certified'] = false;
+        $report['recovery_link_creation_authorized'] = false;
+        $report['data_cloud_ingestion_authorized'] = false;
+        $report['marketing_sends_authorized'] = false;
+        return $report;
+    }
+
     private static function validateSignals(array $signals)
     {
         $keys = array_keys($signals);

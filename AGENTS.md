@@ -1,5 +1,8 @@
 # AGENTS — PrestaShop ↔ Marketing Cloud Growth + Data Cloud (único producto)
 
+**G7 última comprobación local (16/11/2026):** `GrowthCartLastLocalExclusionReview` reutiliza exactamente 1 SELECT cliente y 2 SELECT de pedidos nativos/ledger **después** de la revisión fresca de snapshot SHA-1; `GrowthCartConversionHoldGate::inspectPrestaShopWithFreshLegacyCartFinalReview` compone los 7 SELECT anteriores + 3 nuevos, todos sin caché. Simula compra que aparece en tercer pase y baja después del snapshot. **NO es fence transaccional con Salesforce y NO habilita envíos**; no usar el outbox sandbox G3 para PSCart, no crear tabla ni cola paralela, no alterar hooks ni BC 0.7.1 Test. [Documento](docs/G7_LAST_LOCAL_EXCLUSION_RECHECK.md).
+
+
 **G7 productor fresco local (16/11/2026):** `GrowthLegacyCartFreshNativeReview` reconstruye el JSON original completo de 0.7.1 desde objetos nativos Cart/Customer/Currency/getProducts/getOrderTotal **solo en memoria**, con reglas originales de `marketing_optin` y SHA-1 CHAR40. Se compone con las 7 SELECT sin caché existentes mediante `GrowthCartConversionHoldGate::inspectPrestaShopWithFreshLegacyCartReview`, sin vincularlo a hooks, cron, worker o Salesforce. La lectura no verifica origen/autenticidad del `snapshot_hash` almacenado porque sigue inyectado; tampoco prueba zona horaria histórica, últimos 60 minutos comerciales, consentimiento Growth CSC o exclusión atómica con envío. Incluso hash idéntico = `hold_for_review`. Nunca exportar JSON, hash, PII ni reintroducir transportes históricos. [Guía](docs/G7_FRESH_NATIVE_LEGACY_CART_REVIEW.md).
 
 
