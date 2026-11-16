@@ -37,6 +37,8 @@ El **15/11/2026** el propietario ha confirmado que acepta los tres puntos G3 y n
 
 **G6, evidencia 16/11/2026:** la interfaz ABH Growth muestra una suscripción **Marketing** con canal **Correo electrónico**. Se añade una comprobación protegida de metadatos del DMO CSC, exclusivamente GET, sin contactos ni envíos. [Evidencia y procedimiento G6](docs/G6_ABH_MARKETING_EMAIL_CSC_HANDOFF.md). G5 sigue en cuarentena para POST y BC 0.7.1 Test no se modifica.
 
+**G6 topología, sin datos:** el DMO CSC fue certificado vía API pero no aparece en la UI asignada/explorador. Se incorpora diagnóstico de dos GET de metadatos (mapeos CSC y primera página de streams) que no realiza envíos ni lee consentimientos. [G6 topología](docs/G6_ABH_CONSENT_TOPOLOGY_READONLY.md). G5 permanece bloqueado por el 202 y BC 0.7.1 Test se conserva.
+
 ## Puertas de entrega
 
 | Paso | Estado |
