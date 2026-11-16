@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "incident": "g5_live_validation_received_unexpected_http_202",
+  "observed_on": "2026-11-16",
+  "source": "ABH_PrestaShop_Data_Cloud",
+  "first_workflow_run_url": "https://github.com/Emmakex/prestashop-salesforce-marketing-cloud/actions/runs/43849592253",
+  "first_workflow_sha": "7146858df7ed7e5c0deff0805b954fedd782e040",
+  "first_attempted_object": "PSCustomer",
+  "second_object_attempted": false,
+  "validation_path": "POST /api/v1/ingest/sources/ABH_PrestaShop_Data_Cloud/PSCustomer/actions/test",
+  "observed_status_code": 202,
+  "expected_validation_status_code": 200,
+  "backend_202_explanation_verified": false,
+  "owner_supplied_openapi_generated_from_connector": {
+    "contains_paths": [
+      "/PSCustomer",
+      "/PSOrder"
+    ],
+    "http_202_listed_for_upsert": true,
+    "contains_validation_path": false,
+    "canonical_origin_fingerprint_sha256": "c7571e2d2b114fe98f6d07d8f42a0558e240bd277f283ebb178358996efe66fd",
+    "raw_host_stored": false
+  },
+  "salesforce_ui_observation": {
+    "dlo_customer_visible_count": 0,
+    "dlo_order_visible_count": 0,
+    "problem_records_customer_visible_count": 0,
+    "problem_records_order_visible_count": 0,
+    "latest_displayed_customer_update_before_incident": true,
+    "zero_visible_records_proves_no_async_ingestion": false
+  },
+  "current_policy": {
+    "test_post_retry_permitted": false,
+    "real_ingestion_permitted": false,
+    "campaigns_permitted": false,
+    "permitted_next_operation": "oauth_only_token_host_fingerprint_comparison",
+    "manual_workflow_file": ".github/workflows/g5-pst-actions-test-only.yml"
+  }
+}
