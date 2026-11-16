@@ -1,3 +1,5 @@
+**G6 vínculo Core Marketing / Email (16/11/2026):** Solo una consulta Core protegida de `CommSubscriptionChannelType` filtrada por `CommunicationSubscription.Name='Marketing'`. Comprueba la asociación de configuración a un canal, sin certificar técnicamente que sea Email: ese dato sigue observado por la UI. No exporta IDs, ni consulta CSC personal, ni acredita Business Unit, ni habilita envíos. El workflow es manual sobre `main` tras CI. [Guía](docs/G6_MARKETING_EMAIL_CORE_BINDING_READONLY.md).
+
 **G7/G3 revisión versionada bloqueada (16/11/2026):** Solo CI: `G3GrowthBlockedVersionClaimReview` compara la versión `latest_accepted_sequence` bajo el mismo advisory lock de la outbox existente y `SELECT FOR UPDATE`. Compara exclusión local sintética (compra, baja, incierta), sin reclamar, persistir cancelación, habilitar PSCart ni permitir envíos. Tests MySQL 8/MariaDB 10.11; fuente [docs/G7_G3_BLOCKED_VERSION_CLAIM_REVIEW.md](docs/G7_G3_BLOCKED_VERSION_CLAIM_REVIEW.md). Nunca confundir esto con un fence transaccional de entrega Salesforce ni cambiar BC 0.7.1 Test.
 
 # AGENTS — PrestaShop ↔ Marketing Cloud Growth + Data Cloud (único producto)

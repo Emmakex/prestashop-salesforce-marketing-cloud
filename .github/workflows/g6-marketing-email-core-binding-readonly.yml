@@ -1,0 +1,66 @@
+name: G6 Marketing Email Core Binding Read Only
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'One bounded Salesforce Core configuration GET; no individual consent'
+        required: true
+        type: choice
+        options:
+          - marketing_email_config_get_only
+
+permissions:
+  contents: read
+
+concurrency:
+  group: g6-marketing-email-core-binding-readonly
+  cancel-in-progress: false
+
+jobs:
+  marketing-email-binding:
+    if: >-
+      github.repository == 'Emmakex/prestashop-salesforce-marketing-cloud' &&
+      github.ref == 'refs/heads/main' &&
+      inputs.mode == 'marketing_email_config_get_only'
+    name: Verify Marketing to Email Core association without consent rows
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    environment: salesforce-growth-certification
+    steps:
+      - name: Checkout exact main SHA
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Enforce exact repository and manual workflow
+        shell: bash
+        run: |
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          test "$GITHUB_REF" = "refs/heads/main"
+          test "$GITHUB_REPOSITORY" = "Emmakex/prestashop-salesforce-marketing-cloud"
+          test "$GITHUB_EVENT_NAME" = "workflow_dispatch"
+          test -f tests/live/g6-marketing-email-core-binding-readonly.php
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: curl
+          coverage: none
+      - name: Strict one-GET and redaction contract
+        run: php tests/g6-marketing-email-core-binding-contract.php
+      - name: Inspect bounded configuration relationship without personal data
+        env:
+          G6_CORE_BINDING_MODE: marketing_email_config_get_only
+          G6_CORE_BINDING_CONFIRM: ${{ inputs.mode }}
+          SF_GROWTH_ORG_URL: ${{ vars.SF_GROWTH_ORG_URL }}
+          SF_GROWTH_CLIENT_ID: ${{ secrets.SF_GROWTH_CLIENT_ID }}
+          SF_GROWTH_CLIENT_SECRET: ${{ secrets.SF_GROWTH_CLIENT_SECRET }}
+        run: php tests/live/g6-marketing-email-core-binding-readonly.php
+      - name: Publish sanitized flags only
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: g6-marketing-email-core-binding-${{ github.run_id }}-${{ github.run_attempt }}
+          path: g6-core-marketing-email-sanitized.json
+          if-no-files-found: ignore
+          retention-days: 14
