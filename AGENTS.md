@@ -2,6 +2,8 @@
 
 **Decisión del propietario 14/11/2026:** se elimina la arquitectura multiproveedor. Este proyecto conecta tiendas PrestaShop **1.7.8.x, 8.x y 9.x exclusivamente** con Salesforce **Marketing Cloud Growth sobre Salesforce Core + Data Cloud**. No ofrecer otros destinos Salesforce, selector de proveedores, transportes alternativos ni rutas de fallback.
 
+**Incidente G5 (16/11/2026):** el primer `/actions/test` recibió **HTTP 202**, que corresponde a aceptación de ingesta asíncrona y no certifica validación. Prohibido reintentar POST o aceptar 202 como éxito. La opción de GitHub Actions ha sido puesta en cuarentena y solo admite comparación del host Data Cloud obtenido por OAuth con la huella del servidor del YAML PST del propietario; sin llamadas de datos. Ver `config/g5-pst-incident-202.json` y `docs/G5_ABH_PST_SYNTHETIC_VALIDATION.md`.
+
 **Avance observado 16/11/2026 — G4 completado en Salesforce:** el propietario mostró el esquema PST guardado, streams PSCustomer/PSOrder activos, mapeos LISTO y relación de pedidos N:1 a Individual. Referencia de evidencia: `config/g4-abh-tenant-ui-evidence.json`. Los párrafos históricos de G2/G3 más abajo son fotografías del estado anterior y **no deben reabrir esas tareas**. La fase actual es **G5: validación `/actions/test` con fixtures sintéticos**; solo ese endpoint no persistente, sin activar ingesta ni campañas. Ver `docs/G5_ABH_PST_SYNTHETIC_VALIDATION.md`.
 
 ## 1. Fuente de verdad
