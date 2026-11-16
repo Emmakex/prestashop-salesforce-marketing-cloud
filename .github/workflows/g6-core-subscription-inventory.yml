@@ -1,0 +1,67 @@
+name: G6 Core Subscription Inventory Read Only
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'Core subscription configuration GET only; no customer/CSC data or writes'
+        required: true
+        type: choice
+        options:
+          - readonly_core_config_only
+
+permissions:
+  contents: read
+
+concurrency:
+  group: g6-abh-core-subscription-inventory
+  cancel-in-progress: false
+
+jobs:
+  core-subscription-inventory:
+    if: >-
+      github.repository == 'Emmakex/prestashop-salesforce-marketing-cloud' &&
+      github.ref == 'refs/heads/main' &&
+      inputs.mode == 'readonly_core_config_only'
+    name: Core CommSubscription GET-only (not Growth consent certification)
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    environment: salesforce-growth-certification
+    steps:
+      - name: Checkout exact SHA
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Pin repo, branch, commit, and read-only runner
+        shell: bash
+        run: |
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          test "$GITHUB_REF" = "refs/heads/main"
+          test "$GITHUB_REPOSITORY" = "Emmakex/prestashop-salesforce-marketing-cloud"
+          test "$GITHUB_EVENT_NAME" = "workflow_dispatch"
+          test -f tests/live/g6-core-subscription-inventory-only.php
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: curl
+          coverage: none
+      - name: Negative tests for fixed GET-only config inspection
+        run: php tests/g6-core-subscription-inventory-contract.php
+      - name: Inspect Salesforce Core subscription configuration only
+        env:
+          G6_SUBSCRIPTION_INVENTORY_MODE: readonly_core_config_only
+          G6_SUBSCRIPTION_INVENTORY_CONFIRM: ${{ inputs.mode }}
+          G6_SUBSCRIPTION_EVIDENCE_PATH: g6-abh-core-subscription-inventory.json
+          SF_GROWTH_ORG_URL: ${{ vars.SF_GROWTH_ORG_URL }}
+          SF_GROWTH_CLIENT_ID: ${{ secrets.SF_GROWTH_CLIENT_ID }}
+          SF_GROWTH_CLIENT_SECRET: ${{ secrets.SF_GROWTH_CLIENT_SECRET }}
+        run: php tests/live/g6-core-subscription-inventory-only.php
+      - name: Upload sanitized configuration flags
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: g6-core-subscription-inventory-${{ github.run_id }}-${{ github.run_attempt }}
+          path: g6-abh-core-subscription-inventory.json
+          if-no-files-found: ignore
+          retention-days: 14
