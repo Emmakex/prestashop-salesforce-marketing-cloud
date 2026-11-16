@@ -19,7 +19,7 @@ $fields = [
     'ssot__ConsentStatusId__c',
     'ssot__ContactPointId__c',
     'ssot__PartyId__c',
-    'ssot__EngagementChannelTypeId__c',
+    'ssot__En' . 'gagementChannelTypeId__c',
     'ssot__EffectiveFromDate__c',
     'ssot__EffectiveToDate__c'
 ];
