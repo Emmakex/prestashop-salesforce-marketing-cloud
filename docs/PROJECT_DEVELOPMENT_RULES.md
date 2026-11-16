@@ -10,7 +10,7 @@
 | G3 | Tres decisiones de dirección aceptadas por propietario; no repetirlas. Bases legales por finalidad no inferidas | ACEPTADO propietario, sin generalizar a consentimiento de campañas |
 | G4 | Esquema PST guardado, 2 Data Streams activos, 2 mapeos LISTO, relación pedido→Individual N:1 (capturas 16/11/2026) | **VERIFICADO estructural** |
 | G5 | `/actions/test` recibió 202, no 200. Host oficial PST coincide por diagnóstico sin POST, run #43855505040 | BLOQUEADO para reintentos hasta resolver el 202; no ingesta |
-| G6 | Marketing/Email y DMO CSC metadata verificados; CSC no visible en explorador ni vista Asignado. Dos GET de topología: mapping HTTP 404, streams timeout; ninguna lectura de contactos | Identificación funcional verificada; mapeos, fuente CSC real y barrera de envío pendientes |
+| G6 | Marketing/Email observado en UI; vínculo Core a canal HTTP 200. Ruta elegida: Consent Check nativo obligatorio de Growth en envío promocional; Consent Request/importación desde pestaña Consent solo con base jurídica validada. No autorizar por DMO directo ni por flags locales | Implementación decidida, configuración y prueba real del tenant pendientes |
 | G7 | 7 SELECT sin caché + 3 SELECT finales sin caché tras snapshot SHA-1; prueba compra nueva en tercer pase, baja tardía y ledger incierto | Mitiga desfase local pero NO cierra el fence de despacho externo; hash capturado BC, reloj/actividad, CSC Growth y Flow pendientes |
 | G7 | Flow/campañas Growth, recuperación y dedupe verificados | PENDIENTE |
 | G8 | Release, rollback, CI/runtime 1.7/8/9 y autorización BC | PENDIENTE |
@@ -26,4 +26,4 @@
 7. **CI/release:** PHP >=7.1, PS 1.7.8.11/8.2.8/9.1.5, pruebas negativas y de actualización, CI exact-head, merge solo con todas verdes. Prohibido afirmar uso productivo si solo hay pruebas.
 8. **Avance real:** tras cada corte informar PR/commit/pruebas y siguiente bloqueo mínimo. No ampliar otro tema mientras el proyecto principal esté abierto.
 
-**BC actual:** 0.7.1 en modo Test, sin reinstalar. Versión 0.8.0 Growth-only integrada en `main` y certificada por CI/runtime, pero no instalada en BC. **G4 estructural completado por UI en Salesforce**; ahora se ejecuta G5 `/actions/test` exclusivamente sintético y no persistente. No habilitar envíos ni ingesta real.
+**BC actual:** 0.7.1 en modo Test, sin reinstalar. Versión 0.8.0 Growth-only integrada en `main` y certificada por CI/runtime, pero no instalada en BC. **G4 estructural completado por UI en Salesforce**; G5 `/actions/test` quedó bloqueado por respuesta HTTP 202 inesperada y NO debe reintentarse sin explicación. G6 usa Consent Check nativo Growth como ruta de diseño, pendiente de verificación real. No habilitar envíos ni ingesta real.
