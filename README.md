@@ -45,6 +45,8 @@ El **15/11/2026** el propietario ha confirmado que acepta los tres puntos G3 y n
 
 **G7 60 minutos:** [contrato de inactividad y DST](docs/G7_CART_60M_DST_WINDOW_REVIEW.md) con límite de 3600 s, normalizador UTC y zona IANA por tienda reutilizados, bloqueo de fechas ambiguas o no verificadas. Siete lecturas nativas sin caché, cero envíos y ningún cambio en BC 0.7.1 Test.
 
+**G7 snapshot:** protocolo estricto de comparación del `snapshot_hash` capturado frente a uno recalculado, únicamente con fixtures/digests inyectados y estado de exclusión seguro; no hay productor real certificado ni permisos de campaña. [Contrato G7 y diseño de exclusión final](docs/G7_SNAPSHOT_EQUIVALENCE_FINAL_EXCLUSION.md). BC 0.7.1 Test intacto.
+
 ## Puertas de entrega
 
 | Paso | Estado |
