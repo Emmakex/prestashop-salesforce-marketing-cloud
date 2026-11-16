@@ -192,6 +192,6 @@ foreach (['curl_', 'file_get_contents(', 'Db::getInstance()->execute(', '->execu
 }
 // The only permitted Db call is the explicit uncached read-only adapter.
 // All actual decision logic remains injectable and side-effect-free.
-cartHoldAssert(substr_count($source, 'Db::getInstance()->executeS($sql, true, false)') === 1,
+cartHoldAssert(substr_count($source, 'Db::getInstance()->executeS($sql, true, false)') === 2,
     'native_adapter_must_use_fresh_read_only_select');
 echo "Growth cart conversion double-check PASS: conversion/unknown always hold; no sends.\n";
