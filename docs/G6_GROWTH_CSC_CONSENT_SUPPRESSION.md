@@ -1,5 +1,7 @@
 # G6 — Consentimiento Growth y supresión por suscripción
 
+**Decisión posterior 16/11/2026:** la autorización de marketing por contacto se ejecuta en el **Consent Check nativo de Growth al enviar**, asociado a Marketing/Email, no en este lector de snapshots de Data Cloud. Este código conserva utilidad como supresión local y diagnóstico, pero no certifica las altas ni es imprescindible como segunda fuente positiva del envío. No escribir CSC directamente ni usar flags newsletter como consentimiento. [Ruta corta G6](G6_GROWTH_NATIVE_CONSENT_SENDTIME.md).
+
 **Estado:** preparación read-only, sin hooks, cron, worker ni envío. PrestaShop Barcelona Confort sigue en 0.7.1 Test.
 
 ## Modelo real de Salesforce Marketing Cloud Growth
