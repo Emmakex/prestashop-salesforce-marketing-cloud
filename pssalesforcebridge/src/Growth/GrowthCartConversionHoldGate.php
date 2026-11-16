@@ -331,6 +331,50 @@ final class GrowthCartConversionHoldGate
         return $report;
     }
 
+    /**
+     * G7 review-only composition: seven existing uncached local SQL reads
+     * followed by a fresh PrestaShop Cart/Customer/Currency/getProducts
+     * reconstruction of the EXACT 0.7.1 SHA1 whole-payload fingerprint.
+     *
+     * Both sources are sampled at different instants; no transaction spans
+     * the native object reads and checkout. All flags remain hold/false.
+     * The historical captured hash is injected and is NOT authenticated.
+     */
+    public static function inspectPrestaShopWithFreshLegacyCartReview(
+        $shopId,$cartId,$customerId,array $signals,$capturedHash
+    ) {
+        self::validateSignals($signals);
+        if (!defined('_DB_PREFIX_') || !class_exists('Db')
+            || !class_exists('Configuration')) {
+            throw new RuntimeException('growth_cart_prestashop_unavailable');
+        }
+        $gate=self::inspectWithNativeCart(
+            $shopId,$cartId,$customerId,
+            function($sql) {
+                return \Db::getInstance()->executeS($sql,true,false);
+            }, _DB_PREFIX_, $signals
+        );
+        $orderState=$gate['purchase_found_locally']
+            ? 'found' : ($gate['purchase_state_unknown']
+                ? 'unknown' : 'none_asserted');
+        $timezone=\Emmakex\PrestaShopSalesforceMarketingCloud\DataCloud\ShopTimezoneResolver::readFromPrestaShop($shopId);
+        $fresh=GrowthLegacyCartFreshNativeReview::inspectPrestaShop(
+            $shopId,$cartId,$customerId,$capturedHash,$timezone,
+            $orderState,60
+        );
+        $gate['status']='hold_for_review';
+        $gate['fresh_legacy_snapshot_state']=
+            $fresh['native_legacy_fresh_snapshot_state'];
+        $gate['fresh_legacy_snapshot_source_certified_for_bc']=false;
+        $gate['historical_capture_hash_authenticated']=false;
+        $gate['final_send_exclusion_fence_certified']=false;
+        $gate['reasons']=array_values(array_unique(array_merge(
+            $gate['reasons'],
+            [$fresh['native_legacy_fresh_snapshot_state']]
+        )));
+        return $gate;
+    }
+
     private static function validateSignals(array $signals)
     {
         $keys = array_keys($signals);
