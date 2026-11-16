@@ -17,7 +17,7 @@ $mapping='https://tenant.my.salesforce.com/services/data/v68.0/ssot/'
     . 'data-model-object-mappings?dmoDeveloperName='
     . 'ssot__CommunicationSubscriptionConsent__dlm&dataspace=default';
 $streams='https://tenant.my.salesforce.com/services/data/v68.0/ssot/'
-    . 'data-streams?limit=200&offset=0&orderBy=DeveloperName';
+    . 'data-streams?limit=200&offset=0';
 $mappingBody=['objectSourceTargetMaps'=>[
     ['targetEntityDeveloperName'=>'ssot__CommunicationSubscriptionConsent__dlm',
      'sourceEntityDeveloperName'=>'PRIVATE_SOURCE_DO_NOT_EXPORT','status'=>'ACTIVE',
@@ -115,10 +115,64 @@ foreach(['https://evil.example.com','http://tenant.my.salesforce.com',
 topologyReject(function()use($origin,$fake){
     G6ConsentSourceTopologyProbe::inspect($origin,'short',$fake);
 },'g6_topology_invalid_token');
-topologyReject(function()use($origin,$token){
-    G6ConsentSourceTopologyProbe::inspect($origin,$token,
-        function(){return ['status'=>'200','body'=>'{}'];});
-},'g6_topology_invalid_http_response');
+// Invalid response types are also per-GET failures, never exceptions
+// that erase the other source's result.
+$invalidHttpCalls=0;
+$invalidHttp=G6ConsentSourceTopologyProbe::inspect($origin,$token,
+    function()use(&$invalidHttpCalls) {
+        ++$invalidHttpCalls;
+        return ['status'=>'200','body'=>'{"private":"raw"}'];
+    });
+topologyAssert($invalidHttpCalls===2
+    && $invalidHttp['csc_mapping']['state']==='mapping_transport_unverified'
+    && $invalidHttp['consent_related_streams']['state']==='stream_transport_unverified'
+    && $invalidHttp['csc_mapping']['transport_error_class']==='other'
+    && $invalidHttp['consent_related_streams']['transport_error_class']==='other'
+    && strpos(json_encode($invalidHttp),'raw')===false
+    && $invalidHttp['marketing_sends_authorized']===false,
+    'invalid_http_shape_not_quarantined');
+// One cURL timeout or unsafe exception must not erase the other fixed GET.
+// Diagnostics reveal only bounded classes, never exception text.
+$oneTimeoutCalls=[];
+$oneTimeout=G6ConsentSourceTopologyProbe::inspect($origin,$token,
+    function($url,$bearer)use($mapping,$streamBody,&$oneTimeoutCalls) {
+        $oneTimeoutCalls[]=$url;
+        if ($url===$mapping) {
+            return ['status'=>0,'body'=>'','transport_class'=>'timeout'];
+        }
+        return ['status'=>200,'body'=>json_encode($streamBody)];
+    });
+topologyAssert(count($oneTimeoutCalls)===2
+    && $oneTimeout['csc_mapping']['state']==='mapping_transport_unverified'
+    && $oneTimeout['csc_mapping']['http_status']===null
+    && $oneTimeout['csc_mapping']['transport_error_class']==='timeout'
+    && $oneTimeout['consent_related_streams']['state']==='first_page_observed_review_only'
+    && $oneTimeout['marketing_sends_authorized']===false,
+    'first_timeout_must_preserve_second_get');
+
+$secondFailureCalls=[];
+$secondFailure=G6ConsentSourceTopologyProbe::inspect($origin,$token,
+    function($url,$bearer)use($mapping,$mappingBody,&$secondFailureCalls) {
+        $secondFailureCalls[]=$url;
+        if ($url===$mapping) {
+            return ['status'=>200,'body'=>json_encode($mappingBody)];
+        }
+        throw new RuntimeException('private_downstream_error_or_url');
+    });
+topologyAssert(count($secondFailureCalls)===2
+    && $secondFailure['csc_mapping']['active_mapping_count']===1
+    && $secondFailure['consent_related_streams']['state']==='stream_transport_unverified'
+    && $secondFailure['consent_related_streams']['transport_error_class']==='other'
+    && strpos(json_encode($secondFailure),'private_downstream_error_or_url')===false,
+    'second_exception_must_preserve_mapping');
+
+$bothUnavailable=G6ConsentSourceTopologyProbe::inspect($origin,$token,
+    function() { return ['status'=>0,'body'=>'','transport_class'=>'secret_transport_code']; });
+topologyAssert($bothUnavailable['csc_mapping']['transport_error_class']==='other'
+    && $bothUnavailable['consent_related_streams']['transport_error_class']==='other'
+    && $bothUnavailable['communication_subscription_consent_source_certified']===false,
+    'invalid_transport_class_leaked_or_accepted');
+
 $module=file_get_contents(dirname(__DIR__).'/pssalesforcebridge/pssalesforcebridge.php');
 topologyAssert(strpos($module,'G6ConsentSourceTopologyProbe')===false,
     'not_connected_to_live_module');

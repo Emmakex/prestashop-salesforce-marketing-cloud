@@ -10,6 +10,14 @@ En cambio, en Salesforce Data Cloud, espacio `default`, el propietario comprobó
 
 **Una vista Asignado vacía NO demuestra que el DMO no exista ni que falten permisos.** El DMO estándar pertenece a la categoría Unassigned según Salesforce. No tenemos evidencia de asignaciones ni de registros individuales; no hay que repetir búsquedas ni crear un DMO.
 
+## Incidencia del primer diagnóstico y corrección (16/11/2026)
+
+La ejecución real [#43864960781](https://github.com/Emmakex/prestashop-salesforce-marketing-cloud/actions/runs/43864960781) acabó **FAILURE** tras el éxito de los contratos sintéticos. El artefacto saneado registró exclusivamente `g6_topology_http_read_failed` (cURL devolvió false), sin una respuesta HTTP ni resultado parcial de los GET. El paso real consumió aproximadamente un timeout de 20 segundos. **No se conoce qué GET falló** ni puede atribuirse el problema a permisos, mapeos ausentes o inexistencia de transmisiones.
+
+La corrección mantiene los **dos GET** y los ejecuta de forma independiente; si uno falla, el otro se sigue evaluando. Cada resultado registra `state` específico de mapeos o streams, HTTP de la lista segura (si lo hay), y una categoría saneada de transporte: `timeout`, `dns`, `connect`, `tls` u `other`. No se emite error bruto de cURL, URL, host, token ni respuesta privada. El runner distingue `diagnostic_observed_review_only` (ambas fuentes legibles), `diagnostic_partial_review_only` (una) y `diagnostic_unverified` (ninguna). Una lectura parcial **no certifica el consentimiento ni autoriza envíos**.
+
+Se elimina el parámetro de ordenación innecesario del GET de streams y se mantiene la primera página de 200 registros de metadatos, con timeout limitado por petición y **sin reintentos**. El objetivo es diagnosticar sin inventar conclusiones sobre Salesforce.
+
 ## Corte técnico nuevo: dos GET de metadatos
 
 El workflow manual protegido [G6 Consent Source Topology Read Only](https://github.com/Emmakex/prestashop-salesforce-marketing-cloud/actions/workflows/g6-consent-source-topology.yml) reutiliza la conexión Salesforce Core ya existente, y realiza exactamente estas operaciones:

@@ -39,6 +39,8 @@ El **15/11/2026** el propietario ha confirmado que acepta los tres puntos G3 y n
 
 **G6 topología, sin datos:** el DMO CSC fue certificado vía API pero no aparece en la UI asignada/explorador. Se incorpora diagnóstico de dos GET de metadatos (mapeos CSC y primera página de streams) que no realiza envíos ni lee consentimientos. [G6 topología](docs/G6_ABH_CONSENT_TOPOLOGY_READONLY.md). G5 permanece bloqueado por el 202 y BC 0.7.1 Test se conserva.
 
+**Incidencia G6 topología:** el primer workflow real [#43864960781](https://github.com/Emmakex/prestashop-salesforce-marketing-cloud/actions/runs/43864960781) no pudo completar la consulta de metadatos por transporte cURL; no evidencia ausencia de CSC. La corrección mantiene dos GET seguros y registra el resultado de cada uno sin datos sensibles. No altera BC 0.7.1 Test ni el bloqueo de G5.
+
 ## Puertas de entrega
 
 | Paso | Estado |

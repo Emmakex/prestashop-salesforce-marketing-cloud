@@ -45,14 +45,13 @@ final class G6ConsentSourceTopologyProbe
         $origin = 'https://' . strtolower($u['host']) . self::API;
         $mappingPath = 'data-model-object-mappings?dmoDeveloperName='
             . self::CSC_DMO . '&dataspace=default';
-        $streamPath = 'data-streams?limit=200&offset=0&orderBy=DeveloperName';
+        $streamPath = 'data-streams?limit=200&offset=0';
 
-        $mapping = self::httpReply(
-            call_user_func($fetch, $origin . $mappingPath, $coreToken)
-        );
-        $streams = self::httpReply(
-            call_user_func($fetch, $origin . $streamPath, $coreToken)
-        );
+        // Keep both diagnostics independent: a mapping transport failure
+        // must never conceal the stream result (or vice versa). This is
+        // exactly one GET per fixed path, with no retries or redirect follow.
+        $mapping = self::safeRead($fetch, $origin . $mappingPath, $coreToken);
+        $streams = self::safeRead($fetch, $origin . $streamPath, $coreToken);
         return [
             'stage' => 'g6_consent_topology_metadata_get_only',
             'dataspace' => 'default',
@@ -78,6 +77,7 @@ final class G6ConsentSourceTopologyProbe
         $base = [
             'state' => 'unverified',
             'http_status' => self::safeStatus($response['status']),
+            'transport_error_class' => self::transportClass($response),
             'visible_mapping_count' => null,
             'active_mapping_count' => null,
             'all_active_details_bounded' => false,
@@ -85,7 +85,9 @@ final class G6ConsentSourceTopologyProbe
             'sending_approved' => false,
         ];
         if ($response['status'] !== 200) {
-            $base['state'] = 'mapping_metadata_http_unverified';
+            $base['state'] = $response['status'] === 0
+                ? 'mapping_transport_unverified'
+                : 'mapping_metadata_http_unverified';
             return $base;
         }
         $data = json_decode($response['body'],true);
@@ -127,6 +129,7 @@ final class G6ConsentSourceTopologyProbe
         $base = [
             'state' => 'unverified',
             'http_status' => self::safeStatus($response['status']),
+            'transport_error_class' => self::transportClass($response),
             'page_limit' => self::STREAM_PAGE_LIMIT,
             'first_page_count' => null,
             'first_page_only' => true,
@@ -135,7 +138,9 @@ final class G6ConsentSourceTopologyProbe
             'source_kit_installed_certified' => false,
         ];
         if ($response['status'] !== 200) {
-            $base['state'] = 'stream_inventory_http_unverified';
+            $base['state'] = $response['status'] === 0
+                ? 'stream_transport_unverified'
+                : 'stream_inventory_http_unverified';
             return $base;
         }
         $data = json_decode($response['body'],true);
@@ -180,6 +185,30 @@ final class G6ConsentSourceTopologyProbe
         return $base;
     }
 
+    /**
+     * The probe records only fixed, harmless categories. Never copy a
+     * throwable message, cURL URL, token, response body or curl error text.
+     */
+    private static function safeRead($fetch, $url, $token)
+    {
+        try {
+            return self::httpReply(call_user_func($fetch, $url, $token));
+        } catch (Throwable $error) {
+            return ['status'=>0, 'body'=>'', 'transport_class'=>'other'];
+        }
+    }
+
+    private static function transportClass($response)
+    {
+        if ($response['status'] !== 0) {
+            return null;
+        }
+        return isset($response['transport_class'])
+            && in_array($response['transport_class'],
+                ['timeout','dns','connect','tls','other'], true)
+            ? $response['transport_class'] : 'other';
+    }
+
     private static function safeStatus($status)
     {
         return in_array($status,[200,400,401,403,404,429,500,503],true)
@@ -212,7 +241,7 @@ final class G6ConsentSourceTopologyProbe
                 'Authorization: Bearer ' . $token,
                 'Accept: application/json',
             ],
-            CURLOPT_TIMEOUT => 20,
+            CURLOPT_TIMEOUT => 25,
             CURLOPT_CONNECTTIMEOUT => 10,
             CURLOPT_FOLLOWLOCATION => false,
             CURLOPT_SSL_VERIFYPEER => true,
@@ -221,9 +250,16 @@ final class G6ConsentSourceTopologyProbe
         ]);
         $body = curl_exec($curl);
         $status = (int)curl_getinfo($curl,CURLINFO_HTTP_CODE);
+        $errno = curl_errno($curl);
         curl_close($curl);
         if (!is_string($body)) {
-            throw new RuntimeException('g6_topology_http_read_failed');
+            // Category only. Never emit curl_error(), URL or host.
+            $class = 'other';
+            if ($errno === 28) { $class = 'timeout'; }
+            if ($errno === 6) { $class = 'dns'; }
+            if ($errno === 7) { $class = 'connect'; }
+            if (in_array($errno,[35,51,60],true)) { $class = 'tls'; }
+            return ['status'=>0,'body'=>'','transport_class'=>$class];
         }
         return ['status'=>$status,'body'=>$body];
     }
