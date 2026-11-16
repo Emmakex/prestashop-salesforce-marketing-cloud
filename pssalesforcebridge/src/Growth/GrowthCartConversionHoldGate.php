@@ -415,7 +415,7 @@ final class GrowthCartConversionHoldGate
             || $last['purchase_observed_in_last_check'];
         $report['purchase_state_unknown'] =
             $report['purchase_state_unknown']
-            || $last['last_local_source_uncertain'];
+            || $last['last_purchase_source_uncertain'];
         $report['final_send_exclusion_fence_certified'] = false;
         $report['race_with_future_dispatch_closed'] = false;
         $report['salesforce_send_time_consent_certified'] = false;
