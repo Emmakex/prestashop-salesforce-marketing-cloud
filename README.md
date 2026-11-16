@@ -47,6 +47,8 @@ El **15/11/2026** el propietario ha confirmado que acepta los tres puntos G3 y n
 
 **G7 snapshot:** protocolo estricto de comparación del `snapshot_hash` capturado frente a uno recalculado, únicamente con fixtures/digests inyectados y estado de exclusión seguro; no hay productor real certificado ni permisos de campaña. [Contrato G7 y diseño de exclusión final](docs/G7_SNAPSHOT_EQUIVALENCE_FINAL_EXCLUSION.md). BC 0.7.1 Test intacto.
 
+**G7 compatibilidad del snapshot:** [auditoría histórica de 0.7.1](docs/G7_LEGACY_071_SNAPSHOT_SHA1_COMPATIBILITY.md) verifica que el `snapshot_hash` original es SHA-1 del JSON completo y tiene 40 caracteres, no SHA-256. El comparador G7 y un replay sintético se alinean con el legado; **todavía no** existe recálculo nativo certificado de un carrito actual, ni autorización de envío. BC 0.7.1 Test sin cambios.
+
 ## Puertas de entrega
 
 | Paso | Estado |
