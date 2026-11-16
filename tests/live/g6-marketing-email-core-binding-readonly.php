@@ -38,8 +38,8 @@ try {
     );
     unset($core,$auth);
     $result['binding']=$binding;
-    $result['status']=$binding['single_marketing_email_link_observed']
-        ? 'core_marketing_email_binding_candidate_observed'
+    $result['status']=$binding['single_marketing_channel_link_observed']
+        ? 'core_marketing_channel_link_candidate_observed'
         : 'diagnostic_unverified';
 } catch (Throwable $error) {
     $result['error_code']='g6_core_binding_auth_or_metadata_unverified';
@@ -52,8 +52,8 @@ if (!is_string($json) || file_put_contents(
     fwrite(STDERR,"G6 Core binding review could not save sanitized artifact.\n");
     exit(2);
 }
-if ($result['status'] !== 'core_marketing_email_binding_candidate_observed') {
+if ($result['status'] !== 'core_marketing_channel_link_candidate_observed') {
     fwrite(STDERR,"G6 Core technical binding not certified; no further actions authorized.\n");
     exit(1);
 }
-echo "G6 Core Marketing/Email technical association candidate observed; consent and sends remain blocked.\n";
+echo "G6 Core Marketing subscription-channel association candidate observed; channel type and consent remain unverified.\n";
