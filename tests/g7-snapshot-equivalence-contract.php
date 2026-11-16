@@ -15,8 +15,8 @@ function snapAssert($yes,$why) {
 function snap($origin,$digest=null) {
     return [
         'id_shop'=>2, 'id_cart'=>93, 'id_customer'=>17,
-        'origin'=>$origin, 'algorithm'=>'sha256',
-        'digest'=>$digest === null ? hash('sha256','captured-cart-fixture-1') : $digest,
+        'origin'=>$origin, 'algorithm'=>'sha1',
+        'digest'=>$digest === null ? hash('sha1','captured-cart-fixture-1') : $digest,
     ];
 }
 function snapSafety($out,$expected) {
@@ -32,7 +32,7 @@ function snapSafety($out,$expected) {
     }
     $json=json_encode($out);
     foreach(['captured-cart-fixture','customer@example.invalid',
-        '"id_cart"','"id_customer"','"id_shop"',hash('sha256','captured-cart-fixture-1')]
+        '"id_cart"','"id_customer"','"id_shop"',hash('sha1','captured-cart-fixture-1')]
         as $source) {
         snapAssert(strpos($json,$source)===false,'source_hash_or_identity_leak');
     }
@@ -41,9 +41,11 @@ $original=snap('captured_snapshot');
 $fresh=snap('fresh_recalculation');
 $match=Snapshot::inspect(2,93,17,$original,$fresh);
 snapSafety($match,'snapshot_digest_match_injected_only');
+snapAssert($match['legacy_071_sha1_format_observed']===true,
+    'legacy_sha1_format_not_certified');
 snapAssert($match['injected_digest_match_observed']===true,
     'same_digest_not_observed');
-$changed=snap('fresh_recalculation',hash('sha256','changed-cart-fixture-2'));
+$changed=snap('fresh_recalculation',hash('sha1','changed-cart-fixture-2'));
 $comparison=Snapshot::inspect(2,93,17,$original,$changed);
 snapSafety($comparison,'snapshot_digest_changed_hold');
 snapAssert($comparison['injected_digest_match_observed']===false,'changed_digest_passed');
@@ -55,8 +57,9 @@ foreach([
     ['fresh_wrong_cart',$original,array_merge($fresh,['id_cart'=>94]),'fresh_snapshot_unverified'],
     ['origin_swapped',$fresh,$original,'captured_snapshot_unverified'],
     ['unknown_algorithm',$original,array_merge($fresh,['algorithm'=>'sha512']),'fresh_snapshot_unverified'],
+    ['sha256_not_legacy',$original,array_merge($fresh,['algorithm'=>'sha256','digest'=>hash('sha256','captured-cart-fixture-1')]),'fresh_snapshot_unverified'],
     ['invalid_digest',$original,array_merge($fresh,['digest'=>'abcd']),'fresh_snapshot_unverified'],
-    ['placeholder_digest',$original,array_merge($fresh,['digest'=>str_repeat('0',64)]),'fresh_snapshot_unverified'],
+    ['placeholder_digest',$original,array_merge($fresh,['digest'=>str_repeat('0',40)]),'fresh_snapshot_unverified'],
     ['extra_email',$original,array_merge($fresh,['email'=>'customer@example.invalid']),'fresh_snapshot_unverified'],
     ['missing_hash',$original,array_diff_key($fresh,['digest'=>true]),'fresh_snapshot_unverified'],
     ['wrong_type',$original,array_merge($fresh,['id_shop'=>'2']),'fresh_snapshot_unverified'],

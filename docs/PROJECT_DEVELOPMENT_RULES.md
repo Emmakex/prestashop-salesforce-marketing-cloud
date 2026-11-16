@@ -11,7 +11,7 @@
 | G4 | Esquema PST guardado, 2 Data Streams activos, 2 mapeos LISTO, relación pedido→Individual N:1 (capturas 16/11/2026) | **VERIFICADO estructural** |
 | G5 | `/actions/test` recibió 202, no 200. Host oficial PST coincide por diagnóstico sin POST, run #43855505040 | BLOQUEADO para reintentos hasta resolver el 202; no ingesta |
 | G6 | Marketing/Email y DMO CSC metadata verificados; CSC no visible en explorador ni vista Asignado. Dos GET de topología: mapping HTTP 404, streams timeout; ninguna lectura de contactos | Identificación funcional verificada; mapeos, fuente CSC real y barrera de envío pendientes |
-| G7 | 7 SELECT sin caché, 60m/DST offline y protocolo de comparación de snapshot capturado/recalculado inyectado, sin algoritmo real conectado | Preparación local; validar productor snapshot, actividad UTC, fence final compra/baja, consentimiento CSC y Flow pendientes |
+| G7 | 7 SELECT sin caché, 60m/DST offline, algoritmo snapshot **0.7.1 SHA-1 JSON CHAR40** certificado por código histórico; replay sintético y comparación SHA-1 | Requiere productor fresco nativo, fuente actividad UTC, fence final compra/baja, consentimiento CSC y Flow; nada instalado ni enviando |
 | G7 | Flow/campañas Growth, recuperación y dedupe verificados | PENDIENTE |
 | G8 | Release, rollback, CI/runtime 1.7/8/9 y autorización BC | PENDIENTE |
 

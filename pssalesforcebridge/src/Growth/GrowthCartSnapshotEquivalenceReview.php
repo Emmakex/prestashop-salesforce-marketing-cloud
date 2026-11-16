@@ -9,7 +9,10 @@ use RuntimeException;
  *
  * REVIEW-ONLY: No snapshot producer is connected to this class, and this
  * cannot certify that a hash was obtained from real, fresh cart items.
- * The historical hash algorithm must be audited before an adapter is added.
+ * Historical 0.7.1 snapshot_hash is SHA-1(json_encode(full captured payload))
+ * stored in CHAR(40); see pinned historical CartCaptureService and cart DDL.
+ * This is a change detector, NOT an authentication or consent proof. The
+ * normalized live snapshot producer is still absent in Growth 0.8.0.
  *
  * A match under injected assertions is not campaign eligibility and not a
  * substitute for an atomic pre-dispatch purchase/opt-out exclusion fence.
@@ -48,6 +51,7 @@ final class GrowthCartSnapshotEquivalenceReview
             'status' => 'hold_for_review',
             'snapshot_equivalence_state' => $state,
             'injected_digest_match_observed' => $matched,
+            'legacy_071_sha1_format_observed' => true,
             'captured_snapshot_source_certified_for_bc' => false,
             'fresh_snapshot_producer_certified_for_bc' => false,
             'full_native_cart_snapshot_equivalence_certified' => false,
@@ -76,10 +80,10 @@ final class GrowthCartSnapshotEquivalenceReview
             || $snapshot['id_cart'] !== $cartId
             || $snapshot['id_customer'] !== $customerId
             || $snapshot['origin'] !== $expectedOrigin
-            || $snapshot['algorithm'] !== 'sha256'
+            || $snapshot['algorithm'] !== 'sha1'
             || !is_string($snapshot['digest'])
-            || !preg_match('/^[a-f0-9]{64}$/D', $snapshot['digest'])
-            || $snapshot['digest'] === str_repeat('0', 64)) {
+            || !preg_match('/^[a-f0-9]{40}$/D', $snapshot['digest'])
+            || $snapshot['digest'] === str_repeat('0', 40)) {
             return 'invalid';
         }
         return 'valid';

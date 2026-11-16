@@ -12,13 +12,13 @@ El código Growth 0.8.0, tras retirar el transporte discontinuado, todavía **no
 
 `GrowthCartSnapshotEquivalenceReview::inspect()` recibe dos pequeñas descripciones **inyectadas** con exactamente estas claves: `id_shop`, `id_cart`, `id_customer`, `origin`, `algorithm` y `digest`.
 
-- **Capturado:** `origin=captured_snapshot`, scope positivo exacto del carrito y `algorithm=sha256`, digest hexadecimal de 64 caracteres.
+- **Capturado:** `origin=captured_snapshot`, scope positivo exacto del carrito y **`algorithm=sha1`**, digest hexadecimal de **40 caracteres**, según el código 0.7.1 verificado.
 - **Actual:** `origin=fresh_recalculation`, scope y algoritmo iguales, digest de la **reconstrucción actual** que un futuro adaptador tendrá que justificar.
 - Comparación con `hash_equals()`; devuelve únicamente un estado: `snapshot_digest_match_injected_only`, `snapshot_digest_changed_hold`, `captured_snapshot_unverified` o `fresh_snapshot_unverified`.
 - Se bloquean shops/clientes/carritos cruzados, algoritmo incorrecto, valores vacíos, placeholders, información personal o columnas inesperadas.
 - Nunca se devuelven IDs, hashes, filas, datos de productos ni nombre de cliente.
 
-**Incluso dos hashes iguales son una prueba sintética de un protocolo, no de que se hayan recalculado datos reales.** El algoritmo de serialización del módulo 0.7.1 debe auditarse y conservarse antes de conectar un productor. No se sustituye su `snapshot_hash` por un digest nuevo incompatible.
+**Incluso dos hashes iguales son una prueba sintética de un protocolo, no de que se hayan recalculado datos reales.** El algoritmo del módulo 0.7.1 ya está verificado: `sha1(json_encode($payload))` sobre el array normalizado completo, ampliado con estado/elegibilidad/fecha de abandono; ver [auditoría fuente histórica](G7_LEGACY_071_SNAPSHOT_SHA1_COMPATIBILITY.md). El productor real fresco sigue SIN conectar. No se sustituye su `snapshot_hash` por un digest nuevo incompatible.
 
 `GrowthCartConversionHoldGate::inspectWithNativeCartSnapshotReview()` integra opcionalmente ese estado con los **siete SELECT frescos ya existentes**: 2 carrito/productos, 1 cliente, 4 pedidos en dos rondas. No añade escrituras ni consultas SQL. Aunque las dos huellas coincidan, sigue devolviendo `hold_for_review`, `cart_snapshot_unverified`, y autorización de envíos siempre `false`. Compra sobrevenida en segunda ronda y baja local mantienen prioridad de exclusión.
 
@@ -38,6 +38,6 @@ No usar `newsletter=1` ni `optin=1` como consentimiento afirmativo Growth. No en
 
 ## Siguiente tarea realmente necesaria
 
-Determinar en el código instalado/versión fuente autorizada **cómo serializa `snapshot_hash`**, qué cambios de carrito lo invalidan y cómo se puede recalcular contra el carrito actual sin exponer datos privados. Después implementar un adaptador aislado que lo lea con versiones e identidades, sin escribir ni contactar Salesforce. Esta tarea es independiente del 404/timeout observado en el diagnóstico G6.
+**Cerrada la investigación del algoritmo histórico**: SHA-1 sobre `json_encode` de 24 campos en orden y todas sus líneas; el `RecoveryService` compara hashes persistidos, no un recálculo nativo. Falta crear y certificar un **productor fresco local** que reproduzca exactamente los mismos campos y su orden (incluidos los datos que cambian por elegibilidad), sin exponer datos privados. El replay sintético ya tiene contrato y vector golden en [G7 compatibilidad SHA-1](G7_LEGACY_071_SNAPSHOT_SHA1_COMPATIBILITY.md). Después diseñar el adaptador de lectura y exclusión final, sin escribir ni contactar Salesforce. Esta tarea es independiente del 404/timeout observado en el diagnóstico G6.
 
 La fase G8 certificará la barrera de despacho y reversibilidad del adaptador completo. Barcelona Confort seguirá en 0.7.1 Test hasta que haya aprobación específica.
