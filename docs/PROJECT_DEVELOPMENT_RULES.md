@@ -10,7 +10,7 @@
 | G3 | Tres decisiones de dirección aceptadas por propietario; no repetirlas. Bases legales por finalidad no inferidas | ACEPTADO propietario, sin generalizar a consentimiento de campañas |
 | G4 | Esquema PST guardado, 2 Data Streams activos, 2 mapeos LISTO, relación pedido→Individual N:1 (capturas 16/11/2026) | **VERIFICADO estructural** |
 | G5 | `/actions/test` recibió 202, no 200. Host oficial PST coincide por diagnóstico sin POST, run #43855505040 | BLOQUEADO para reintentos hasta resolver el 202; no ingesta |
-| G6 | Suscripción **Marketing / Email** verificada en interfaz ABH (16/11/2026). Gate local fail-closed; siguiente prueba metadatos CSC por un GET sin registros | Identificación funcional verificada, adaptador CSC real y barrera final pendientes |
+| G6 | Marketing/Email y DMO CSC metadata verificados; CSC no visible en explorador ni vista Asignado. Dos GET de topología (mapeos/streams) preparados; ninguna lectura de contactos | Identificación funcional verificada; mapeos, fuente CSC real y barrera de envío pendientes |
 | G7 | Flow/campañas Growth, recuperación y dedupe verificados | PENDIENTE |
 | G8 | Release, rollback, CI/runtime 1.7/8/9 y autorización BC | PENDIENTE |
 
