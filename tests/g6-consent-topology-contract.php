@@ -17,7 +17,7 @@ $mapping='https://tenant.my.salesforce.com/services/data/v68.0/ssot/'
     . 'data-model-object-mappings?dmoDeveloperName='
     . 'ssot__CommunicationSubscriptionConsent__dlm&dataspace=default';
 $streams='https://tenant.my.salesforce.com/services/data/v68.0/ssot/'
-    . 'data-streams?limit=200&offset=0&orderBy=DeveloperName';
+    . 'data-streams?limit=200&offset=0';
 $mappingBody=['objectSourceTargetMaps'=>[
     ['targetEntityDeveloperName'=>'ssot__CommunicationSubscriptionConsent__dlm',
      'sourceEntityDeveloperName'=>'PRIVATE_SOURCE_DO_NOT_EXPORT','status'=>'ACTIVE',
@@ -119,6 +119,48 @@ topologyReject(function()use($origin,$token){
     G6ConsentSourceTopologyProbe::inspect($origin,$token,
         function(){return ['status'=>'200','body'=>'{}'];});
 },'g6_topology_invalid_http_response');
+// One cURL timeout or unsafe exception must not erase the other fixed GET.
+// Diagnostics reveal only bounded classes, never exception text.
+$oneTimeoutCalls=[];
+$oneTimeout=G6ConsentSourceTopologyProbe::inspect($origin,$token,
+    function($url,$bearer)use($mapping,$streamBody,&$oneTimeoutCalls) {
+        $oneTimeoutCalls[]=$url;
+        if ($url===$mapping) {
+            return ['status'=>0,'body'=>'','transport_class'=>'timeout'];
+        }
+        return ['status'=>200,'body'=>json_encode($streamBody)];
+    });
+topologyAssert(count($oneTimeoutCalls)===2
+    && $oneTimeout['csc_mapping']['state']==='mapping_transport_unverified'
+    && $oneTimeout['csc_mapping']['http_status']===null
+    && $oneTimeout['csc_mapping']['transport_error_class']==='timeout'
+    && $oneTimeout['consent_related_streams']['state']==='first_page_observed_review_only'
+    && $oneTimeout['marketing_sends_authorized']===false,
+    'first_timeout_must_preserve_second_get');
+
+$secondFailureCalls=[];
+$secondFailure=G6ConsentSourceTopologyProbe::inspect($origin,$token,
+    function($url,$bearer)use($mapping,$mappingBody,&$secondFailureCalls) {
+        $secondFailureCalls[]=$url;
+        if ($url===$mapping) {
+            return ['status'=>200,'body'=>json_encode($mappingBody)];
+        }
+        throw new RuntimeException('private_downstream_error_or_url');
+    });
+topologyAssert(count($secondFailureCalls)===2
+    && $secondFailure['csc_mapping']['active_mapping_count']===1
+    && $secondFailure['consent_related_streams']['state']==='stream_transport_unverified'
+    && $secondFailure['consent_related_streams']['transport_error_class']==='other'
+    && strpos(json_encode($secondFailure),'private_downstream_error_or_url')===false,
+    'second_exception_must_preserve_mapping');
+
+$bothUnavailable=G6ConsentSourceTopologyProbe::inspect($origin,$token,
+    function() { return ['status'=>0,'body'=>'','transport_class'=>'secret_transport_code']; });
+topologyAssert($bothUnavailable['csc_mapping']['transport_error_class']==='other'
+    && $bothUnavailable['consent_related_streams']['transport_error_class']==='other'
+    && $bothUnavailable['communication_subscription_consent_source_certified']===false,
+    'invalid_transport_class_leaked_or_accepted');
+
 $module=file_get_contents(dirname(__DIR__).'/pssalesforcebridge/pssalesforcebridge.php');
 topologyAssert(strpos($module,'G6ConsentSourceTopologyProbe')===false,
     'not_connected_to_live_module');
