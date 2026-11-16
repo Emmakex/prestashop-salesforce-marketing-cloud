@@ -33,6 +33,8 @@ El **15/11/2026** el propietario ha confirmado que acepta los tres puntos G3 y n
 
 **G6 · Sin envíos:** [control read-only de consentimiento y supresión](docs/G6_GROWTH_CSC_CONSENT_SUPPRESSION.md). Salesforce Growth usa Communication Subscription Consent, no los flags `newsletter`/`optin` como permiso de campaña. El nuevo componente comprueba scope/frescura de evidencia CSC inyectada, da prioridad a las bajas y no habilita envíos, incluso con una señal positiva sintética. G5 continúa sin POST por HTTP 202 no aclarado.
 
+**Siguiente corte G6:** inventario protegido de suscripciones Core con **dos GET de configuración, sin datos personales**, y confirmación separada del canal Email en Growth. Ver [G6 inventario de suscripciones](docs/G6_ABH_CORE_SUBSCRIPTION_INVENTORY.md). No ejecuta G5, que sigue bloqueado para POST, ni habilita marketing.
+
 ## Puertas de entrega
 
 | Paso | Estado |
