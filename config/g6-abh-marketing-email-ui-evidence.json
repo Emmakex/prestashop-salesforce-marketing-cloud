@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "observed_on": "2026-11-16",
+  "source": "owner_supplied_marketing_growth_ui_screenshot",
+  "workspace": "ABH Marketing",
+  "ui_location": "Marketing > Consentimiento > Suscripciones",
+  "subscription_name": "Marketing",
+  "channel": "email",
+  "ui_subscription_count_visible": 1,
+  "ui_subscription_last_modified_date": "2026-07-16",
+  "core_inventory_run": "https://github.com/Emmakex/prestashop-salesforce-marketing-cloud/actions/runs/43859152306",
+  "core_inventory_completed": true,
+  "core_name_marketing_found": true,
+  "growth_ui_subscription_name_and_channel_verified": true,
+  "subscription_record_id_verified": false,
+  "business_unit_scope_verified": false,
+  "customer_consent_read_verified": false,
+  "communication_subscription_consent_dmo_metadata_verified": false,
+  "specific_marketing_consent_approved": false,
+  "customer_data_ingestion_authorized": false,
+  "marketing_sends_authorized": false
+}
