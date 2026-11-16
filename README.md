@@ -41,6 +41,8 @@ El **15/11/2026** el propietario ha confirmado que acepta los tres puntos G3 y n
 
 **Incidencia G6 topología:** el primer workflow real [#43864960781](https://github.com/Emmakex/prestashop-salesforce-marketing-cloud/actions/runs/43864960781) no pudo completar la consulta de metadatos por transporte cURL; no evidencia ausencia de CSC. La corrección mantiene dos GET seguros y registra el resultado de cada uno sin datos sensibles. No altera BC 0.7.1 Test ni el bloqueo de G5.
 
+**G7 avance local:** [revisión nativa de carritos](docs/G7_NATIVE_CART_SNAPSHOT_REVIEW.md): dos SELECT de carrito/productos por tienda + cliente y los cinco SELECT ya existentes de seguridad (cliente/pedidos), todos sin caché; sin permisos de envíos, ingesta ni recuperación. No certifica aún los 60 minutos ni la zona horaria, y no modifica BC 0.7.1 Test.
+
 ## Puertas de entrega
 
 | Paso | Estado |

@@ -186,6 +186,63 @@ final class GrowthCartConversionHoldGate
         );
     }
 
+    /**
+     * G7 native cart + existing fresh local customer and double order hold.
+     *
+     * Prevent caller assertions of cart nonemptiness, snapshot freshness,
+     * and elapsed abandonment from being treated as certified evidence.
+     * Even a present, nonempty cart is NOT "abandoned" until inactivity
+     * provenance, trusted snapshot, and final purchase fence are certified.
+     *
+     * Preflight validates all signals BEFORE any DB read; no PII is returned.
+     */
+    public static function inspectWithNativeCart(
+        $shopId, $cartId, $customerId, $selectRows, $prefix, array $signals
+    ) {
+        self::validateSignals($signals);
+        $cart = GrowthLocalCartSnapshotReader::inspect(
+            $shopId, $cartId, $customerId, $selectRows, $prefix
+        );
+        // A caller supplied "snapshot_current=true" is NOT proof of a
+        // snapshot match. Validate locally, then keep that claim unverified.
+        $signals['cart_has_products'] = $cart['positive_product_observed'];
+        $signals['snapshot_current'] = false;
+        $signals['abandonment_window'] = 'unknown';
+        $signals['cart_status'] = 'unknown';
+        $result = self::inspectWithLocalCustomer(
+            $shopId, $cartId, $customerId, $selectRows, $prefix, $signals
+        );
+        $result['status'] = 'hold_for_review';
+        $result['local_cart_source_state'] = $cart['local_cart_source_state'];
+        $result['local_cart_positive_product_observed'] =
+            $cart['positive_product_observed'];
+        $result['native_cart_snapshot_verified_for_bc'] = false;
+        $result['local_cart_source_checked'] = true;
+        $result['reasons'] = array_values(array_unique(array_merge(
+            $result['reasons'], $cart['reasons']
+        )));
+        return $result;
+    }
+
+    /**
+     * PrestaShop 1.7/8/9 read-only adaptation.
+     * Every cart, product, customer, native-order and ledger SELECT uses
+     * executeS($sql, true, false) to bypass the PrestaShop result cache.
+     */
+    public static function inspectPrestaShopWithNativeCart(
+        $shopId, $cartId, $customerId, array $signals
+    ) {
+        self::validateSignals($signals);
+        if (!defined('_DB_PREFIX_') || !class_exists('Db')) {
+            throw new RuntimeException('growth_cart_prestashop_unavailable');
+        }
+        return self::inspectWithNativeCart(
+            $shopId, $cartId, $customerId, function ($sql) {
+                return \Db::getInstance()->executeS($sql, true, false);
+            }, _DB_PREFIX_, $signals
+        );
+    }
+
     private static function validateSignals(array $signals)
     {
         $keys = array_keys($signals);
