@@ -1,37 +1,32 @@
-# G6 — vínculo técnico de Marketing / Email en Salesforce Core
+# G6 — vínculo Core de suscripción Marketing con un tipo de canal
 
-**16/11/2026.** Siguiente corte operativo después de las pruebas del lector CSC y de los dos GET de topología. El último diagnóstico G6 real [#43866286020](https://github.com/Emmakex/prestashop-salesforce-marketing-cloud/actions/runs/43866286020) observó `404` para la consulta de mapping CSC y un `timeout` para la página de streams. La respuesta 404 no certifica ausencia del DMO; su esquema ya había respondido 200. El envío, el onboarding de PSCart y G5 siguen bloqueados.
+**16/11/2026 · Solo lectura.** La UI de Growth ya mostró **Marketing / Correo electrónico**. El diagnóstico de topología G6 [#43866286020](https://github.com/Emmakex/prestashop-salesforce-marketing-cloud/actions/runs/43866286020) registró mapping CSC HTTP 404 y stream timeout. No inferir ausencia del DMO, reintentar esos GET ni consultar consentimientos de personas.
 
-## Operación distinta, sobre Core, sin PII ni registros de consentimiento
+## Objetivo de esta pieza
 
-Con la evidencia ya existente de la UI **Marketing → Suscripciones: Marketing / Correo electrónico**, este corte prepara una comprobación de la **asociación técnica** de configuración en Core. No toca Data Cloud DLOs/DMOs, no reintenta los dos GET problemáticos y tampoco registra identidades de clientes.
+Verificar que Salesforce Core contiene un vínculo de configuración entre la suscripción **Marketing** y al menos un tipo de canal asociado. La consulta Core **no** vuelve a verificar el tipo de canal *Email* de forma técnica: esa evidencia sigue siendo visual en Growth. Tampoco demuestra ámbito Business Unit ni opt-in de destinatarios.
 
-**Solo 1 GET**, SOQL inmutable y limitada a dos filas:
+Se ejecuta **un GET** a `/services/data/v68.0/query/?q=...` con SOQL fija:
 
-```soql
-SELECT CommunicationSubscriptionId,
-       CommunicationSubscription.Name,
-       EngagementChannelType.ContactPointType
+```sql
+SELECT Id, CommunicationSubscriptionId, CommunicationSubscription.Name
 FROM CommSubscriptionChannelType
 WHERE CommunicationSubscription.Name = 'Marketing'
-  AND EngagementChannelType.ContactPointType = 'Email'
 LIMIT 2
 ```
 
-Salesforce documenta `CommSubscriptionChannelType.CommunicationSubscriptionId` y la referencia `EngagementChannelType`, además de `EngagementChannelType.ContactPointType` con valor `Email`. Las relaciones a Core son **configuración de suscripción/canal**, no consentimiento de una persona. Fuentes:
+Fuente oficial: [CommSubscriptionChannelType](https://developer.salesforce.com/docs/platform/object-reference/references/standard-objects/object-commsubscriptionchanneltype.html).
 
-- https://developer.salesforce.com/docs/platform/object-reference/references/standard-objects/object-commsubscriptionchanneltype.html
-- https://developer.salesforce.com/docs/platform/object-reference/references/standard-objects/object-engagementchanneltype.html
-- https://help.salesforce.com/s/articleView?id=mktg.mktg_consent_tools_ref.htm&type=5
+El componente `tests/review/G6MarketingEmailCoreBindingReview.php` valida dominio HTTPS oficial, cuerpo acotado, respuesta íntegra, exactamente una relación y formato de IDs **solo en memoria**. Si hay cero, más de una, HTTP anómalo, timeout, error de permisos o estructura inesperada, responde con un estado de revisión no verificado. El resultado jamás expone IDs, URLs, tokens o filas.
 
-`G6MarketingEmailCoreBindingReview` comprueba conexión TLS, URL en dominio Salesforce, scope exacto, tipo de respuesta, `done=true`, cardinalidad y asociación anidada. Una única fila con relación correcta devuelve `marketing_email_core_binding_observed_review_only`. Cero filas es `not_observed`; más de una es **ambiguo**; cualquier 4xx, timeout, error de permisos o forma no verificada bloquea. No se infiere que una fila de otra unidad de negocio esté dentro de ABH.
+Aun con un vínculo único, conserva `hold_for_review`, `email_channel_type_technically_verified=false`, `business_unit_scope_certified=false`, `csc_effective_consent_certified=false`, `marketing_sends_authorized=false` y `data_cloud_ingestion_authorized=false`. No existe envío, consentimiento por contacto ni lectura de cliente.
 
-El reporte solo contiene estados predefinidos y booleanos: **no emite `CommunicationSubscriptionId`, host, token, SOQL, email ni valores arbitrarios**. Un resultado favorable sigue `hold_for_review`, `csc_effective_consent_certified=false`, `business_unit_scope_certified=false` y `marketing_sends_authorized=false`.
+## Uso del workflow
 
-## Ejecutar manualmente después de CI + runtime y merge
+Tras fusionar el PR con CI exact-head verde y runtime 1.7/8/9 verde: [G6 Marketing Email Core Binding Read Only](https://github.com/Emmakex/prestashop-salesforce-marketing-cloud/actions/workflows/g6-marketing-email-core-binding-readonly.yml) → **Run workflow** → rama **main** → `marketing_email_config_get_only`.
 
-Ir a [G6 Marketing Email Core Binding Read Only](https://github.com/Emmakex/prestashop-salesforce-marketing-cloud/actions/workflows/g6-marketing-email-core-binding-readonly.yml). Seleccionar **Run workflow → main → `marketing_email_config_get_only`**. El job comprueba repositorio, SHA y `workflow_dispatch`, reutiliza las credenciales OAuth Core protegidas y genera un artefacto JSON saneado, sin datos personales y sin escritura. No modificar las credenciales ni intentar comandos directos.
+La ejecución protegida usa OAuth Core ya conectado, un único GET acotado y publica solo flags de diagnóstico. No requiere acceso SQL ni nuevas credenciales. Nunca cambia la instalación de Barcelona Confort.
 
-**Condición de cierre G6:** este paso verifica como máximo una asociación de configuración. Faltan el ámbito de Business Unit y un método admitido de consulta del consentimiento CSC por destinatario y finalidad, con revalidación de envío. Nunca convertir `newsletter` / `optin` en autorización Growth.
+## Faltante para G6
 
-**Frontera vigente:** Barcelona Confort en **0.7.1 Test**, 0.8.0 no instalada, G5 `/actions/test` 202 sin resolver y ningún Salesforce POST/Flow/campaña autorizado.
+Acreditar el vínculo del canal exacto y del ámbito de la suscripción en el tenant, y después disponer de un método de verificación del consentimiento **efectivo** por finalidad, contacto y canal que corresponda con Growth. No convertir `newsletter` ni `optin` en permiso de envío. G5 HTTP 202 sigue bloqueado para POST, y Barcelona Confort permanece **0.7.1 Test**.
