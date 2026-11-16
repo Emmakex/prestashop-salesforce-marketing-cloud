@@ -9,8 +9,8 @@
 | G2 | Data Cloud token exchange, PST existente | VERIFICADO sin escrituras |
 | G3 | Tres decisiones de dirección aceptadas por propietario; no repetirlas. Bases legales por finalidad no inferidas | ACEPTADO propietario, sin generalizar a consentimiento de campañas |
 | G4 | Esquema PST guardado, 2 Data Streams activos, 2 mapeos LISTO, relación pedido→Individual N:1 (capturas 16/11/2026) | **VERIFICADO estructural** |
-| G5 | Synchronous `/actions/test` sin persistencia, workflow manual. Ingesta real por endpoint 202 en otro corte | TEST EN PREPARACIÓN; ingesta persistente BLOQUEADO |
-| G6 | Consentimiento y supresión Growth, sin confiar solo en flags newsletter | PENDIENTE |
+| G5 | `/actions/test` recibió 202, no 200. Host oficial PST coincide por diagnóstico sin POST, run #43855505040 | BLOQUEADO para reintentos hasta resolver el 202; no ingesta |
+| G6 | Lector local + snapshot CSC por canal/suscripción, fail-closed y sin envíos | Contrato local implementado; adaptador CSC real y barrera final pendientes |
 | G7 | Flow/campañas Growth, recuperación y dedupe verificados | PENDIENTE |
 | G8 | Release, rollback, CI/runtime 1.7/8/9 y autorización BC | PENDIENTE |
 
