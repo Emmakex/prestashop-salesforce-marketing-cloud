@@ -45,7 +45,15 @@ try {
     );
     unset($core,$client);
     $evidence['metadata']=$result;
-    $evidence['status']='diagnostic_observed_review_only';
+    $mappingOK = $result['csc_mapping']['state']
+        === 'mapping_metadata_observed_review_only';
+    $streamsOK = $result['consent_related_streams']['state']
+        === 'first_page_observed_review_only';
+    $evidence['status'] = $mappingOK && $streamsOK
+        ? 'diagnostic_observed_review_only'
+        : ($mappingOK || $streamsOK
+            ? 'diagnostic_partial_review_only'
+            : 'diagnostic_unverified');
 } catch (Throwable $error) {
     $code=(string)$error->getMessage();
     if (!preg_match('/^(?:growth_oauth|g6_topology)_[a-z0-9_]{1,100}$/D',$code)) {
@@ -61,5 +69,10 @@ if (!is_string($json)
     fwrite(STDERR,"G6 topology could not save sanitized artifact.\n");
     exit(2);
 }
-if ($evidence['status']!=='diagnostic_observed_review_only')exit(1);
-fwrite(STDOUT,"G6 consent source topology observed safely; mappings and streams are metadata, not eligibility or consent.\n");
+if (!in_array($evidence['status'],[
+    'diagnostic_observed_review_only','diagnostic_partial_review_only'
+],true)) {
+    fwrite(STDERR,"G6 topology unavailable: both metadata reads unverified; see sanitized artifact.\n");
+    exit(1);
+}
+fwrite(STDOUT,"G6 consent topology recorded with sanitized partial/complete evidence; no consent or sends.\n");
