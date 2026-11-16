@@ -172,6 +172,8 @@ jobs:
           python -m unittest discover -s tests -p 'test_g3_dlo_dmo_mapping_candidate.py'
           python scripts/ci/verify-g3-business-goal-coverage.py
           python scripts/ci/verify-g3-technical-closure.py
+          python scripts/ci/verify-g6-native-consent-policy.py
+          python -m unittest discover -s tests -p 'test_g6_native_consent_policy.py'
           python -m unittest discover -s tests -p 'test_g3_technical_closure.py'
           python scripts/ci/verify-g3-signoff-handoff.py
           python -m unittest discover -s tests -p 'test_g3_signoff_handoff.py'
