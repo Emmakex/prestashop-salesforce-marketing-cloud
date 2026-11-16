@@ -68,6 +68,7 @@ final class GrowthCartLastLocalExclusionReview
             'last_connector_order_state' => $ledgerOrder,
             'last_local_checks' => 3,
             'purchase_observed_in_last_check' => $purchaseFound,
+            'last_purchase_source_uncertain' => $purchaseUnknown,
             'last_local_source_uncertain' => $purchaseUnknown
                 || $customerState === 'unknown',
             'reasons' => $reasons,
