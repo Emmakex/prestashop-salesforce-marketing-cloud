@@ -14,7 +14,7 @@ final class G6ConsentSourceTopologyProbe
 {
     const CSC_DMO = 'ssot__CommunicationSubscriptionConsent__dlm';
     const API = '/services/data/v68.0/ssot/';
-    const MAX_HTTP_BODY = 524288;
+    const MAX_HTTP_BODY = 4194304;
     const STREAM_PAGE_LIMIT = 200;
     const MAPPING_LIMIT = 500;
 
