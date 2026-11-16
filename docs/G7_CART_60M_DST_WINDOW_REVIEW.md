@@ -43,4 +43,6 @@ El nuevo `GrowthCartInactivityWindowReview::inspect(localDateUpd, shopTimezone, 
 
 Referencias internas: `docs/ABH_TIMEZONE_CONFIRMATION_AND_DB_PREFLIGHT.md`, `docs/BC_G3_TIMESTAMP_PROVENANCE_AUDIT.md`, `docs/G7_NATIVE_CART_SNAPSHOT_REVIEW.md`.
 
+**Corte siguiente realizado (solo contrato):** [comparación de snapshot y diseño de exclusión final](G7_SNAPSHOT_EQUIVALENCE_FINAL_EXCLUSION.md), sin lector de digest real ni autorización de envío.
+
 **Próximo corte G7:** especificar cómo observar actividad y cambio de snapshot con instante UTC fiable para *nuevos* eventos, y una barrera de supresión final (compra, baja, límite de frecuencia) que no dependa de lecturas realizadas antes del futuro despacho. No reabrir G3/G4 ni exigir SQL al propietario.

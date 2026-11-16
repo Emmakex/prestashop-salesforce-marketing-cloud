@@ -1,5 +1,8 @@
 # AGENTS — PrestaShop ↔ Marketing Cloud Growth + Data Cloud (único producto)
 
+**G7 snapshot, sin proveedor ni envíos (16/11/2026):** contrato anterior ya registra un `snapshot_hash` determinista en `sfmc_cart`; reutilizarlo, NO crear otro esquema ni fingir conocer su serialización. `GrowthCartSnapshotEquivalenceReview` compara dos descripciones estrictas de digests `sha256` inyectados por origen capturado/recalculado y scope idéntico; no hay productor real conectado y aunque coincidan las huellas retorna `hold_for_review`, sin acreditar snapshot nativo. `GrowthCartConversionHoldGate::inspectWithNativeCartSnapshotReview` conserva las siete consultas locales existentes y el bloqueo por baja/compra. La exclusión transaccional local justo antes del despacho está **diseñada, no implementada**, y no puede cerrar una carrera con un API externo sin controles oficiales de consentimiento/supresión en Growth. [Documento](docs/G7_SNAPSHOT_EQUIVALENCE_FINAL_EXCLUSION.md).
+
+
 **G7 ventana 60m (16/11/2026):** el candidato `GrowthCartInactivityWindowReview` reutiliza normalizador DST y zona IANA de tienda ya existentes. Exige reloj UTC de referencia, proveniencia de escritura explícita (sin inferir de `PS_TIMEZONE`) y clasifica 3599/3600 segundos, hora repetida/omitida, futuro e inconsistencia. Se integra opcionalmente en el lector carrito/productos sin SELECT adicional; composición G7 sigue en 7 SELECT sin caché, devuelve siempre `hold_for_review`. `shop_local_write_path_asserted` NO es prueba real ni autorización. Fuente [docs/G7_CART_60M_DST_WINDOW_REVIEW.md](docs/G7_CART_60M_DST_WINDOW_REVIEW.md). Nada conectado a hooks, cron, workers o Salesforce.
 
 

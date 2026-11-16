@@ -297,6 +297,40 @@ final class GrowthCartConversionHoldGate
         );
     }
 
+    /**
+     * Review-only G7 convergence: reuse the existing seven fresh native
+     * cart/customer/order SELECTs and separately compare two injected,
+     * shop-scoped snapshot hashes. The current/fresh producer is not
+     * connected to native items yet; match NEVER certifies true equivalence.
+     *
+     * No dispatch operation occurs or can become authorized here.
+     */
+    public static function inspectWithNativeCartSnapshotReview(
+        $shopId, $cartId, $customerId, $selectRows, $prefix, array $signals,
+        $capturedSnapshot, $freshSnapshot, $reviewWindow = null
+    ) {
+        self::validateSignals($signals);
+        $comparison = GrowthCartSnapshotEquivalenceReview::inspect(
+            $shopId, $cartId, $customerId, $capturedSnapshot, $freshSnapshot
+        );
+        $report = self::inspectWithNativeCart(
+            $shopId, $cartId, $customerId, $selectRows, $prefix,
+            $signals, $reviewWindow
+        );
+        $report['status'] = 'hold_for_review';
+        $report['snapshot_equivalence_state'] =
+            $comparison['snapshot_equivalence_state'];
+        $report['snapshot_digest_match_injected_only'] =
+            $comparison['injected_digest_match_observed'];
+        $report['full_native_cart_snapshot_equivalence_certified'] = false;
+        $report['final_send_exclusion_fence_certified'] = false;
+        $report['reasons'] = array_values(array_unique(array_merge(
+            $report['reasons'],
+            [$comparison['snapshot_equivalence_state']]
+        )));
+        return $report;
+    }
+
     private static function validateSignals(array $signals)
     {
         $keys = array_keys($signals);
