@@ -51,6 +51,8 @@ El **15/11/2026** el propietario ha confirmado que acepta los tres puntos G3 y n
 
 **G7 snapshot fresco:** el [adaptador nativo de revisión](docs/G7_FRESH_NATIVE_LEGACY_CART_REVIEW.md) reproduce localmente el SHA-1 del carrito completo legado 0.7.1 desde objetos actuales PrestaShop, manteniendo 7 controles SQL sin caché. Fuente capturada en BC y condición final de despacho no certificadas: todos los envíos e ingesta siguen deshabilitados y BC sigue 0.7.1 Test.
 
+**G7 última exclusión local:** [relectura al final del snapshot](docs/G7_LAST_LOCAL_EXCLUSION_RECHECK.md) con 3 SELECT adicionales sin caché para compra/baja; una compra o exclusión aparecida después de las primeras lecturas bloquea. **No equivale a una barrera atómica de envío**, sin datos personales exportados ni cambios en BC 0.7.1 Test.
+
 ## Puertas de entrega
 
 | Paso | Estado |
