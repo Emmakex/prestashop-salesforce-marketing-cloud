@@ -42,7 +42,7 @@ function g6Safe($out) {
         'salesforce_send_time_consent_certified','external_suppression_sources_complete',
         'final_atomic_exclusion_fence_ready','data_cloud_ingestion_authorized',
         'marketing_sends_authorized'] as $key) {
-        g6Assert(isset($out[$key])===false && array_key_exists($key,$out)
+        g6Assert(array_key_exists($key,$out)
             && $out[$key]===false,'unsafe_flag_'.$key);
     }
     $body=json_encode($out);
