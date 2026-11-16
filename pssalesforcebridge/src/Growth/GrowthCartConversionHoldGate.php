@@ -288,8 +288,8 @@ final class GrowthCartConversionHoldGate
             || !class_exists('Configuration')) {
             throw new RuntimeException('growth_cart_prestashop_unavailable');
         }
-        $timezone = \Emmakex\PrestaShopSalesforceMarketingCloud\DataCloud
-            \ShopTimezoneResolver::readFromPrestaShop($shopId);
+        $timezone = \Emmakex\PrestaShopSalesforceMarketingCloud\DataCloud\ShopTimezoneResolver
+            ::readFromPrestaShop($shopId);
         return self::inspectWithNativeCartWindow(
             $shopId, $cartId, $customerId, function ($sql) {
                 return \Db::getInstance()->executeS($sql, true, false);
