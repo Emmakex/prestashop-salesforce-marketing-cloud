@@ -245,3 +245,95 @@ foreach(['curl_','executeS(', 'Db::getInstance()', '->enqueue(',
     '->insert(', '->issueUrl(', '/api/v1/ingest/'] as $bad)
     freshAssert(strpos($code,$bad)===false,'native_review_side_effect');
 echo "G7 fresh native 0.7.1 snapshot replay PASS: golden SHA1, drift, 7 uncached holds, late purchase, optout, no sends.\n";
+
+// G7 last local exclusion check occurs AFTER the native SHA1 read.
+// The ten SELECTs intentionally do NOT constitute marketing permission.
+function resetLastLocalMocks() {
+    Db::$calls=[];Db::$orders=0;Db::$customers=0;Db::$ledgerReads=0;
+    Db::$lateOrder=false;Db::$optout=false;Db::$finalOrder=false;
+    Db::$finalOptout=false;Db::$finalLedgerUnknown=false;
+    Cart::$template=freshCart();Customer::$template=freshCustomer();
+}
+function assertLastLocal($r,$status) {
+    freshAssert($r['last_local_exclusion_state']===$status
+        && $r['status']==='hold_for_review'
+        && $r['last_local_check_count']===3
+        && $r['last_local_customer_state']!==null
+        && $r['final_send_exclusion_fence_certified']===false
+        && $r['race_with_future_dispatch_closed']===false
+        && $r['salesforce_send_time_consent_certified']===false
+        && $r['recovery_link_creation_authorized']===false
+        && $r['data_cloud_ingestion_authorized']===false
+        && $r['marketing_sends_authorized']===false,
+        'last_local_must_remain_blocked_'.$status);
+    freshAssert(count(Db::$calls)===10,'last_local_ten_fresh_selects');
+    foreach(Db::$calls as $c) {
+        freshAssert($c[1]===true && $c[2]===false,
+            'last_local_query_cache_must_be_bypassed');
+    }
+    freshAssert(
+        strpos(Db::$calls[7][0],'FROM `ps_ci_customer`')!==false
+        && strpos(Db::$calls[8][0],'FROM `ps_ci_orders`')!==false
+        && strpos(Db::$calls[9][0],'FROM `ps_ci_sfmc_order_sync`')!==false,
+        'last_recheck_sql_order_customer_then_native_order_then_ledger');
+    $serialized=json_encode($r);
+    foreach([CAPTURED_071_SHA1,'synthetic@example.invalid',
+        'SYNTH-SKU','Synthetic product','2026-11-16 11:30:00']
+        as $private) {
+        freshAssert(strpos($serialized,$private)===false,
+            'last_check_leaked_source_data');
+    }
+}
+resetLastLocalMocks();
+$final=Gate::inspectPrestaShopWithFreshLegacyCartFinalReview(
+    2,93,17,freshSignals(),CAPTURED_071_SHA1);
+assertLastLocal($final,'last_local_no_negative_observed_review_only');
+freshAssert($final['fresh_legacy_snapshot_state']
+    === 'native_071_recomputed_digest_match_review_only'
+    && !$final['last_local_purchase_observed']
+    && !$final['last_local_source_uncertain'],
+    'no_negative_only_a_review_candidate');
+
+resetLastLocalMocks();Db::$finalOrder=true;
+$final=Gate::inspectPrestaShopWithFreshLegacyCartFinalReview(
+    2,93,17,freshSignals(),CAPTURED_071_SHA1);
+assertLastLocal($final,'purchase_found_in_last_local_review');
+freshAssert($final['purchase_found_locally']===true
+    && $final['last_local_purchase_observed']===true
+    && in_array('purchase_found_in_last_local_review',$final['reasons'],true)
+    && $final['fresh_legacy_snapshot_state']
+        ==='native_071_recomputed_digest_match_review_only',
+    'late_purchase_after_matching_snapshot_not_blocked');
+
+resetLastLocalMocks();Db::$finalOptout=true;
+$final=Gate::inspectPrestaShopWithFreshLegacyCartFinalReview(
+    2,93,17,freshSignals(),CAPTURED_071_SHA1);
+assertLastLocal($final,'last_local_customer_negative');
+freshAssert(in_array('last_local_customer_negative',$final['reasons'],true)
+    && $final['last_local_customer_state']==='known_negative',
+    'late_optout_after_matching_snapshot_not_blocked');
+
+resetLastLocalMocks();Db::$finalLedgerUnknown=true;
+$final=Gate::inspectPrestaShopWithFreshLegacyCartFinalReview(
+    2,93,17,freshSignals(),CAPTURED_071_SHA1);
+assertLastLocal($final,'last_local_purchase_source_unverified');
+freshAssert($final['last_local_source_uncertain']===true
+    && $final['purchase_state_unknown']===true
+    && in_array('last_local_purchase_source_unverified',$final['reasons'],true),
+    'unknown_final_ledger_cannot_look_clear');
+
+resetLastLocalMocks();
+$invalidSignals=freshSignals();$invalidSignals['email']='must_not_access_source';
+try {
+    Gate::inspectPrestaShopWithFreshLegacyCartFinalReview(
+        2,93,17,$invalidSignals,CAPTURED_071_SHA1);
+    freshAssert(false,'unexpected_final_payload_accepted');
+} catch (\RuntimeException $error) {
+    freshAssert($error->getMessage()==='growth_cart_signal_shape_invalid'
+        && count(Db::$calls)===0,'invalid_signals_reached_final_db');
+}
+freshAssert(strpos($module,'GrowthCartLastLocalExclusionReview')===false
+    && strpos($module,'inspectPrestaShopWithFreshLegacyCartFinalReview')===false,
+    'final_reader_must_not_be_wired_to_module');
+echo "G7 last local exclusion PASS: 10 uncached SELECTs, third-pass purchase, late optout/unknown, no sends.\n";
+
