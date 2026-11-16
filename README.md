@@ -49,6 +49,8 @@ El **15/11/2026** el propietario ha confirmado que acepta los tres puntos G3 y n
 
 **G7 compatibilidad del snapshot:** [auditoría histórica de 0.7.1](docs/G7_LEGACY_071_SNAPSHOT_SHA1_COMPATIBILITY.md) verifica que el `snapshot_hash` original es SHA-1 del JSON completo y tiene 40 caracteres, no SHA-256. El comparador G7 y un replay sintético se alinean con el legado; **todavía no** existe recálculo nativo certificado de un carrito actual, ni autorización de envío. BC 0.7.1 Test sin cambios.
 
+**G7 snapshot fresco:** el [adaptador nativo de revisión](docs/G7_FRESH_NATIVE_LEGACY_CART_REVIEW.md) reproduce localmente el SHA-1 del carrito completo legado 0.7.1 desde objetos actuales PrestaShop, manteniendo 7 controles SQL sin caché. Fuente capturada en BC y condición final de despacho no certificadas: todos los envíos e ingesta siguen deshabilitados y BC sigue 0.7.1 Test.
+
 ## Puertas de entrega
 
 | Paso | Estado |
