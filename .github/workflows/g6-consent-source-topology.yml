@@ -1,0 +1,67 @@
+name: G6 Consent Source Topology Read Only
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'Two fixed Data Cloud metadata GETs; no consent or customer records'
+        required: true
+        type: choice
+        options:
+          - two_metadata_gets_no_records
+
+permissions:
+  contents: read
+
+concurrency:
+  group: g6-consent-source-metadata-only
+  cancel-in-progress: false
+
+jobs:
+  g6-consent-topology:
+    if: >-
+      github.repository == 'Emmakex/prestashop-salesforce-marketing-cloud' &&
+      github.ref == 'refs/heads/main' &&
+      inputs.mode == 'two_metadata_gets_no_records'
+    name: Inspect CSC mapping and consent stream metadata without records
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    environment: salesforce-growth-certification
+    steps:
+      - name: Checkout exact main SHA
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Enforce exact repo and manual action
+        shell: bash
+        run: |
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          test "$GITHUB_REPOSITORY" = "Emmakex/prestashop-salesforce-marketing-cloud"
+          test "$GITHUB_REF" = "refs/heads/main"
+          test "$GITHUB_EVENT_NAME" = "workflow_dispatch"
+          test -f tests/live/g6-consent-topology-readonly.php
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: curl
+          coverage: none
+      - name: Synthetic topology read-only and fail-closed test
+        run: php tests/g6-consent-topology-contract.php
+      - name: Inspect two fixed configuration endpoints (no individual consent)
+        env:
+          G6_TOPOLOGY_MODE: two_metadata_gets_no_records
+          G6_TOPOLOGY_CONFIRM: ${{ inputs.mode }}
+          G6_TOPOLOGY_EVIDENCE: g6-consent-topology-sanitized.json
+          SF_GROWTH_ORG_URL: ${{ vars.SF_GROWTH_ORG_URL }}
+          SF_GROWTH_CLIENT_ID: ${{ secrets.SF_GROWTH_CLIENT_ID }}
+          SF_GROWTH_CLIENT_SECRET: ${{ secrets.SF_GROWTH_CLIENT_SECRET }}
+        run: php tests/live/g6-consent-topology-readonly.php
+      - name: Upload sanitized flags only
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: g6-consent-source-topology-${{ github.run_id }}-${{ github.run_attempt }}
+          path: g6-consent-topology-sanitized.json
+          if-no-files-found: ignore
+          retention-days: 14
