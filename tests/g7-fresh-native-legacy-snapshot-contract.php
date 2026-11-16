@@ -150,6 +150,7 @@ class Db {
     public static $ledgerReads=0;
     public static $finalOrder=false;
     public static $finalOptout=false;
+    public static $finalCustomerUnknown=false;
     public static $finalLedgerUnknown=false;
     public static function getInstance(){return new self();}
     public function executeS($sql,$array=true,$useCache=true) {
@@ -161,6 +162,7 @@ class Db {
             return [['id_cart'=>'93','id_shop'=>'2','quantity'=>'1']];
         if(strpos($sql,'FROM `ps_ci_customer`')!==false) {
             ++self::$customers;
+            if(self::$finalCustomerUnknown && self::$customers===2) return false;
             $negative=self::$optout || (self::$finalOptout && self::$customers===2);
             return [['id_customer'=>'17','id_shop'=>'2','active'=>'1',
                 'deleted'=>'0','is_guest'=>'0','newsletter'=>$negative?'0':'1',
@@ -251,7 +253,8 @@ echo "G7 fresh native 0.7.1 snapshot replay PASS: golden SHA1, drift, 7 uncached
 function resetLastLocalMocks() {
     Db::$calls=[];Db::$orders=0;Db::$customers=0;Db::$ledgerReads=0;
     Db::$lateOrder=false;Db::$optout=false;Db::$finalOrder=false;
-    Db::$finalOptout=false;Db::$finalLedgerUnknown=false;
+    Db::$finalOptout=false;Db::$finalCustomerUnknown=false;
+    Db::$finalLedgerUnknown=false;
     Cart::$template=freshCart();Customer::$template=freshCustomer();
 }
 function assertLastLocal($r,$status) {
@@ -321,6 +324,25 @@ freshAssert($final['last_local_source_uncertain']===true
     && $final['purchase_state_unknown']===true
     && in_array('last_local_purchase_source_unverified',$final['reasons'],true),
     'unknown_final_ledger_cannot_look_clear');
+
+resetLastLocalMocks();Db::$finalCustomerUnknown=true;
+$final=Gate::inspectPrestaShopWithFreshLegacyCartFinalReview(
+    2,93,17,freshSignals(),CAPTURED_071_SHA1);
+assertLastLocal($final,'last_local_customer_source_unverified');
+freshAssert($final['last_local_source_uncertain']===true
+    && $final['purchase_state_unknown']===false
+    && $final['last_local_customer_state']==='unknown'
+    && in_array('last_local_customer_source_unverified',$final['reasons'],true),
+    'unknown_final_customer_must_block_without_falsifying_purchase_state');
+
+resetLastLocalMocks();Db::$finalOrder=true;Db::$finalOptout=true;
+$final=Gate::inspectPrestaShopWithFreshLegacyCartFinalReview(
+    2,93,17,freshSignals(),CAPTURED_071_SHA1);
+assertLastLocal($final,'purchase_found_in_last_local_review');
+freshAssert($final['purchase_found_locally']===true
+    && in_array('last_local_customer_negative',$final['reasons'],true)
+    && in_array('purchase_found_in_last_local_review',$final['reasons'],true),
+    'simultaneous_purchase_and_optout_must_preserve_both_reasons');
 
 resetLastLocalMocks();
 $invalidSignals=freshSignals();$invalidSignals['email']='must_not_access_source';
