@@ -8,6 +8,7 @@ require_once dirname(__DIR__).'/pssalesforcebridge/src/Growth/GrowthLocalCartSna
 require_once dirname(__DIR__).'/pssalesforcebridge/src/Growth/GrowthLocalCustomerHoldReader.php';
 require_once dirname(__DIR__).'/pssalesforcebridge/src/Growth/LocalOrderPresenceReader.php';
 require_once dirname(__DIR__).'/pssalesforcebridge/src/Growth/GrowthCartConversionHoldGate.php';
+require_once dirname(__DIR__).'/pssalesforcebridge/src/Growth/GrowthCartLastLocalExclusionReview.php';
 
 use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthLegacyCartFreshNativeReview as Fresh;
 use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthCartConversionHoldGate as Gate;
@@ -145,6 +146,11 @@ class Db {
     public static $lateOrder=false;
     public static $optout=false;
     public static $orders=0;
+    public static $customers=0;
+    public static $ledgerReads=0;
+    public static $finalOrder=false;
+    public static $finalOptout=false;
+    public static $finalLedgerUnknown=false;
     public static function getInstance(){return new self();}
     public function executeS($sql,$array=true,$useCache=true) {
         self::$calls[]=[$sql,$array,$useCache];
@@ -153,17 +159,25 @@ class Db {
                 'date_upd'=>'2026-11-16 11:30:00']];
         if(strpos($sql,'FROM `ps_ci_cart_product`')!==false)
             return [['id_cart'=>'93','id_shop'=>'2','quantity'=>'1']];
-        if(strpos($sql,'FROM `ps_ci_customer`')!==false)
+        if(strpos($sql,'FROM `ps_ci_customer`')!==false) {
+            ++self::$customers;
+            $negative=self::$optout || (self::$finalOptout && self::$customers===2);
             return [['id_customer'=>'17','id_shop'=>'2','active'=>'1',
-                'deleted'=>'0','is_guest'=>'0','newsletter'=>self::$optout?'0':'1',
+                'deleted'=>'0','is_guest'=>'0','newsletter'=>$negative?'0':'1',
                 'optin'=>'1']];
+        }
         if(strpos($sql,'FROM `ps_ci_orders`')!==false) {
             ++self::$orders;
-            if(self::$lateOrder && self::$orders===2)
+            if((self::$lateOrder && self::$orders===2)
+                || (self::$finalOrder && self::$orders===3))
                 return [['id_cart'=>'93','id_shop'=>'2','id_order'=>'200']];
             return [];
         }
-        if(strpos($sql,'FROM `ps_ci_sfmc_order_sync`')!==false) return [];
+        if(strpos($sql,'FROM `ps_ci_sfmc_order_sync`')!==false) {
+            ++self::$ledgerReads;
+            if(self::$finalLedgerUnknown && self::$ledgerReads===3) return false;
+            return [];
+        }
         freshAssert(false,'unexpected_SQL');
     }
 }
