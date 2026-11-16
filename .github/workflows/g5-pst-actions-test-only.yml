@@ -1,0 +1,68 @@
+name: G5 PST Synthetic Salesforce Actions Test Only
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_validation_only:
+        description: 'Validate 2 fixed synthetic records via Salesforce /actions/test ONLY (no ingestion)'
+        required: true
+        type: choice
+        options:
+          - yes_synthetic_actions_test_only
+
+permissions:
+  contents: read
+
+concurrency:
+  group: g5-pst-synthetic-actions-test-only
+  cancel-in-progress: false
+
+jobs:
+  validate-synthetic-only:
+    if: >-
+      github.repository == 'Emmakex/prestashop-salesforce-marketing-cloud' &&
+      github.ref == 'refs/heads/main' &&
+      inputs.confirm_validation_only == 'yes_synthetic_actions_test_only'
+    name: ABH PST /actions/test only, no data persistence
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    environment: salesforce-growth-certification
+    steps:
+      - name: Checkout exact main SHA, without persisted GitHub credentials
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Verify repo, event, exact checkout and /actions/test fence
+        shell: bash
+        run: |
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          test "$GITHUB_REF" = "refs/heads/main"
+          test "$GITHUB_REPOSITORY" = "Emmakex/prestashop-salesforce-marketing-cloud"
+          test "$GITHUB_EVENT_NAME" = "workflow_dispatch"
+          grep -Fq "G5SyntheticValidationOnly" tests/live/g5-pst-actions-test-only.php
+          grep -Fq "'/actions/test'" tests/review/G5SyntheticValidationOnly.php
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: curl
+          coverage: none
+      - name: Offline synthetic negative cases before tenant authentication
+        run: php tests/g5-synthetic-actions-test-contract.php
+      - name: Validate fixed synthetic customer + order, no ingestion endpoint
+        env:
+          G5_PST_VALIDATION_MODE: yes_synthetic_actions_test_only
+          G5_PST_RUN_CONFIRM: ${{ inputs.confirm_validation_only }}
+          SF_GROWTH_ORG_URL: ${{ vars.SF_GROWTH_ORG_URL }}
+          SF_GROWTH_CLIENT_ID: ${{ secrets.SF_GROWTH_CLIENT_ID }}
+          SF_GROWTH_CLIENT_SECRET: ${{ secrets.SF_GROWTH_CLIENT_SECRET }}
+          G5_PST_EVIDENCE_PATH: g5-pst-actions-test-sanitized.json
+        run: php tests/live/g5-pst-actions-test-only.php
+      - name: Publish sanitized status only
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: g5-pst-actions-test-sanitized-${{ github.run_id }}-${{ github.run_attempt }}
+          path: g5-pst-actions-test-sanitized.json
+          if-no-files-found: ignore
+          retention-days: 14
