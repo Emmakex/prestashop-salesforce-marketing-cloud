@@ -197,11 +197,13 @@ final class GrowthCartConversionHoldGate
      * Preflight validates all signals BEFORE any DB read; no PII is returned.
      */
     public static function inspectWithNativeCart(
-        $shopId, $cartId, $customerId, $selectRows, $prefix, array $signals
+        $shopId, $cartId, $customerId, $selectRows, $prefix, array $signals,
+        $reviewWindow = null
     ) {
         self::validateSignals($signals);
         $cart = GrowthLocalCartSnapshotReader::inspect(
-            $shopId, $cartId, $customerId, $selectRows, $prefix
+            $shopId, $cartId, $customerId, $selectRows, $prefix,
+            $reviewWindow
         );
         // A caller supplied "snapshot_current=true" is NOT proof of a
         // snapshot match. Validate locally, then keep that claim unverified.
@@ -216,6 +218,9 @@ final class GrowthCartConversionHoldGate
         $result['local_cart_source_state'] = $cart['local_cart_source_state'];
         $result['local_cart_positive_product_observed'] =
             $cart['positive_product_observed'];
+        $result['local_cart_inactivity_window_state'] =
+            $cart['local_cart_inactivity_window_state'];
+        $result['inactivity_window_certified_for_bc'] = false;
         $result['native_cart_snapshot_verified_for_bc'] = false;
         $result['local_cart_source_checked'] = true;
         $result['reasons'] = array_values(array_unique(array_merge(
@@ -240,6 +245,55 @@ final class GrowthCartConversionHoldGate
             $shopId, $cartId, $customerId, function ($sql) {
                 return \Db::getInstance()->executeS($sql, true, false);
             }, _DB_PREFIX_, $signals
+        );
+    }
+
+    /**
+     * Review the local 60-minute cart window under EXPLICIT writer/timezone/
+     * observation assumptions, then combine with existing purchase and
+     * opt-out holds. Even an elapsed time is review-only and never a send.
+     * No new queries: the callback reads the date from the same validated
+     * cart row within the existing seven fresh local SELECTs.
+     */
+    public static function inspectWithNativeCartWindow(
+        $shopId, $cartId, $customerId, $selectRows, $prefix, array $signals,
+        $shopTimezone, $asOfUtc, $writePathEvidence
+    ) {
+        self::validateSignals($signals);
+        return self::inspectWithNativeCart(
+            $shopId, $cartId, $customerId, $selectRows, $prefix,
+            $signals, function ($cartLocalDate) use (
+                $shopTimezone, $asOfUtc, $writePathEvidence
+            ) {
+                return GrowthCartInactivityWindowReview::inspect(
+                    $cartLocalDate, $shopTimezone, $asOfUtc,
+                    $writePathEvidence
+                );
+            }
+        );
+    }
+
+    /**
+     * PrestaShop 1.7/8/9 adapter: shop-specific PS_TIMEZONE read only.
+     * PS_TIMEZONE alone never proves past date_upd write semantics;
+     * the caller must supply a separately verified UTC clock/evidence,
+     * and the returned result remains hold_for_review in every case.
+     */
+    public static function inspectPrestaShopWithNativeCartWindow(
+        $shopId, $cartId, $customerId, array $signals,
+        $asOfUtc, $writePathEvidence
+    ) {
+        self::validateSignals($signals);
+        if (!defined('_DB_PREFIX_') || !class_exists('Db')
+            || !class_exists('Configuration')) {
+            throw new RuntimeException('growth_cart_prestashop_unavailable');
+        }
+        $timezone = \Emmakex\PrestaShopSalesforceMarketingCloud\DataCloud\ShopTimezoneResolver::readFromPrestaShop($shopId);
+        return self::inspectWithNativeCartWindow(
+            $shopId, $cartId, $customerId, function ($sql) {
+                return \Db::getInstance()->executeS($sql, true, false);
+            }, _DB_PREFIX_, $signals, $timezone, $asOfUtc,
+            $writePathEvidence
         );
     }
 

@@ -11,7 +11,7 @@ use Throwable;
  */
 final class GrowthLocalCartSnapshotReader
 {
-    public static function inspect($shopId, $cartId, $customerId, $selectRows, $prefix)
+    public static function inspect($shopId, $cartId, $customerId, $selectRows, $prefix, $reviewWindow = null)
     {
         if (!is_int($shopId) || $shopId <= 0
             || !is_int($cartId) || $cartId <= 0
@@ -20,6 +20,9 @@ final class GrowthLocalCartSnapshotReader
         }
         if (!is_callable($selectRows)) {
             throw new RuntimeException('growth_cart_snapshot_reader_required');
+        }
+        if ($reviewWindow !== null && !is_callable($reviewWindow)) {
+            throw new RuntimeException('growth_cart_snapshot_window_reviewer_invalid');
         }
         if (!is_string($prefix) || strlen($prefix) < 1
             || strlen($prefix) > 64
@@ -87,8 +90,41 @@ final class GrowthLocalCartSnapshotReader
             return self::hold('cart_source_unverified',
                 'local_cart_product_scope_or_quantity_invalid', false);
         }
+        // Supply the raw date only to an explicitly injected local callback
+        // AFTER verifying the source row and products. Do not return the
+        // date, its UTC conversion or identity in the public result.
+        $windowState = 'not_checked';
+        if ($reviewWindow !== null) {
+            try {
+                $review = call_user_func($reviewWindow, $row['date_upd']);
+                $allow = [
+                    'write_path_provenance_unknown',
+                    'dst_overlap_ambiguous',
+                    'dst_gap_nonexistent',
+                    'invalid_source_calendar',
+                    'invalid_source_format',
+                    'shop_timezone_unknown',
+                    'timestamp_conversion_unverified',
+                    'source_clock_in_future',
+                    'under_60_minutes',
+                    'elapsed_60m_candidate_under_asserted_provenance'
+                ];
+                if (is_array($review)
+                    && isset($review['inactivity_window_state'])
+                    && in_array($review['inactivity_window_state'], $allow, true)
+                    && isset($review['marketing_sends_authorized'])
+                    && $review['marketing_sends_authorized'] === false) {
+                    $windowState = $review['inactivity_window_state'];
+                } else {
+                    $windowState = 'review_failed';
+                }
+            } catch (Throwable $error) {
+                $windowState = 'review_failed';
+            }
+        }
         return self::hold('cart_present_nonempty_review_only',
-            'cart_snapshot_and_abandonment_window_unverified', true);
+            'cart_snapshot_and_abandonment_window_unverified',
+            true, $windowState);
     }
 
     /** Native PrestaShop 1.7/8/9; no cache on either SELECT. */
@@ -102,13 +138,14 @@ final class GrowthLocalCartSnapshotReader
         }, _DB_PREFIX_);
     }
 
-    private static function hold($state, $reason, $hasProducts)
+    private static function hold($state, $reason, $hasProducts, $windowState = 'not_checked')
     {
         return [
             'status' => 'hold_for_review',
             'local_cart_source_state' => $state,
             'reasons' => [$reason],
             'positive_product_observed' => $hasProducts,
+            'local_cart_inactivity_window_state' => $windowState,
             'source_snapshot_hash_verified' => false,
             'abandonment_window_verified' => false,
             'cart_timestamp_timezone_verified' => false,

@@ -38,6 +38,10 @@ Esquema nativo de referencia:
 - https://devdocs.prestashop-project.org/9/development/database/
 - https://devdocs.prestashop-project.org/8/webservice/resources/carts/
 
+## Avance posterior: verificación offline de los 60 minutos (16/11/2026)
+
+Se añade el [contrato 60 minutos/DST](G7_CART_60M_DST_WINDOW_REVIEW.md): cálculo de 3600 segundos con el normalizador IANA/UTC ya existente y adaptación opcional al mismo lector nativo, sin nuevas consultas SQL. Rechaza DST ambiguo o inexistente y separa la procedencia real de escritura de una hipótesis de test. Todas las comprobaciones continúan bloqueadas para marketing, sin equiparar `date_upd` a actividad comercial certificada.
+
 ## Siguiente corte G7 (separado, sin activar envíos)
 
 Certificar la fuente de actividad/frescura del carrito, la ventana efectiva de 60 minutos y el contrato temporal (origen, DB/server timezone, DST), además de un diseño explícito de exclusión atómica de compra y baja antes del despacho. Con G6 pendiente de consentimientos reales, ninguna prueba G7 puede declarar campañas listas para producción.

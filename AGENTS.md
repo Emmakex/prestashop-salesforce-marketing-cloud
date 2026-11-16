@@ -1,5 +1,8 @@
 # AGENTS — PrestaShop ↔ Marketing Cloud Growth + Data Cloud (único producto)
 
+**G7 ventana 60m (16/11/2026):** el candidato `GrowthCartInactivityWindowReview` reutiliza normalizador DST y zona IANA de tienda ya existentes. Exige reloj UTC de referencia, proveniencia de escritura explícita (sin inferir de `PS_TIMEZONE`) y clasifica 3599/3600 segundos, hora repetida/omitida, futuro e inconsistencia. Se integra opcionalmente en el lector carrito/productos sin SELECT adicional; composición G7 sigue en 7 SELECT sin caché, devuelve siempre `hold_for_review`. `shop_local_write_path_asserted` NO es prueba real ni autorización. Fuente [docs/G7_CART_60M_DST_WINDOW_REVIEW.md](docs/G7_CART_60M_DST_WINDOW_REVIEW.md). Nada conectado a hooks, cron, workers o Salesforce.
+
+
 **G7 corte nativo (16/11/2026):** `GrowthLocalCartSnapshotReader` lee solo carrito y existencia de producto de misma tienda/cliente (2 SELECT); `GrowthCartConversionHoldGate::inspectWithNativeCart` reutiliza 1 SELECT cliente y 4 de pedidos, todos sin caché. Cualquier señal externa `abandoned`, `snapshot_current` o ventana 60 min se invalida, aun cuando el carrito contenga productos. Sigue sin consentimiento Growth certificado, sin cierre de carrera con despacho, sin PSCart stream, sin URLs de recuperación y sin envíos. [Detalle](docs/G7_NATIVE_CART_SNAPSHOT_REVIEW.md). No conectar el lector a hooks/cron antes de las aprobaciones.
 
 

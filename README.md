@@ -43,6 +43,8 @@ El **15/11/2026** el propietario ha confirmado que acepta los tres puntos G3 y n
 
 **G7 avance local:** [revisión nativa de carritos](docs/G7_NATIVE_CART_SNAPSHOT_REVIEW.md): dos SELECT de carrito/productos por tienda + cliente y los cinco SELECT ya existentes de seguridad (cliente/pedidos), todos sin caché; sin permisos de envíos, ingesta ni recuperación. No certifica aún los 60 minutos ni la zona horaria, y no modifica BC 0.7.1 Test.
 
+**G7 60 minutos:** [contrato de inactividad y DST](docs/G7_CART_60M_DST_WINDOW_REVIEW.md) con límite de 3600 s, normalizador UTC y zona IANA por tienda reutilizados, bloqueo de fechas ambiguas o no verificadas. Siete lecturas nativas sin caché, cero envíos y ningún cambio en BC 0.7.1 Test.
+
 ## Puertas de entrega
 
 | Paso | Estado |
