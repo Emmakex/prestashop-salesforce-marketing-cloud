@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "observed_at_local_date": "2026-11-16",
+  "evidence_source": "owner_supplied_salesforce_data_cloud_ui_captures_in_project_conversation",
+  "merchant": "ABH",
+  "connector": "ABH_PrestaShop_Data_Cloud",
+  "connector_alias": "PST",
+  "data_space": "default",
+  "uploaded_schema": {
+    "objects": ["PSCustomer", "PSOrder"],
+    "source_attributes_each": 11,
+    "persisted_in_tenant": true,
+    "exact_schema_sha256_verified_by_tenant": false
+  },
+  "streams": {
+    "PST-PSCustomer": {
+      "state": "active",
+      "category": "profile",
+      "pk": "source_key",
+      "dlo_dmo_mapping_state": "LISTO",
+      "assigned_fields_display": "7/15",
+      "target_dmos": ["Individual", "Contact Point Email"],
+      "contact_point_email_to_individual_relation": "N:1",
+      "source_records_observed": 0
+    },
+    "PST-PSOrder": {
+      "state": "active",
+      "category": "other",
+      "pk": "source_key",
+      "dlo_dmo_mapping_state": "LISTO",
+      "assigned_fields_display": "15/15",
+      "target_dmos": ["PST-PSOrder"],
+      "source_records_observed": 0,
+      "relationship_to_individual": {
+        "source_field": "customer_source_key",
+        "source_key_qualifier": "KQ_customer_source_key",
+        "cardinality": "ManyToOne",
+        "target_field": "Individual Id",
+        "target_key_qualifier": "KQ_Id",
+        "saved": true
+      }
+    }
+  },
+  "scope_limits": {
+    "physical_ingestion_observed": false,
+    "join_of_real_rows_verified": false,
+    "marketing_consent_proven": false,
+    "campaigns_activated": false,
+    "prestashop_0_8_0_installed_in_bc": false
+  },
+  "next_gate": "g5_actions_test_synthetic_only"
+}
