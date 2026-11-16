@@ -1,0 +1,67 @@
+name: G6 CSC DMO Schema Metadata Read Only
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'Single GET of CSC DMO schema metadata; no consent or customer records'
+        required: true
+        type: choice
+        options:
+          - metadata_get_no_records
+
+permissions:
+  contents: read
+
+concurrency:
+  group: g6-abh-csc-dmo-metadata-only
+  cancel-in-progress: false
+
+jobs:
+  inspect-csc-dmo-metadata:
+    if: >-
+      github.repository == 'Emmakex/prestashop-salesforce-marketing-cloud' &&
+      github.ref == 'refs/heads/main' &&
+      inputs.mode == 'metadata_get_no_records'
+    name: Core CSC DMO GET metadata (no records)
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    environment: salesforce-growth-certification
+    steps:
+      - name: Checkout exact SHA, no persisted token
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Verify repository, branch and source fence
+        shell: bash
+        run: |
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          test "$GITHUB_REF" = "refs/heads/main"
+          test "$GITHUB_REPOSITORY" = "Emmakex/prestashop-salesforce-marketing-cloud"
+          test "$GITHUB_EVENT_NAME" = "workflow_dispatch"
+          test -f tests/live/g6-csc-dmo-metadata-only.php
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: curl
+          coverage: none
+      - name: Contract negative tests before OAuth
+        run: php tests/g6-csc-dmo-metadata-contract.php
+      - name: Inspect exact Salesforce CSC DMO metadata by one GET
+        env:
+          G6_CSC_METADATA_MODE: metadata_get_no_records
+          G6_CSC_METADATA_CONFIRM: ${{ inputs.mode }}
+          G6_CSC_METADATA_REPORT: g6-csc-dmo-metadata-sanitized.json
+          SF_GROWTH_ORG_URL: ${{ vars.SF_GROWTH_ORG_URL }}
+          SF_GROWTH_CLIENT_ID: ${{ secrets.SF_GROWTH_CLIENT_ID }}
+          SF_GROWTH_CLIENT_SECRET: ${{ secrets.SF_GROWTH_CLIENT_SECRET }}
+        run: php tests/live/g6-csc-dmo-metadata-only.php
+      - name: Upload sanitized schema-presence flags only
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: g6-csc-dmo-metadata-${{ github.run_id }}-${{ github.run_attempt }}
+          path: g6-csc-dmo-metadata-sanitized.json
+          if-no-files-found: ignore
+          retention-days: 14
