@@ -31,4 +31,6 @@ Fuentes exactas:
 4. Falta un adaptador de **reconstrucción actual real**: el lector de siete SELECT solo confirma existencia de un producto, no las líneas, nombre, precio, currency, email, preferencias o cálculo de elegibilidad y fecha `abandon_after`. Conectar el serializador exige revisar las diferencias entre versiones PrestaShop y el hash histórico, y una estrategia clara para no reactivar el antiguo transporte.
 5. Falta el *fence* final por compra/baja y el lector real de consentimiento CSC. No crear PSCart/Flow ni emitir campañas. G5 POST continúa bloqueado por el HTTP 202.
 
+**Corte siguiente implementado solo para revisión:** [reconstrucción local de snapshot fresco desde PrestaShop](G7_FRESH_NATIVE_LEGACY_CART_REVIEW.md) y composición con 7 SELECT actuales. No certifica aún origen de hash histórico ni condiciones para enviar.
+
 **Siguiente corte G7:** integrar un productor fresco **local, minimizado y desacoplado** que compare el hash histórico completo de forma segura, o determinar con pruebas si conviene una señal de cambio del carrito más estable versionada para la ruta Growth sin alterar los registros legados. Solo después abordar el despacho aprobado.
