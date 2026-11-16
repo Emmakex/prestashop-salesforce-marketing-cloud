@@ -7,9 +7,9 @@
 | G0 | Contrato del producto Growth-only | VERIFICADO |
 | G1 | App externa y OAuth Salesforce Core, scope probado | VERIFICADO |
 | G2 | Data Cloud token exchange, PST existente | VERIFICADO sin escrituras |
-| G3 | Diccionario PSCustomer/PSOrder, namespace, TZ/DST, finalidades, consentimiento, borrado, relación y firma | **BLOQUEADO** |
-| G4 | Esquema PST autorizado, Data Streams y mapeo tipado | PENDIENTE |
-| G5 | Test sintético Data Cloud, posterior escritura sintética aprobada | PENDIENTE |
+| G3 | Tres decisiones de dirección aceptadas por propietario; no repetirlas. Bases legales por finalidad no inferidas | ACEPTADO propietario, sin generalizar a consentimiento de campañas |
+| G4 | Esquema PST guardado, 2 Data Streams activos, 2 mapeos LISTO, relación pedido→Individual N:1 (capturas 16/11/2026) | **VERIFICADO estructural** |
+| G5 | Synchronous `/actions/test` sin persistencia, workflow manual. Ingesta real por endpoint 202 en otro corte | TEST EN PREPARACIÓN; ingesta persistente BLOQUEADO |
 | G6 | Consentimiento y supresión Growth, sin confiar solo en flags newsletter | PENDIENTE |
 | G7 | Flow/campañas Growth, recuperación y dedupe verificados | PENDIENTE |
 | G8 | Release, rollback, CI/runtime 1.7/8/9 y autorización BC | PENDIENTE |
@@ -25,4 +25,4 @@
 7. **CI/release:** PHP >=7.1, PS 1.7.8.11/8.2.8/9.1.5, pruebas negativas y de actualización, CI exact-head, merge solo con todas verdes. Prohibido afirmar uso productivo si solo hay pruebas.
 8. **Avance real:** tras cada corte informar PR/commit/pruebas y siguiente bloqueo mínimo. No ampliar otro tema mientras el proyecto principal esté abierto.
 
-**BC actual:** 0.7.1 en modo Test, sin reinstalar. Versión 0.8.0 preparada en rama, pendiente de certificar; no equivalen. **G3 BLOQUEADO** por aprobaciones formales, pero el código en CI puede evolucionar sin tocar producción.
+**BC actual:** 0.7.1 en modo Test, sin reinstalar. Versión 0.8.0 Growth-only integrada en `main` y certificada por CI/runtime, pero no instalada en BC. **G4 estructural completado por UI en Salesforce**; ahora se ejecuta G5 `/actions/test` exclusivamente sintético y no persistente. No habilitar envíos ni ingesta real.
