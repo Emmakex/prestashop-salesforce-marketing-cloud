@@ -3,7 +3,7 @@
 /**
  * PrestaShop -> Salesforce Marketing Cloud Growth + Data Cloud.
  *
- * v0.8.2: ALFABH publisher and MariaDB 11.8 database check.
+ * v0.8.3: ALFABH publisher and MariaDB 11.8 database check.
  * v0.8.1: staged local-only Growth event capture, explicitly armed in BO.
  * No Salesforce delivery, campaign, auto migration or production activation.
  * Existing 0.7.1 legacy tables, settings and customer data are preserved but
@@ -58,7 +58,7 @@ class PsSalesforceBridge extends Module
     {
         $this->name = 'pssalesforcebridge';
         $this->tab = 'advertising_marketing';
-        $this->version = '0.8.2';
+        $this->version = '0.8.3';
         $this->author = 'ALFABH';
         $this->need_instance = 0;
         $this->bootstrap = true;
