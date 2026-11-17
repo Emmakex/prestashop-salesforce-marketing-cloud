@@ -13,11 +13,16 @@ require_once dirname(__DIR__,2)
     .'/pssalesforcebridge/src/DataCloud/StagedAtomicUtcAcceptance.php';
 require_once dirname(__DIR__,2)
     .'/pssalesforcebridge/src/Growth/GrowthOutboxDeliveryLease.php';
+require_once dirname(__DIR__,2)
+    .'/pssalesforcebridge/src/DataCloud/GrowthStreamingIngestionPlan.php';
+require_once dirname(__DIR__,2)
+    .'/pssalesforcebridge/src/Growth/GrowthBlockedDispatchRehearsal.php';
 require_once __DIR__.'/G3GrowthOutboxSandboxMigration.php';
 require_once __DIR__.'/G3GrowthOutboxSandboxStore.php';
 
 use Emmakex\PrestaShopSalesforceMarketingCloud\DataCloud\StagedAtomicUtcAcceptance;
 use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthOutboxDeliveryLease;
+use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthBlockedDispatchRehearsal as Rehearsal;
 
 function g7LeaseAssert($yes,$code)
 {
@@ -177,6 +182,104 @@ function g7LeaseTest()
     g7LeaseAssert($store->inspect($ns,1,'customer',705,$race)['attempts']===1,
         'concurrent_attempt_counter_invalid');
 
+
+    // A complete synthetic worker rehearsal, using only the existing G3
+    // outbox/ledger and a simulated HTTP result. No HTTP client or payload.
+    $blocked=g7LeaseAdd($db,706,'2');
+    $denied=Rehearsal::simulate(
+        $store,$ns,1,'customer',706,$blocked,$token,true,202
+    );
+    g7LeaseAssert($denied['state']==='claim_denied'
+        && !$denied['lease_claimed']
+        && !$denied['http_request_performed'],
+        'blocked_outbox_must_not_rehearse');
+
+    $accepted=g7LeaseAdd($db,707,'3');
+    g7LeaseReady($db,$accepted);
+    $receipt=Rehearsal::simulate(
+        $store,$ns,1,'customer',707,$accepted,$token,true,202
+    );
+    $inspect=$store->inspect($ns,1,'customer',707,$accepted);
+    g7LeaseAssert($receipt['state']==='reconcile'
+        && $receipt['outcome_state']==='accepted_asynchronously_unconfirmed'
+        && $inspect['state']==='reconcile'
+        && $inspect['last_http']===202
+        && !$receipt['record_persisted_certified']
+        && !$receipt['outbox_delivery_authorized']
+        && !$store->claim($ns,1,'customer',707,$accepted,$token,60),
+        '202_rehearsal_overstated_completion');
+
+    $timeout=g7LeaseAdd($db,708,'4');
+    g7LeaseReady($db,$timeout);
+    $lost=Rehearsal::simulate(
+        $store,$ns,1,'customer',708,$timeout,$token,false,null
+    );
+    $inspect=$store->inspect($ns,1,'customer',708,$timeout);
+    g7LeaseAssert($lost['state']==='reconcile'
+        && $lost['outcome_state']==='unknown_after_transport'
+        && $inspect['state']==='reconcile'
+        && $inspect['last_http']===null
+        && !$inspect['lease_active']
+        && !$store->claim($ns,1,'customer',708,$timeout,$token,60),
+        'timeout_not_immediately_quarantined');
+
+    foreach ([[709,'5',503],[710,'6',200],[711,'7',401]] as $test) {
+        $seq=g7LeaseAdd($db,$test[0],$test[1]);
+        g7LeaseReady($db,$seq);
+        $bad=Rehearsal::simulate(
+            $store,$ns,1,'customer',$test[0],$seq,$token,true,$test[2]
+        );
+        $inspect=$store->inspect($ns,1,'customer',$test[0],$seq);
+        g7LeaseAssert($bad['state']==='held'
+            && $inspect['state']==='held'
+            && $inspect['last_http']===$test[2]
+            && !$bad['automatic_retry_authorized']
+            && !$bad['marketing_sends_authorized'],
+            'non202_rehearsal_was_delivered');
+    }
+
+    $preCancelled=g7LeaseAdd($db,712,'8');
+    g7LeaseReady($db,$preCancelled);
+    g7LeaseAssert($store->cancel($ns,1,'customer',712,$preCancelled),
+        'rehearsal_cancel_setup_failed');
+    $skip=Rehearsal::simulate(
+        $store,$ns,1,'customer',712,$preCancelled,$token,true,202
+    );
+    g7LeaseAssert($skip['state']==='claim_denied'
+        && !$skip['lease_claimed'],'cancelled_rehearsal_claimed');
+
+    $late=g7LeaseAdd($db,713,'9');
+    g7LeaseReady($db,$late);
+    g7LeaseAssert($store->claim($ns,1,'customer',713,$late,$token,60),
+        'late_cancel_not_claimed');
+    g7LeaseAssert($store->cancel($ns,1,'customer',713,$late),
+        'late_cancel_not_cancelled');
+    g7LeaseAssert(!$store->markUnknownUnconfirmed(
+        $ns,1,'customer',713,$late,$token),
+        'late_cancel_unknown_revived');
+
+    $invalid=g7LeaseAdd($db,714,'a');
+    g7LeaseReady($db,$invalid);
+    $badInputRejected=false;
+    try {
+        Rehearsal::simulate(
+            $store,$ns,1,'customer',714,$invalid,$token,false,202
+        );
+    } catch (RuntimeException $e) {
+        $badInputRejected=$e->getMessage()
+            ==='g7_rehearsal_simulated_outcome_invalid';
+    }
+    g7LeaseAssert($badInputRejected
+        && $store->inspect($ns,1,'customer',714,$invalid)['state']==='ready',
+        'invalid_fixture_claimed');
+
+    $safeReport=json_encode([$denied,$receipt,$lost,$bad,$skip]);
+    g7LeaseAssert(is_string($safeReport)
+        && strpos($safeReport,$token)===false
+        && strpos($safeReport,$ns)===false
+        && strpos($safeReport,'source_key')===false,
+        'rehearsal_leaks_lease_or_namespace');
+
     $count=(int)$db->query(
         "SELECT COUNT(*) FROM g3_growth_outbox_v1 WHERE status <> 'blocked'"
     )->fetchColumn();
@@ -216,7 +319,7 @@ try{
         exit(0);
     }
     g7LeaseTest();
-    echo "G7 durable lease PASS: original outbox, 4 worker race, cancellation, stale/202/timeout hold, rollback, no sends.\n";
+    echo "G7 durable lease PASS: original outbox, 4 worker race, simulated 202/503/200/timeout/cancellation, immediate quarantine, rollback, no sends.\n";
 }catch(Throwable $e){
     // Safe diagnostic only. Never print SQL, exceptions, scope IDs or tokens.
     $code=(string)$e->getMessage();
