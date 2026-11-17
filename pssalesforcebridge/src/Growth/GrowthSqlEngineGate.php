@@ -43,9 +43,11 @@ final class GrowthSqlEngineGate
         $patch = (int) $match[3];
         if ($isMaria) {
             $result['engine'] = 'mariadb';
-            // Only tested MariaDB family at present: 10.11 LTS. Other
-            // versions may work but must be certified independently.
-            if ($major === 10 && $minor === 11 && ($mariaCheckSetting === 1
+            // Only certified MariaDB 10.11 and 11.8. Unsupported versions
+            // must be tested before allowing staging schema setup.
+            if ((($major === 10 && $minor === 11)
+                || ($major === 11 && $minor === 8))
+                && ($mariaCheckSetting === 1
                 || $mariaCheckSetting === '1'
                 || $mariaCheckSetting === 'ON')) {
                 $result['status'] = 'eligible_for_sandbox_schema_preflight';
