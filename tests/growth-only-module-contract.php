@@ -45,6 +45,7 @@ require_once dirname(__DIR__) . '/pssalesforcebridge/pssalesforcebridge.php';
 require_once dirname(__DIR__) . '/pssalesforcebridge/upgrade/upgrade-0.8.0.php';
 require_once dirname(__DIR__) . '/pssalesforcebridge/upgrade/upgrade-0.8.1.php';
 require_once dirname(__DIR__) . '/pssalesforcebridge/upgrade/upgrade-0.8.2.php';
+require_once dirname(__DIR__) . '/pssalesforcebridge/upgrade/upgrade-0.8.3.php';
 
 use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthOnlyHookPreflight as Hook;
 
@@ -67,7 +68,8 @@ $old = [
 Configuration::$values = $old;
 growthAssert(upgrade_module_0_8_0(null) === true
     && upgrade_module_0_8_1(null) === true
-    && upgrade_module_0_8_2(null) === true, 'upgrade_failed');
+    && upgrade_module_0_8_2(null) === true
+    && upgrade_module_0_8_3(null) === true, 'upgrade_failed');
 growthAssert(Configuration::get('PS_SFMC_MODE') === 'test', 'upgrade_not_fail_closed');
 foreach ($old as $key => $value) {
     if ($key !== 'PS_SFMC_MODE') {
@@ -96,7 +98,7 @@ growthAssert(upgrade_module_0_8_2(null) === true
 Configuration::$values = [];
 Configuration::$writes = [];
 $module = new PsSalesforceBridge();
-growthAssert($module->version === '0.8.2'
+growthAssert($module->version === '0.8.3'
     && $module->author === 'ALFABH'
     && PsSalesforceBridge::PROVIDER === 'marketing_cloud_growth'
     && PsSalesforceBridge::DATA_PLATFORM === 'data_cloud',

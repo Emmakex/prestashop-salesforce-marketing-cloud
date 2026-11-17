@@ -1,3 +1,4 @@
+- [x] **G7 0.8.3 · registro de hooks 3/3 confirmado; corrección preventiva de campos opcionales en altas:** `CUSTOMER_UPDATED` de cliente ficticio ID 4 ya visible en outbox local `blocked`; `CUSTOMER_CREATED` anterior ausente de SQL, raíz exacta no comprobada. Fuente G7 de altas ahora tolera `null`/ausentes sin inferir opt-in, mantiene ID/tienda estrictos. No reenvía ni rellena histórico; captura vuelve a OFF en upgrade. [Guía](docs/G7_STAGING_HOOK_CAPTURE.md).
 - [x] **0.8.2 · Autoría ALFABH y compatibilidad MariaDB 11.8**: autor visible del módulo y metadata Composer actualizados; se certifican `check_constraint_checks=ON` y la cola G3 en MySQL 8, MariaDB 10.11 y MariaDB 11.8 (CI). Upgrade 0.8.1→0.8.2 no destructivo; Test y captura local OFF, sin envíos reales. No habilitar sin copia y validación de staging.
 # Roadmap — Marketing Cloud Growth + Data Cloud
 

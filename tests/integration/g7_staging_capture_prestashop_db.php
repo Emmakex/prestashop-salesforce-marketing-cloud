@@ -115,19 +115,28 @@ $order=(object)[
     'date_upd'=>'2026-11-17 11:32:00'
 ];
 $r4=Capture::captureFromShop('actionValidateOrder',['order'=>$order]);
+$created=clone $customer;
+$created->id=904;
+$created->newsletter=null;
+$created->optin=null;
+$created->date_upd=null;
+$r5=Capture::captureFromShop('actionCustomerAccountAdd',['newCustomer'=>$created]);
+$r6=Capture::captureFromShop('actionCustomerAccountAdd',['newCustomer'=>$created]);
 g7DbCheck($r1['status']==='blocked_local_only' && $r1['inserted']
     && $r2['status']==='blocked_local_only' && !$r2['inserted']
-    && $r3['inserted'] && $r4['inserted'],
+    && $r3['inserted'] && $r4['inserted']
+    && $r5['status']==='blocked_local_only' && $r5['inserted']
+    && $r6['status']==='blocked_local_only' && !$r6['inserted'],
     'source_events_not_captured_or_deduped');
 $tab='ci_growth_outbox_v1';
 $ledger='ci_growth_entity_ledger_v1';
-g7DbCheck((int)$db->getValue("SELECT COUNT(*) FROM `$tab`")===3,
+g7DbCheck((int)$db->getValue("SELECT COUNT(*) FROM `$tab`")===4,
     'unexpected_rows');
-g7DbCheck((int)$db->getValue("SELECT COUNT(*) FROM `$ledger`")===2,
+g7DbCheck((int)$db->getValue("SELECT COUNT(*) FROM `$ledger`")===3,
     'ledger_not_unique_by_entity');
 g7DbCheck((int)$db->getValue(
     "SELECT COUNT(*) FROM `$tab` WHERE status='blocked'"
-)===3,'status_not_blocked');
+)===4,'status_not_blocked');
 g7DbCheck((int)$db->getValue(
     "SELECT COUNT(*) FROM `$tab` WHERE entity_id=901"
 )===2,'customer_did_not_update');
@@ -137,7 +146,7 @@ g7DbCheck((int)$db->getValue(
 Configuration::updateValue('PS_GROWTH_LOCAL_CAPTURE','off');
 $off=Capture::captureFromShop('actionValidateOrder',['order'=>$order]);
 g7DbCheck($off['status']==='local_capture_disabled'
-    && (int)$db->getValue("SELECT COUNT(*) FROM `$tab`")===3,
+    && (int)$db->getValue("SELECT COUNT(*) FROM `$tab`")===4,
     'revocation_failed');
 g7DbCheck((int)$db->getValue(
     "SELECT COUNT(*) FROM information_schema.TABLES "

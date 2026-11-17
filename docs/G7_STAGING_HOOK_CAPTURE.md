@@ -45,3 +45,13 @@ Los tres atraviesan `GrowthStagingHookCapture`, el router Growth-only y el mismo
 - La ingesta sintética a DLO de PSCustomer + PSOrder está acreditada mediante GitHub Actions; **eso no certifica el circuito de eventos del módulo hasta que staging reciba eventos y hasta que worker/G6 estén aprobados**.
 
 Referencias: [G5 canary](G5_CONTROLLED_SYNTHETIC_UPSERT.md), [G7 lease CI](G7_DURABLE_LEASE_CANCELLATION.md) y [seguimiento central](https://github.com/Emmakex/prestashop-salesforce-marketing-cloud/issues/12).
+
+### G7 — Alta de cuenta PS9 y campos opcionales (revisión 0.8.3, 17/11/2026)
+
+El CSV real `request_sql_2.csv` confirma `actionCustomerAccountAdd`, `actionCustomerAccountUpdate` y `actionValidateOrder` registrados una vez cada uno. El CSV previo `request_sql_1.csv` muestra **un único evento CUSTOMER_UPDATED** para el cliente ID 4, en Test/blocked. La causa exacta del alta ausente todavía no está demostrada.
+
+El registro oficial de PrestaShop 9.1.5 llama `actionCustomerAccountAdd` **después** de guardar `newCustomer`. El código previo G7 exigía que **todos los campos**, incluidos `newsletter`, `optin`, `date_upd`, etc., estuvieran presentes y no fueran `null`; si alguno faltaba, omitía la captura de forma segura, sin mostrar errores. La corrección **solo para CUSTOMER_CREATED** permite campos opcionales ausentes/nulos, representándolos en el snapshot HMAC como **no disponibles**, sin inferir valores falsos de consentimiento. La entidad debe conservar un ID y `id_shop` explícitos; tipos objeto/array siguen rechazados, igual que eventos de carrito no aprobados. El HMAC se calcula en memoria y se sigue almacenando solo ID/tienda/estado bloqueado (no email, nombre ni preferencias).
+
+Esta es una **corrección preventiva de compatibilidad**, no una certificación de que la ausencia de esos campos fuera la causa real en la cuenta del usuario. Las pruebas PHP y MySQL/MariaDB introducen una creación con optin/newsletter/fecha nulos y validan dedupe, revocación y no envíos. **No se reejecuta el alta del cliente ID 4**, no se crea un backfill ni se activa envíos.
+
+Después de actualizar a 0.8.3 solo en el PrestaShop 9 staging, la captura vuelve a **OFF** por seguridad y requiere habilitación explícita en BO (las tablas y la identidad se conservan). Para verificar este cambio, crear **una nueva cuenta ficticia** con opciones promocionales desmarcadas y consultar `r1dn_growth_outbox_v1` desde SQL Manager. Los eventos antiguos no se completan automáticamente.
