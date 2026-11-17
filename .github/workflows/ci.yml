@@ -101,6 +101,7 @@ jobs:
           php tests/g7-native-customer-order-draft-contract.php
           php tests/g7-streaming-ingestion-plan-contract.php
           php tests/g5-synthetic-actions-test-contract.php
+          php tests/g5-controlled-synthetic-upsert-contract.php
           php tests/g5-pst-host-attestation-contract.php
           php tests/g3-dlo-dmo-relationship-contract.php
           php tests/g3-tenant-dmo-catalog-contract.php

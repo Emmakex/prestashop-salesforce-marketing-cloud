@@ -1,0 +1,155 @@
+name: G5 Single Synthetic Upsert (No Marketing)
+
+# MANUAL ONLY. The customer/order modes make one REAL upsert into the
+# connected ABH Data Cloud tenant. Default mode does not use any credential.
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'preview_only first; customer/order modes persist one synthetic row'
+        type: choice
+        required: true
+        default: preview_only
+        options:
+          - preview_only
+          - customer_upsert_once
+          - order_upsert_after_customer_verified
+      approval_code:
+        description: 'For real upsert enter I_APPROVE_SYNTHETIC_UPSERT'
+        type: string
+        required: false
+      absence_attestation:
+        description: 'After checking canary absent in DLO enter CANARY_NOT_PRESENT_IN_DLO'
+        type: string
+        required: false
+      customer_dlo_attestation:
+        description: 'For order only, after PSCustomer visible enter CUSTOMER_DLO_VERIFIED'
+        type: string
+        required: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: g5-synthetic-canary-${{ github.repository }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  validate-owner-inputs:
+    name: Validate owner approval, no Salesforce credentials
+    if: >-
+      github.repository == 'Emmakex/prestashop-salesforce-marketing-cloud' &&
+      github.ref == 'refs/heads/main' &&
+      github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    env:
+      REQUESTED_ACTION: ${{ inputs.action }}
+      OWNER_APPROVAL: ${{ inputs.approval_code }}
+      ABSENCE_ATTESTATION: ${{ inputs.absence_attestation }}
+      CUSTOMER_DLO_ATTESTATION: ${{ inputs.customer_dlo_attestation }}
+    steps:
+      - name: Check input before any token access
+        shell: bash
+        run: |
+          set -euo pipefail
+          case "$REQUESTED_ACTION" in
+            preview_only)
+              echo "Offline preview; no network or token."
+              ;;
+            customer_upsert_once)
+              test "$OWNER_APPROVAL" = "I_APPROVE_SYNTHETIC_UPSERT"
+              test "$ABSENCE_ATTESTATION" = "CANARY_NOT_PRESENT_IN_DLO"
+              echo "Customer owner approval received; no remote record verified."
+              ;;
+            order_upsert_after_customer_verified)
+              test "$OWNER_APPROVAL" = "I_APPROVE_SYNTHETIC_UPSERT"
+              test "$ABSENCE_ATTESTATION" = "CANARY_NOT_PRESENT_IN_DLO"
+              test "$CUSTOMER_DLO_ATTESTATION" = "CUSTOMER_DLO_VERIFIED"
+              echo "Order owner attestation received; live verification remains required."
+              ;;
+            *)
+              echo "Invalid action; no outbound operation."
+              exit 2
+              ;;
+          esac
+
+  offline-preview:
+    if: ${{ inputs.action == 'preview_only' }}
+    needs: validate-owner-inputs
+    name: G5 offline synthetic preview (zero network)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout exact main SHA
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          coverage: none
+      - name: Offline contract using fake transport
+        run: php tests/g5-controlled-synthetic-upsert-contract.php
+      - name: Prepare fixed preview without OAuth
+        env:
+          G5_CANARY_MODE: preview_only
+          G5_CANARY_EVIDENCE_PATH: g5-canary-sanitized.json
+        run: php tests/live/g5-controlled-synthetic-upsert.php
+      - name: Upload sanitized preview
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: g5-canary-offline-${{ github.run_id }}
+          path: g5-canary-sanitized.json
+          if-no-files-found: ignore
+          retention-days: 14
+
+  one-real-synthetic-upsert:
+    if: ${{ inputs.action == 'customer_upsert_once' || inputs.action == 'order_upsert_after_customer_verified' }}
+    needs: validate-owner-inputs
+    name: One protected synthetic Data Cloud upsert (no marketing)
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    environment: salesforce-growth-certification
+    steps:
+      - name: Checkout exact main SHA
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Check exact manual main SHA
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          test "$GITHUB_REF" = "refs/heads/main"
+          test "$GITHUB_EVENT_NAME" = "workflow_dispatch"
+          test "$GITHUB_REPOSITORY" = "Emmakex/prestashop-salesforce-marketing-cloud"
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: curl
+          coverage: none
+      - name: Run offline synthetic contract first
+        run: php tests/g5-controlled-synthetic-upsert-contract.php
+      - name: Single real synthetic POST, never automatic retry
+        env:
+          G5_CANARY_MODE: ${{ inputs.action }}
+          G5_CANARY_APPROVAL: ${{ inputs.approval_code }}
+          G5_CANARY_ABSENCE_CONFIRMED: ${{ inputs.absence_attestation }}
+          G5_CANARY_CUSTOMER_CONFIRMED: ${{ inputs.customer_dlo_attestation }}
+          G5_CANARY_EVIDENCE_PATH: g5-canary-sanitized.json
+          SF_GROWTH_ORG_URL: ${{ vars.SF_GROWTH_ORG_URL }}
+          SF_GROWTH_CLIENT_ID: ${{ secrets.SF_GROWTH_CLIENT_ID }}
+          SF_GROWTH_CLIENT_SECRET: ${{ secrets.SF_GROWTH_CLIENT_SECRET }}
+        run: php tests/live/g5-controlled-synthetic-upsert.php
+      - name: Upload sanitized result only
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: g5-canary-upsert-${{ github.run_id }}-${{ github.run_attempt }}
+          path: g5-canary-sanitized.json
+          if-no-files-found: ignore
+          retention-days: 14
