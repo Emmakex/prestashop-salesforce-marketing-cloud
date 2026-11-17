@@ -106,6 +106,21 @@ final class GrowthOutboxDeliveryLease
         );
     }
 
+    /**
+     * A timeout / lost HTTP response has an UNKNOWN remote outcome even
+     * before the lease expires. Quarantine immediately, never claim that
+     * the remote request failed and never put the row back into ready.
+     * Token and unexpired ownership are required; a cancelled claim cannot
+     * be revived by a late response. No HTTP status is fabricated.
+     */
+    public function markUnknownUnconfirmed(
+        $namespace,$shop,$type,$id,$sequence,$token
+    ) {
+        return $this->endLease(
+            $namespace,$shop,$type,$id,$sequence,$token,'reconcile',null
+        );
+    }
+
     /** An explicit local hold after a known failure, never auto-retry. */
     public function holdClaim(
         $namespace,$shop,$type,$id,$sequence,$token,$httpStatus
