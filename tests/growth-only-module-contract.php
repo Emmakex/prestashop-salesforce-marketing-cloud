@@ -77,6 +77,22 @@ foreach ($old as $key => $value) {
     }
 }
 
+// Updating from an armed 0.8.1 staging install must stop capture,
+ // preserve the local HMAC and namespace, and never authorize sends.
+Configuration::$values = [
+    'PS_SFMC_MODE' => 'test',
+    'PS_GROWTH_LOCAL_CAPTURE' => 'staging_armed',
+    'PS_GROWTH_CAPTURE_HMAC_KEY' => str_repeat('c', 64),
+    'PS_GROWTH_MERCHANT' => 'ABH',
+    'PS_GROWTH_NAMESPACE' => 'abh_ci_previous_install',
+];
+Configuration::$writes = [];
+growthAssert(upgrade_module_0_8_2(null) === true
+    && Configuration::get('PS_GROWTH_LOCAL_CAPTURE') === 'off'
+    && Configuration::get('PS_GROWTH_CAPTURE_HMAC_KEY') === str_repeat('c', 64)
+    && Configuration::get('PS_GROWTH_NAMESPACE') === 'abh_ci_previous_install',
+    'upgrade_081_revocation_or_identity_preservation');
+
 Configuration::$values = [];
 Configuration::$writes = [];
 $module = new PsSalesforceBridge();
