@@ -79,6 +79,38 @@ growthRuntimeAssert($module->hookActionCustomerAccountAdd(
 $after = growthRuntimeOldTableCount();
 growthRuntimeAssert($before === $after, 'old_queue_mutated_by_growth_hook');
 
+// Exercise the actual PrestaShop hook dispatcher as well as the direct module
+// methods above. This catches hook registration/dispatch compatibility gaps
+// across PS 1.7, 8 and 9 without creating a customer, writing Growth tables
+// or invoking unrelated modules: the third argument selects our module only.
+// Staging capture must be OFF throughout this disposable runtime check.
+growthRuntimeAssert(
+    (string) Configuration::get('PS_GROWTH_LOCAL_CAPTURE') === 'off',
+    'native_hook_dispatch_requires_local_capture_off'
+);
+$nativeCustomer = new Customer();
+$nativeCustomer->id = 987654321; // Synthetic, deliberately never persisted.
+$nativeCustomer->id_shop = 1;
+$nativeCustomer->email = 'hook-ci@example.invalid';
+$nativeCustomer->firstname = 'CI';
+$nativeCustomer->lastname = 'ONLY';
+$nativeCustomer->newsletter = 0;
+$nativeCustomer->optin = 0;
+$nativeDispatched = Hook::exec(
+    'actionCustomerAccountAdd',
+    ['newCustomer' => $nativeCustomer],
+    (int) $module->id
+);
+growthRuntimeAssert(
+    !empty($nativeDispatched),
+    'native_customer_add_hook_not_dispatched'
+);
+growthRuntimeAssert(
+    growthRuntimeOldTableCount() === $after
+    && (string) Configuration::get('PS_GROWTH_LOCAL_CAPTURE') === 'off',
+    'native_dispatch_mutated_legacy_queue_or_capture_mode'
+);
+
 $health = $module->healthReport();
 $cron = $module->cronReport();
 growthRuntimeAssert($health['status'] === 'blocked_test'
