@@ -8,6 +8,8 @@
  * a merchant upgrade or migration; it is only a proof of the worker lease.
  */
 require_once dirname(__DIR__,2)
+    .'/pssalesforcebridge/src/DataCloud/LiveEventUtcObservation.php';
+require_once dirname(__DIR__,2)
     .'/pssalesforcebridge/src/DataCloud/StagedAtomicUtcAcceptance.php';
 require_once dirname(__DIR__,2)
     .'/pssalesforcebridge/src/Growth/GrowthOutboxDeliveryLease.php';
