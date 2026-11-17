@@ -26,6 +26,13 @@ foreach ([
     ['10.11.13-MariaDB', 1, true],
     ['5.5.5-10.11.13-MariaDB', 'ON', true],
     ['10.6.22-MariaDB', 'ON', false],
+    ['11.8.9-MariaDB-log', 'ON', true],
+    ['11.8.9-MariaDB-log', '1', true],
+    ['11.8.9-MariaDB-log', 1, true],
+    ['11.8.9-MariaDB-log', 'OFF', false],
+    ['11.8.9-MariaDB-log', null, false],
+    ['11.6.2-MariaDB-log', 'ON', false],
+    ['12.0.3-MariaDB-log', 'ON', false],
     ['8.0.44-TiDB', null, false],
     ['8.0.44-Vitess', null, false],
     ['unavailable', null, false],
@@ -90,6 +97,9 @@ foreach ([
     ['10.11.13-MariaDB', 'ON', true, 2],
     ['10.11.13-MariaDB', 'OFF', false, 2],
     ['10.11.13-MariaDB', false, false, 2],
+    ['11.8.9-MariaDB-log', 'ON', true, 2],
+    ['11.8.9-MariaDB-log', 'OFF', false, 2],
+    ['11.8.9-MariaDB-log', false, false, 2],
     ['bad-version', null, false, 1],
 ] as $case) {
     $db = new GrowthEngineNativeDbDouble($case[0], $case[1]);

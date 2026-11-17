@@ -1,6 +1,6 @@
-# G7 — PrestaShop → outbox local G3 en staging (módulo 0.8.1)
+# G7 — PrestaShop → outbox local G3 en staging (módulo 0.8.2)
 
-**Corte 17/11/2026. Funcionalidad local real, desactivada por defecto; aún no envía datos a Salesforce.**
+**Corte 17/11/2026. En 0.8.2 la autoría visible es ALFABH y la verificación de motor admite MariaDB 11.8 con CHECK activo, tras CI real. Funcionalidad local desactivada por defecto; aún no envía datos a Salesforce.**
 
 ## Qué ya funciona en esta versión
 
@@ -24,9 +24,9 @@ Los tres atraviesan `GrowthStagingHookCapture`, el router Growth-only y el mismo
 
 **No ejecutar este paso en Barcelona Confort producción (0.7.1 Test).** El propietario debe aprobar previamente tratamiento local de los identificadores y conservar un backup/reversión. Las tablas nuevas son prueba de staging, no certificación legal ni autorización de ingesta comercial.
 
-1. Instalar el ZIP 0.8.1 exclusivamente en staging, tras pasar CI y certificación PrestaShop 1.7.8.11 / 8.2.8 / 9.1.5. No reemplaza la 0.8.0 ya instalada hasta decisión expresa.
+1. Instalar el ZIP 0.8.2 exclusivamente en staging, tras pasar CI y certificación PrestaShop 1.7.8.11 / 8.2.8 / 9.1.5. No reemplaza la 0.8.0 ya instalada hasta decisión expresa.
 2. En Back Office → módulo Salesforce Marketing Cloud Growth + Data Cloud, guardar Merchant y namespace exclusivo de esta instalación. La procedencia temporal de BC `Europe/Madrid` y staging PS9 `UTC` se respetan por separado.
-3. Verificar motor **MySQL 8.0.16+** (probado MySQL 8) o **MariaDB 10.11 con CHECK activo**. MySQL 5.7, versiones o `CHECK` desconocidos se rechazan; compatibilidad de PrestaShop ≠ seguridad de su servidor SQL.
+3. Verificar motor **MySQL 8.0.16+** (probado MySQL 8) o **MariaDB 10.11 / 11.8 con CHECK activo**. MySQL 5.7, versiones o `CHECK` desconocidos se rechazan; compatibilidad de PrestaShop ≠ seguridad de su servidor SQL.
 4. Escribir `ENABLE_STAGING_LOCAL_CAPTURE_ONLY` en el campo del panel **G7 - Local Test capture** y pulsar **Prepare & enable local Test capture**. Esto crea una vez las tres tablas de origen G3. Si no hay consentimiento/backup/aprobación, dejar desactivado.
 5. Crear o actualizar un cliente y crear un pedido **sintéticos dentro del PrestaShop staging**. Comprobar filas `blocked` y un ledger para cada entidad. No usar PII de compradores reales para el test. Repetir el mismo hook no debe crear otra fila; una modificación sí.
 6. Pulsar **Stop local capture** para detener nuevas filas. Los datos ya observados se conservan para revisión; no hay limpieza automática ni reversión destructiva.

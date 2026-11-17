@@ -1,3 +1,5 @@
+> **Actualización 0.8.2 (17/11/2026):** el autor del módulo PrestaShop pasa a ser **ALFABH**; la captura G7 local de staging se mantiene apagada por defecto. Se añade soporte limitado a MariaDB **11.8** con `check_constraint_checks` activo, probado con la base real en CI, además de MariaDB 10.11 y MySQL 8. El paquete conserva el nombre técnico `pssalesforcebridge`, el namespace PHP existente y los datos históricos; **sin activar ingesta real, envíos, worker ni campañas**. [Guía staging](docs/G7_STAGING_HOOK_CAPTURE.md).
+
 # Puente PrestaShop ↔ Salesforce Marketing Cloud Growth + Data Cloud
 
 **Producto único:** integración reusable para **PrestaShop 1.7.8.x, 8.x y 9.x** con **Salesforce Marketing Cloud Growth (Next)** y **Data Cloud**. No hay selección de proveedor, transporte alternativo ni motor de campañas propio. Las reglas vinculantes están en [AGENTS.md](AGENTS.md), [normas de desarrollo](docs/PROJECT_DEVELOPMENT_RULES.md), [contrato](config/project-contract.json) y [roadmap](ROADMAP.md).
