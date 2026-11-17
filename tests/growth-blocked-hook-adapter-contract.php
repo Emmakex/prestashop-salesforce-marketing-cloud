@@ -199,8 +199,9 @@ blockedHookReject(function () {
 
 blockedHookAssert($spyCalls === 0, 'invalid_source_called_atomic_store');
 $module = file_get_contents(dirname(__DIR__) . '/pssalesforcebridge/pssalesforcebridge.php');
-blockedHookAssert(strpos($module, 'GrowthBlockedHookAdapter') === false,
-    'growth_hooks_must_not_be_registered_in_legacy_module');
+blockedHookAssert(strpos($module, 'GrowthStagingHookCapture::captureFromShop') !== false
+    && strpos($module, "CONFIG_LOCAL_CAPTURE") !== false,
+    'growth_staging_hook_gate_missing');
 $source = file_get_contents($root . 'Growth/GrowthBlockedHookAdapter.php');
 foreach ([
     'Db::', 'Configuration::', 'curl_', '/api/v1/ingest/',
