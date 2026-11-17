@@ -39,7 +39,8 @@ growthRuntimeAssert(!getenv('EXPECTED_PS_VERSION') ||
     'wrong_prestashop_version');
 growthRuntimeAssert(Module::isInstalled('pssalesforcebridge'), 'module_not_installed');
 $module = Module::getInstanceByName('pssalesforcebridge');
-growthRuntimeAssert(is_object($module) && $module->version === '0.8.1',
+growthRuntimeAssert(is_object($module) && $module->version === '0.8.2'
+    && $module->author === 'ALFABH',
     'wrong_growth_module_release');
 growthRuntimeAssert((string) Configuration::get('PS_SFMC_MODE') === 'test',
     'upgrade_or_install_not_test_mode');
@@ -82,7 +83,7 @@ $health = $module->healthReport();
 $cron = $module->cronReport();
 growthRuntimeAssert($health['status'] === 'blocked_test'
     && $health['mode'] === 'test'
-    && $health['module_version'] === '0.8.1'
+    && $health['module_version'] === '0.8.2'
     && $health['record_ingestion_allowed'] === false
     && $health['marketing_sends_allowed'] === false
     && $cron['status'] === 'blocked_test'
