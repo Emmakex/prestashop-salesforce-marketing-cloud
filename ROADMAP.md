@@ -1,3 +1,4 @@
+- [x] **0.8.2 · Autoría ALFABH y compatibilidad MariaDB 11.8**: autor visible del módulo y metadata Composer actualizados; se certifican `check_constraint_checks=ON` y la cola G3 en MySQL 8, MariaDB 10.11 y MariaDB 11.8 (CI). Upgrade 0.8.1→0.8.2 no destructivo; Test y captura local OFF, sin envíos reales. No habilitar sin copia y validación de staging.
 # Roadmap — Marketing Cloud Growth + Data Cloud
 
 **Dirección vigente (14/11/2026):** únicamente Growth + Data Cloud para PrestaShop 1.7.8.x, 8.x y 9.x; no existen proveedores alternativos. Barcelona Confort es el piloto. Consulta [AGENTS.md](AGENTS.md), [contrato](config/project-contract.json), [canon](docs/ABH_GROWTH_CANONICAL_TARGET.md) y [gates](docs/PROJECT_DEVELOPMENT_RULES.md).
