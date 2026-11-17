@@ -3,6 +3,7 @@
   "description": "PrestaShop bridge for Salesforce Marketing Cloud Growth + Data Cloud only",
   "type": "prestashop-module",
   "license": "MIT",
+  "authors": [{"name": "ALFABH"}],
   "require": {
     "php": ">=7.1"
   },
