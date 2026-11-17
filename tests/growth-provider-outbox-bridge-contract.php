@@ -154,6 +154,7 @@ foreach ([
     outboxBridgeAssert(strpos($code, $bad) === false, 'outbound_or_sql_in_bridge_' . $bad);
 }
 $module = file_get_contents(dirname(__DIR__) . '/pssalesforcebridge/pssalesforcebridge.php');
-outboxBridgeAssert(strpos($module, 'BlockedOutboxCoordinator') === false,
-    'module_071_should_not_auto_enqueue_growth');
+outboxBridgeAssert(strpos($module, 'GrowthStagingHookCapture::captureFromShop') !== false
+    && strpos($module, "CONFIG_LOCAL_CAPTURE") !== false,
+    'module_must_default_to_capture_off');
 echo "Growth provider->atomic outbox: offline idempotency and fail-closed contracts PASS.\n";
