@@ -216,6 +216,13 @@ try{
     g7LeaseTest();
     echo "G7 durable lease PASS: original outbox, 4 worker race, cancellation, stale/202/timeout hold, rollback, no sends.\n";
 }catch(Throwable $e){
-    fwrite(STDERR,"G7 durable lease CI safety check failed (no data or tokens displayed).\n");
+    // Safe diagnostic only. Never print SQL, exceptions, scope IDs or tokens.
+    $code=(string)$e->getMessage();
+    if (!preg_match('/^g7_ci_lease_[a-z0-9_]{1,80}$/D',$code)
+        && !preg_match('/^g7_lease_[a-z0-9_]{1,80}$/D',$code)) {
+        $code=($e instanceof PDOException) ? 'g7_ci_lease_database_error'
+            : 'g7_ci_lease_unclassified_failure';
+    }
+    fwrite(STDERR,"G7 durable lease CI safety check failed: ".$code."\n");
     exit(1);
 }
