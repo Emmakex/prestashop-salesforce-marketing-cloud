@@ -59,7 +59,7 @@ foreach($expected as $object=>$key) {
             ===$expected['PSCustomer']
             && $decoded['data'][0]['cart_source_key']===''
             && $decoded['data'][0]['paid_flag']===false
-            && $decoded['data'][0]['total_paid']===0.0
+            && (float)$decoded['data'][0]['total_paid']===0.0
             && count($decoded['data'][0])===11,
             'synthetic_order_not_safe');
     }
