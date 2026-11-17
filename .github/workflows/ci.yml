@@ -221,6 +221,7 @@ jobs:
       G3_CI_DSN: 'mysql:host=127.0.0.1;port=3306;dbname=g3_ci;charset=utf8mb4'
       G3_CI_USER: g3_ci_user
       G3_CI_PASSWORD: g3_ci_pass_only
+      G7_CI_LEASE_ENABLE: yes_synthetic_only
     steps:
       - uses: actions/checkout@v4
         with:
@@ -249,6 +250,7 @@ jobs:
           php tests/integration/g3_namespace_registry.php
           php tests/integration/g3_proof_key_lifecycle.php
           php tests/integration/g7_g3_blocked_version_claim_review.php
+          php tests/integration/g7_durable_outbox_lease.php
 
   package:
     name: Build release package
