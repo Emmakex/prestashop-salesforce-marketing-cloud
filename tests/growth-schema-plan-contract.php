@@ -113,6 +113,8 @@ foreach (['Db::', 'PDO', 'curl_', 'file_get_contents(', '->execute(',
     schemaCheck(strpos($src, $bad) === false, 'planner_performs_io_' . $bad);
 }
 $module = file_get_contents(dirname(__DIR__) . '/pssalesforcebridge/pssalesforcebridge.php');
-schemaCheck(strpos($module, 'GrowthOutboxSchemaPlan') === false,
-    'module_installer_must_not_execute_unapproved_preview');
+schemaCheck(strpos($module, 'GrowthOutboxSchemaPlan') !== false
+    && strpos($module, "GrowthStagingSchemaBootstrap::install(") !== false
+    && strpos($module, "Tools::isSubmit('submitPsGrowthStagingCapture')") !== false,
+    'module_manual_setup_must_be_guarded');
 echo "Growth three-table prefixed install/upgrade preview: PHP offline PASS (no SQL executed).\n";
