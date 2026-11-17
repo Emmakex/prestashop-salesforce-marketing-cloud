@@ -1,3 +1,5 @@
+> **G7 0.8.3 (17/11/2026):** corrección defensiva del hook de alta de cliente para permitir campos opcionales nulos, sin asumir consentimiento y sin reactivar captura Test tras upgrade. El origen real del `CUSTOMER_CREATED` ausente está en investigación; `CUSTOMER_UPDATED` sí se verificó en outbox. [Evidencia](docs/G7_STAGING_HOOK_CAPTURE.md).
+
 > **Actualización 0.8.2 (17/11/2026):** el autor del módulo PrestaShop pasa a ser **ALFABH**; la captura G7 local de staging se mantiene apagada por defecto. Se añade soporte limitado a MariaDB **11.8** con `check_constraint_checks` activo, probado con la base real en CI, además de MariaDB 10.11 y MySQL 8. El paquete conserva el nombre técnico `pssalesforcebridge`, el namespace PHP existente y los datos históricos; **sin activar ingesta real, envíos, worker ni campañas**. [Guía staging](docs/G7_STAGING_HOOK_CAPTURE.md).
 
 # Puente PrestaShop ↔ Salesforce Marketing Cloud Growth + Data Cloud
