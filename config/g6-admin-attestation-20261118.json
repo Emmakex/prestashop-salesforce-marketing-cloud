@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "stage": "G6",
+  "project_gate_status": "accepted_by_administrator_attestation",
+  "accepted_on": "2026-11-18",
+  "attestation_source": "owner_reports_admin_confirmation_existing_crm_integration_already_validated",
+  "existing_observed_configuration": [
+    "marketing_subscription_single",
+    "marketing_email_channel_related",
+    "native_promotional_consent_check_enabled"
+  ],
+  "scope": "accept_G6_for_project_progress_to_G7_not_authorization_to_send",
+  "limits": {
+    "contact_level_opt_out_test_independently_documented": false,
+    "business_unit_scope_independently_documented": false,
+    "approved_contact_consent_evidence_independently_documented": false,
+    "data_cloud_real_customer_ingestion_authorized": false,
+    "marketing_sends_authorized": false
+  },
+  "runtime_module_unchanged": true,
+  "staging_module_version": "0.8.7",
+  "production_module_version": "0.7.1",
+  "next_stage": "G7 delivery work (blocked outbound)"
+}

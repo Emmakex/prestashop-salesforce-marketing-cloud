@@ -1,3 +1,13 @@
+## G6 — aceptación administrativa para continuar (18/11/2026)
+
+**Decisión vigente del propietario:** el administrador de ABH ha confirmado que la configuración y validación de consentimiento ya se realizaron en la integración previa con el CRM. El propietario solicita **dar G6 por validado y seguir sin más rondas de verificación de pantallas**. Registramos **G6 como aceptado administrativamente para avanzar a G7**, sin repetir configuración de Marketing/Email, Business Unit ni pedir capturas de la página de preferencias. La evidencia anterior del tenant ya muestra suscripción `Marketing` única, canal `Email` y Consent Check promocional habilitado, además del vínculo técnico y objetos relacionados.
+
+**Alcance explícito:** esta aceptación se basa en la confirmación del administrador transmitida por el propietario, no en haber observado aquí una prueba negativa de opt-out por cada contacto, su Business Unit, procedencia/legalidad de listas ni consentimiento actual para campañas nuevas. Se conserva `marketing_sends_authorized=false`, `data_cloud_ingestion_authorized=false` y las comprobaciones automáticas que evitan interpretar `newsletter/optin` de PrestaShop como consentimiento. Es correcto marcar el **hito de proyecto G6 como validado**, pero **no convertirlo en autorización de envío** ni certificar técnicamente una prueba no presenciada.
+
+**Próximo trabajo:** avanzar G7 con la misma outbox G3, relectura nativa PSCustomer/PSOrder probada en PS9, lease/cancelación/reconciliación, selección de fuente y revalidación en el instante de envío. Mantener toda salida real en Test/bloqueada hasta un pilotaje G8 expresamente autorizado con política de contacto y bajas aplicable. BC producción 0.7.1 Test y staging 0.8.7 Test intactos. No instalar otro ZIP por esta decisión.
+
+---
+
 # G6 — ruta nativa y mínima de consentimiento de Marketing Cloud Growth
 
 **16/11/2026 · Decisión técnica; no certificación del tenant.**
