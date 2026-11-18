@@ -3,6 +3,7 @@
 /**
  * PrestaShop -> Salesforce Marketing Cloud Growth + Data Cloud.
  *
+ * v0.8.7: fix missing BO escape helper to reveal safe G7 diagnoses.
  * v0.8.6: per-entity safe diagnostics for native PST readback; no egress.
  * v0.8.5: staging-only read-only native PSCustomer/PSOrder shape check.
  * v0.8.4: capture initial ORDER_CREATED before PrestaShop applies order state.
@@ -66,7 +67,7 @@ class PsSalesforceBridge extends Module
     {
         $this->name = 'pssalesforcebridge';
         $this->tab = 'advertising_marketing';
-        $this->version = '0.8.6';
+        $this->version = '0.8.7';
         $this->author = 'ALFABH';
         $this->need_instance = 0;
         $this->bootstrap = true;
@@ -287,6 +288,16 @@ class PsSalesforceBridge extends Module
         ];
         $raw=$e->getMessage();
         return isset($known[$raw]) ? $known[$raw] : 'unclassified_blocked';
+    }
+
+    /** Escape the strictly allowlisted G7 status message for Back Office HTML.
+     * The previous 0.8.6 call site used an undefined $this->escape() method.
+     * That Error was caught by the outer handler as setup_unavailable, hiding
+     * both per-entity results even when they had actually been computed.
+     */
+    private function escape($value)
+    {
+        return htmlspecialchars((string)$value, ENT_QUOTES, 'UTF-8');
     }
 
     private function renderReadbackForm()
