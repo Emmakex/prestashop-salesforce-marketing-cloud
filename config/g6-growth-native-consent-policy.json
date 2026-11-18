@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "scope": "growth_only",
-  "status": "g6_accepted_for_project_progress_admin_attestation",
+  "status": "implementation_decision_not_tenant_certification",
   "target": {
     "salesforce_product": "marketing_cloud_growth",
     "subscription_name": "Marketing",
@@ -40,17 +40,5 @@
     "mode": "test",
     "new_module": "0.8.0_not_installed",
     "tenant_consent_observed": "Marketing_Email_ui_and_Core_channel_link_only"
-  },
-  "project_gate_acceptance": {
-    "g6_accepted_for_project_progress": true,
-    "accepted_on": "2026-11-18",
-    "basis": "owner_reports_admin_validated_existing_crm_integration",
-    "covers": "existing_marketing_email_subscription_and_native_promotional_consent_configuration_for_g6_workflow_progress",
-    "independent_contact_level_sendtime_test_documented": false,
-    "business_unit_scope_independently_documented": false,
-    "consent_records_or_legal_basis_independently_audited": false,
-    "explicitly_authorizes_real_data_ingestion": false,
-    "explicitly_authorizes_marketing_sends": false,
-    "next_phase": "g7_delivery_implementation_with_outbound_gates_locked"
   }
 }
