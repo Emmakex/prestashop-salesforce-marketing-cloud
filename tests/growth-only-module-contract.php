@@ -128,6 +128,7 @@ growthAssert($safeReason->invoke(null,
 class Db {
     public static function getInstance() { return new \stdClass(); }
 }
+Configuration::updateValue('PS_SFMC_MODE', 'test');
 Configuration::updateValue('PS_GROWTH_LOCAL_CAPTURE', 'staging_armed');
 $diagnostic=$readbackMethod->invoke($module);
 growthAssert(strpos($diagnostic, 'customer: blocked (')!==false
