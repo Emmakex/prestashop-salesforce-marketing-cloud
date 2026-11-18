@@ -27,6 +27,10 @@ require_once dirname(__DIR__,2)
     .'/pssalesforcebridge/src/DataCloud/GrowthCapturedEventPstPreview.php';
 require_once dirname(__DIR__,2)
     .'/pssalesforcebridge/src/Growth/GrowthFreshSourceBlockedRehearsal.php';
+require_once dirname(__DIR__,2)
+    .'/pssalesforcebridge/src/Growth/GrowthOutboxSchemaPlan.php';
+require_once dirname(__DIR__,2)
+    .'/pssalesforcebridge/src/Growth/GrowthG7DeliverySchemaPlan.php';
 require_once __DIR__.'/G3GrowthOutboxSandboxMigration.php';
 require_once __DIR__.'/G3GrowthOutboxSandboxStore.php';
 
@@ -34,6 +38,7 @@ use Emmakex\PrestaShopSalesforceMarketingCloud\DataCloud\StagedAtomicUtcAcceptan
 use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthOutboxDeliveryLease;
 use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthBlockedDispatchRehearsal as Rehearsal;
 use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthFreshSourceBlockedRehearsal as Fresh;
+use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthG7DeliverySchemaPlan as DeliverySchema;
 
 function g7LeaseAssert($yes,$code)
 {
@@ -130,15 +135,13 @@ function g7LeaseTest()
     g7LeaseAssert($migration->install()===true,'migration_not_clean');
     // Candidate columns on the SAME outbox. The original CHECK status =
     // blocked and the G3 ledger constraints are untouched throughout.
-    $db->exec("ALTER TABLE g3_growth_outbox_v1 "
-        . "ADD COLUMN delivery_state VARCHAR(16) NOT NULL DEFAULT 'blocked',"
-        . "ADD COLUMN lease_token_hash CHAR(64) CHARACTER SET ascii "
-        . "COLLATE ascii_bin NULL,"
-        . "ADD COLUMN lease_until_epoch BIGINT UNSIGNED NULL,"
-        . "ADD COLUMN delivery_attempts INT UNSIGNED NOT NULL DEFAULT 0,"
-        . "ADD COLUMN delivery_last_http SMALLINT UNSIGNED NULL,"
-        . "ADD KEY idx_g7_lease_state (delivery_state,lease_until_epoch)"
-    );
+    // EXACT SQL from the review-only migration plan; still executed only
+    // in disposable g3_ci after its explicit environment/identity guard.
+    $deliveryPlan=DeliverySchema::preview('g3_');
+    g7LeaseAssert($deliveryPlan['dispatch_authorized']===false
+        && $deliveryPlan['merchant_upgrade_authorized']===false,
+        'migration_plan_unexpectedly_authorized');
+    $db->exec($deliveryPlan['upgrade_sql']);
     $ns='growth_g7_lease_ci';
     $store=new GrowthOutboxDeliveryLease($db);
     $token=str_repeat('a',64);
@@ -455,14 +458,16 @@ function g7LeaseTest()
         . "WHERE source_namespace='growth_g7_lease_ci'");
     $db->exec("DELETE FROM g3_growth_outbox_v1 "
         . "WHERE source_namespace='growth_g7_lease_ci'");
-    $db->exec("ALTER TABLE g3_growth_outbox_v1 "
-        . "DROP KEY idx_g7_lease_state,"
-        . "DROP COLUMN delivery_last_http,"
-        . "DROP COLUMN delivery_attempts,"
-        . "DROP COLUMN lease_until_epoch,"
-        . "DROP COLUMN lease_token_hash,"
-        . "DROP COLUMN delivery_state"
-    );
+    $pending=(int)$db->query(
+        $deliveryPlan['rollback_nonempty_state_count_sql']
+    )->fetchColumn();
+    $rollbackReview=DeliverySchema::reviewRollback($pending);
+    g7LeaseAssert($pending===0
+        && $rollbackReview['status']
+            ==='rollback_candidate_requires_owner_approval'
+        && !$rollbackReview['automatic_rollback_authorized'],
+        'delivery_schema_rollback_not_empty');
+    $db->exec($deliveryPlan['rollback_sql']);
     $migration->assertSchema();
     g7LeaseAssert($migration->rollbackIfEmpty()===true,
         'original_schema_rollback_failed');
