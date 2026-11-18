@@ -30,6 +30,8 @@ Se sustituye el `ALTER TABLE` manuscrito de `tests/integration/g7_durable_outbox
 
 El contrato PHP `tests/g7-delivery-schema-plan-contract.php` rechaza prefijos peligrosos, confirma que la propuesta preserva todas las puertas a false, que el rollback exige aprobación incluso con cero intentos y que ni el módulo ni cron cargan el plan.
 
+**Preflight antes de autorizar una migración en tienda:** inspeccionar con solo lectura `information_schema.columns` e índices de la tabla exacta derivada del prefijo, y rechazar instalaciones parciales antes de ejecutar un `ALTER`. No usar `ADD COLUMN IF NOT EXISTS` como sustituto de esta validación: ocultaría estados inconsistentes. Hacer respaldo externo confirmado, inventariar motor, volumen y ventana de mantenimiento. La conversión de un evento a `ready` exige una decisión separada por finalidad y tenant; añadir columnas por sí solo nunca lo autoriza.
+
 ## Próximo corte operativo
 
 Una vez certificado el SQL en CI, desarrollar una actualización reversible **solo para staging**, con inventario de columnas, respaldo confirmado, gate explícito, instalación no destructiva y comprobación de cancelaciones. **No convertir la clase CI GrowthOutboxDeliveryLease en una API de producción sin revisar su guardia de base, el fence en el instante del POST y la conciliación asíncrona con Data Cloud.**
