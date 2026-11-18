@@ -47,6 +47,7 @@ require_once dirname(__DIR__) . '/pssalesforcebridge/upgrade/upgrade-0.8.1.php';
 require_once dirname(__DIR__) . '/pssalesforcebridge/upgrade/upgrade-0.8.2.php';
 require_once dirname(__DIR__) . '/pssalesforcebridge/upgrade/upgrade-0.8.3.php';
 require_once dirname(__DIR__) . '/pssalesforcebridge/upgrade/upgrade-0.8.4.php';
+require_once dirname(__DIR__) . '/pssalesforcebridge/upgrade/upgrade-0.8.5.php';
 require_once dirname(__DIR__) . '/pssalesforcebridge/upgrade/upgrade-0.8.6.php';
 
 use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthOnlyHookPreflight as Hook;
