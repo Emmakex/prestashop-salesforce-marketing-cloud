@@ -79,6 +79,9 @@ $ns='growth_g7_stage_ci';
 Configuration::updateValue('PS_SFMC_MODE','test');
 Configuration::updateValue('PS_GROWTH_MERCHANT','ABH');
 Configuration::updateValue('PS_GROWTH_NAMESPACE',$ns);
+g7DbCheck((int)$db->getValue(
+    "SELECT COUNT(*) FROM `$tab` WHERE entity_id=905 AND entity_type='order'"
+)===1,'order_pre_state_not_recorded');
 Configuration::updateValue('PS_GROWTH_LOCAL_CAPTURE','off');
 $customer=(object)[
     'id'=>901,'id_shop'=>1,'email'=>'ci-synthetic@example.invalid',
@@ -115,6 +118,12 @@ $order=(object)[
     'date_upd'=>'2026-11-17 11:32:00'
 ];
 $r4=Capture::captureFromShop('actionValidateOrder',['order'=>$order]);
+// Mirror PaymentModule::validateOrder hook before OrderHistory applies state.
+$orderPending=clone $order;
+$orderPending->id=905;
+$orderPending->current_state=null;
+$r4Pending=Capture::captureFromShop('actionValidateOrder',
+    ['order'=>$orderPending]);
 $created=clone $customer;
 $created->id=904;
 $created->newsletter=null;
@@ -125,18 +134,19 @@ $r6=Capture::captureFromShop('actionCustomerAccountAdd',['newCustomer'=>$created
 g7DbCheck($r1['status']==='blocked_local_only' && $r1['inserted']
     && $r2['status']==='blocked_local_only' && !$r2['inserted']
     && $r3['inserted'] && $r4['inserted']
+    && $r4Pending['status']==='blocked_local_only' && $r4Pending['inserted']
     && $r5['status']==='blocked_local_only' && $r5['inserted']
     && $r6['status']==='blocked_local_only' && !$r6['inserted'],
     'source_events_not_captured_or_deduped');
 $tab='ci_growth_outbox_v1';
 $ledger='ci_growth_entity_ledger_v1';
-g7DbCheck((int)$db->getValue("SELECT COUNT(*) FROM `$tab`")===4,
+g7DbCheck((int)$db->getValue("SELECT COUNT(*) FROM `$tab`")===5,
     'unexpected_rows');
-g7DbCheck((int)$db->getValue("SELECT COUNT(*) FROM `$ledger`")===3,
+g7DbCheck((int)$db->getValue("SELECT COUNT(*) FROM `$ledger`")===4,
     'ledger_not_unique_by_entity');
 g7DbCheck((int)$db->getValue(
     "SELECT COUNT(*) FROM `$tab` WHERE status='blocked'"
-)===4,'status_not_blocked');
+)===5,'status_not_blocked');
 g7DbCheck((int)$db->getValue(
     "SELECT COUNT(*) FROM `$tab` WHERE entity_id=901"
 )===2,'customer_did_not_update');
@@ -146,7 +156,7 @@ g7DbCheck((int)$db->getValue(
 Configuration::updateValue('PS_GROWTH_LOCAL_CAPTURE','off');
 $off=Capture::captureFromShop('actionValidateOrder',['order'=>$order]);
 g7DbCheck($off['status']==='local_capture_disabled'
-    && (int)$db->getValue("SELECT COUNT(*) FROM `$tab`")===4,
+    && (int)$db->getValue("SELECT COUNT(*) FROM `$tab`")===5,
     'revocation_failed');
 g7DbCheck((int)$db->getValue(
     "SELECT COUNT(*) FROM information_schema.TABLES "
