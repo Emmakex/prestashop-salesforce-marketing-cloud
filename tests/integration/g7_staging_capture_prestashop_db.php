@@ -56,12 +56,17 @@ foreach([
     'Growth/GrowthStagingSchemaBootstrap.php',
     'Growth/GrowthStagingOutboxStore.php',
     'Growth/GrowthStagingHookCapture.php',
+    'DataCloud/IngestionPayloadBuilder.php',
+    'DataCloud/GrowthTypedPstPayloadBuilder.php',
+    'DataCloud/GrowthNativeCustomerOrderDraft.php',
+    'Growth/GrowthStagingNativeReadback.php',
     'Growth/GrowthSandboxMigrationExecutor.php'
 ] as $path)require_once $root.$path;
 
 use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthStagingHookCapture as Capture;
 use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthStagingSchemaBootstrap as Setup;
 use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthSandboxMigrationExecutor as SandMigration;
+use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthStagingNativeReadback as Readback;
 
 function g7DbCheck($ok,$code){
     if(!$ok)throw new RuntimeException('g7_real_staging_ci_'.$code);
@@ -153,8 +158,71 @@ g7DbCheck((int)$db->getValue(
 g7DbCheck((int)$db->getValue(
     "SELECT COUNT(*) FROM `$tab` WHERE entity_id=905 AND entity_type='order'"
 )===1,'order_pre_state_not_recorded');
+// G7 0.8.5: read actual local outbox + ledger through PrestaShop Db API,
+// then use injected native-object loaders (no real PII or external requests).
+$createdFresh=clone $created;
+$createdFresh->newsletter=0;
+$createdFresh->optin=0;
+$createdFresh->date_upd='2026-11-18 09:00:00';
+$loadCustomer=function($id)use($createdFresh,$customer) {
+    if ($id===904) return clone $createdFresh;
+    if ($id===901) return clone $customer;
+    throw new RuntimeException('fixture_customer_unknown');
+};
+$loadOrder=function($id)use($orderPending) {
+    if ($id!==905) throw new RuntimeException('fixture_order_unknown');
+    $loaded=clone $orderPending;
+    $loaded->current_state=2;
+    return $loaded;
+};
+$loadCurrency=function($id) {
+    if ($id!==1) throw new RuntimeException('fixture_currency_unknown');
+    return (object)['id'=>1,'iso_code'=>'EUR'];
+};
+$customerReport=Readback::inspectLatest(
+    $db,_PS_VERSION_,'ABH',$ns,_DB_PREFIX_,'customer',
+    $loadCustomer,$loadOrder,$loadCurrency
+);
+$orderReport=Readback::inspectLatest(
+    $db,_PS_VERSION_,'ABH',$ns,_DB_PREFIX_,'order',
+    $loadCustomer,$loadOrder,$loadCurrency
+);
+g7DbCheck($customerReport['status']==='native_pst_shape_verified_blocked'
+    && $customerReport['pst_objects_validated']===1
+    && $orderReport['status']==='native_pst_shape_verified_blocked'
+    && $orderReport['pst_objects_validated']===2
+    && $orderReport['latest_blocked_ledger_observed']===true
+    && $orderReport['data_cloud_ingestion_authorized']===false
+    && $orderReport['outbound_worker_authorized']===false
+    && $orderReport['marketing_sends_authorized']===false,
+    'native_readback_not_verified');
+$reportSerialized=json_encode([$customerReport,$orderReport]);
+g7DbCheck(strpos($reportSerialized,'ci-synthetic@example.invalid')===false
+    && strpos($reportSerialized,$ns)===false
+    && strpos($reportSerialized,'902')===false
+    && strpos($reportSerialized,'905')===false
+    && (int)$db->getValue("SELECT COUNT(*) FROM ci_growth_outbox_v1")===5,
+    'readback_leaked_source_or_changed_outbox');
+$denied=false;
+try {
+    Readback::inspectLatest($db,_PS_VERSION_,'ABH',$ns,_DB_PREFIX_,
+        'cart',$loadCustomer,$loadOrder,$loadCurrency);
+} catch (RuntimeException $e) {
+    $denied=$e->getMessage()==='g7_readback_not_authorized';
+}
+g7DbCheck($denied,'unsupported_cart_inspection_accepted');
+
 Configuration::updateValue('PS_GROWTH_LOCAL_CAPTURE','off');
 $off=Capture::captureFromShop('actionValidateOrder',['order'=>$order]);
+$readbackDisabled=false;
+try {
+    Readback::inspectLatest($db,_PS_VERSION_,'ABH',$ns,_DB_PREFIX_,
+        'order',$loadCustomer,$loadOrder,$loadCurrency);
+} catch (RuntimeException $e) {
+    $readbackDisabled=$e->getMessage()==='g7_readback_not_authorized';
+}
+g7DbCheck($readbackDisabled,'readback_not_revoked');
+
 g7DbCheck($off['status']==='local_capture_disabled'
     && (int)$db->getValue("SELECT COUNT(*) FROM `$tab`")===5,
     'revocation_failed');

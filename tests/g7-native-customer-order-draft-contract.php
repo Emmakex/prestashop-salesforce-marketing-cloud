@@ -125,8 +125,15 @@ g7DraftAssert(json_decode($noCartDraft['order_json'],true)['data'][0]
 $module=file_get_contents(dirname(__DIR__).'/pssalesforcebridge/pssalesforcebridge.php');
 $source=file_get_contents(dirname(__DIR__)
     .'/pssalesforcebridge/src/DataCloud/GrowthNativeCustomerOrderDraft.php');
-g7DraftAssert(strpos($module,'GrowthNativeCustomerOrderDraft')===false,
-    'accidental_runtime_hook');
+// The class is now loaded only for a deliberate Back Office READ-ONLY
+// check. The customer/order hooks and cron must never project PST payloads.
+$hookStart=strpos($module,'public function hookActionCustomerAccountAdd');
+$hookEnd=strpos($module,'public function getContent');
+g7DraftAssert($hookStart!==false && $hookEnd>$hookStart
+    && strpos(substr($module,$hookStart,$hookEnd-$hookStart),
+        'GrowthNativeCustomerOrderDraft')===false
+    && strpos($module,'GrowthStagingNativeReadback::inspectLatest')!==false,
+    'native_projection_exposed_to_hook_or_missing_bo_gate');
 foreach(['curl_','file_get_contents(', 'Db::', 'Configuration::',
     '->execute(', '->insert(', '/api/v1/ingest/'] as $forbidden) {
     g7DraftAssert(strpos($source,$forbidden)===false,

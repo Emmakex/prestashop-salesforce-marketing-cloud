@@ -3,6 +3,7 @@
 /**
  * PrestaShop -> Salesforce Marketing Cloud Growth + Data Cloud.
  *
+ * v0.8.5: staging-only read-only native PSCustomer/PSOrder shape check.
  * v0.8.4: capture initial ORDER_CREATED before PrestaShop applies order state.
  * v0.8.3: ALFABH publisher and MariaDB 11.8 database check.
  * v0.8.1: staged local-only Growth event capture, explicitly armed in BO.
@@ -33,6 +34,10 @@ require_once __DIR__ . '/src/Growth/GrowthSqlEngineGate.php';
 require_once __DIR__ . '/src/Growth/GrowthStagingSchemaBootstrap.php';
 require_once __DIR__ . '/src/Growth/GrowthStagingOutboxStore.php';
 require_once __DIR__ . '/src/Growth/GrowthStagingHookCapture.php';
+require_once __DIR__ . '/src/DataCloud/IngestionPayloadBuilder.php';
+require_once __DIR__ . '/src/DataCloud/GrowthTypedPstPayloadBuilder.php';
+require_once __DIR__ . '/src/DataCloud/GrowthNativeCustomerOrderDraft.php';
+require_once __DIR__ . '/src/Growth/GrowthStagingNativeReadback.php';
 
 use Emmakex\PrestaShopSalesforceMarketingCloud\Compatibility\Platform;
 use Emmakex\PrestaShopSalesforceMarketingCloud\Compatibility\ShopResolver;
@@ -41,6 +46,7 @@ use Emmakex\PrestaShopSalesforceMarketingCloud\DataCloud\InstallationReadinessDa
 use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthOnlyHookPreflight;
 use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthStagingHookCapture;
 use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthStagingSchemaBootstrap;
+use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthStagingNativeReadback;
 
 class PsSalesforceBridge extends Module
 {
@@ -59,7 +65,7 @@ class PsSalesforceBridge extends Module
     {
         $this->name = 'pssalesforcebridge';
         $this->tab = 'advertising_marketing';
-        $this->version = '0.8.4';
+        $this->version = '0.8.5';
         $this->author = 'ALFABH';
         $this->need_instance = 0;
         $this->bootstrap = true;
@@ -154,7 +160,9 @@ class PsSalesforceBridge extends Module
     public function getContent()
     {
         $message = '';
-        if (Tools::isSubmit('submitPsGrowthBridge')) {
+        if (Tools::isSubmit('submitPsGrowthReadback')) {
+            $message = $this->verifyStagingNativeReadback();
+        } elseif (Tools::isSubmit('submitPsGrowthBridge')) {
             $message = $this->saveGrowthSettings();
         } elseif (Tools::isSubmit('submitPsGrowthStagingCaptureStop')) {
             $message = $this->disableStagingCapture();
@@ -178,7 +186,70 @@ class PsSalesforceBridge extends Module
                 $this->l('The read-only Data Cloud installation checks are unavailable; exports remain blocked.')
             );
         }
-        return $html . $this->renderGrowthForm() . $this->renderCaptureForm();
+        return $html . $this->renderGrowthForm() . $this->renderCaptureForm()
+            . $this->renderReadbackForm();
+    }
+
+    /**
+     * Explicit Back Office action. Read only; never reveal an ID, email, JSON,
+     * amount, endpoint, OAuth token, SQL statement or raw exception message.
+     * This cannot certify consent, source-write provenance or remote delivery.
+     */
+    private function verifyStagingNativeReadback()
+    {
+        if ((string)Configuration::get(self::CONFIG_MODE)!=='test'
+            || (string)Configuration::get(self::CONFIG_LOCAL_CAPTURE)
+                !=='staging_armed') {
+            return $this->displayError(
+                $this->l('Local staging capture must be armed in Test. No data read or sent.')
+            );
+        }
+        try {
+            $db=Db::getInstance();
+            $merchant=(string)Configuration::get(self::CONFIG_MERCHANT);
+            $namespace=(string)Configuration::get(self::CONFIG_NAMESPACE);
+            $loadCustomer=function($id) { return new \Customer($id); };
+            $loadOrder=function($id) { return new \Order($id); };
+            $loadCurrency=function($id) { return new \Currency($id); };
+            $messages=[];
+            foreach (['customer','order'] as $type) {
+                $report=GrowthStagingNativeReadback::inspectLatest(
+                    $db,(string)_PS_VERSION_,$merchant,$namespace,_DB_PREFIX_,
+                    $type,$loadCustomer,$loadOrder,$loadCurrency
+                );
+                $messages[]=$type . ': ' . $report['status'];
+            }
+            return $this->displayConfirmation(
+                $this->l('G7 local native PST check (no sends): ')
+                . $this->escape(implode(' | ',$messages))
+                . '. ' . $this->l('Source freshness, consent and all exports remain unapproved.')
+            );
+        } catch (\Throwable $e) {
+            return $this->displayError(
+                $this->l('G7 local PST check blocked: missing or changed source, schema or ledger. No records sent. Review staging diagnostics locally.')
+            );
+        }
+    }
+
+    private function renderReadbackForm()
+    {
+        $helper=new HelperForm();
+        $helper->module=$this;
+        $helper->name_controller=$this->name;
+        $helper->token=Tools::getAdminTokenLite('AdminModules');
+        $helper->currentIndex=AdminController::$currentIndex.'&configure='.$this->name;
+        $helper->submit_action='submitPsGrowthReadback';
+        $helper->default_form_language=(int)Configuration::get('PS_LANG_DEFAULT');
+        $helper->allow_employee_form_lang=(int)Configuration::get('PS_BO_ALLOW_EMPLOYEE_FORM_LANG');
+        return $helper->generateForm([['form'=>[
+            'legend'=>[
+                'title'=>$this->l('G7 - Read-only native PST source check'),
+                'icon'=>'icon-search'
+            ],
+            'description'=>$this->l('Explicitly check the latest blocked customer and order on staging. Results contain only generic statuses. No SQL changes, emails or Salesforce requests.'),
+            'input'=>[],
+            'submit'=>['title'=>$this->l('Check native customer and order (no sends)')]
+        ]]]);
     }
 
     private function saveGrowthSettings()
