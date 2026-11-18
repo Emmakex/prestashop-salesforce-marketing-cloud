@@ -17,12 +17,23 @@ require_once dirname(__DIR__,2)
     .'/pssalesforcebridge/src/DataCloud/GrowthStreamingIngestionPlan.php';
 require_once dirname(__DIR__,2)
     .'/pssalesforcebridge/src/Growth/GrowthBlockedDispatchRehearsal.php';
+require_once dirname(__DIR__,2)
+    .'/pssalesforcebridge/src/DataCloud/IngestionPayloadBuilder.php';
+require_once dirname(__DIR__,2)
+    .'/pssalesforcebridge/src/DataCloud/GrowthTypedPstPayloadBuilder.php';
+require_once dirname(__DIR__,2)
+    .'/pssalesforcebridge/src/DataCloud/GrowthNativeCustomerOrderDraft.php';
+require_once dirname(__DIR__,2)
+    .'/pssalesforcebridge/src/DataCloud/GrowthCapturedEventPstPreview.php';
+require_once dirname(__DIR__,2)
+    .'/pssalesforcebridge/src/Growth/GrowthFreshSourceBlockedRehearsal.php';
 require_once __DIR__.'/G3GrowthOutboxSandboxMigration.php';
 require_once __DIR__.'/G3GrowthOutboxSandboxStore.php';
 
 use Emmakex\PrestaShopSalesforceMarketingCloud\DataCloud\StagedAtomicUtcAcceptance;
 use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthOutboxDeliveryLease;
 use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthBlockedDispatchRehearsal as Rehearsal;
+use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthFreshSourceBlockedRehearsal as Fresh;
 
 function g7LeaseAssert($yes,$code)
 {
@@ -85,6 +96,33 @@ function g7LeaseRace($sequence)
     }
     g7LeaseAssert($success===1,'concurrent_double_claim');
 }
+function g7FreshReader(PDO $db,$sequence,$id,$customer,$changeOnSecond=null)
+{
+    $reads=0;
+    return function()use($db,$sequence,$id,$customer,$changeOnSecond,&$reads) {
+        $reads++;
+        $q=$db->prepare("SELECT accepted_sequence,source_namespace,shop_id,"
+            . "entity_type,entity_id,original_event_type,status "
+            . "FROM g3_growth_outbox_v1 WHERE accepted_sequence=?");
+        $q->execute([$sequence]);
+        $event=$q->fetch(PDO::FETCH_ASSOC);
+        $q=$db->prepare("SELECT source_namespace,shop_id,entity_type,entity_id,"
+            . "latest_accepted_sequence,status FROM g3_growth_entity_ledger_v1 "
+            . "WHERE source_namespace=? AND shop_id=? "
+            . "AND entity_type='customer' AND entity_id=?");
+        $q->execute(['growth_g7_lease_ci',1,$id]);
+        $ledger=$q->fetch(PDO::FETCH_ASSOC);
+        $current=clone $customer;
+        if ($reads===2 && is_callable($changeOnSecond)) {
+            $changeOnSecond($current,$ledger);
+        }
+        return [
+            'event'=>$event,'ledger'=>$ledger,'customer'=>$current,
+            'order'=>null,'currency'=>null
+        ];
+    };
+}
+
 function g7LeaseTest()
 {
     $db=g7LeaseDb();
@@ -272,6 +310,127 @@ function g7LeaseTest()
     g7LeaseAssert($badInputRejected
         && $store->inspect($ns,1,'customer',714,$invalid)['state']==='ready',
         'invalid_fixture_claimed');
+
+    // Fresh-native-source + current-ledger + *same* G3 lease rehearsal.
+    // Both passes re-read real CI G3 rows and rebuild PSCustomer PST in
+    // memory. No HTTP endpoint is called and no PII can leave the report.
+    $origin='https://credencial.c360a.salesforce.com';
+    $sourceName='ABH_PrestaShop_Data_Cloud';
+    $freshCustomer=(object)[
+        'id'=>715,'id_shop'=>1,'email'=>'PRIVATE_CANARY@example.invalid',
+        'firstname'=>'PRIVATE_FIRST','lastname'=>'PRIVATE_LAST',
+        'newsletter'=>1,'optin'=>0,'active'=>1,'deleted'=>0,'is_guest'=>0,
+        'date_upd'=>'2026-11-18 10:00:00'
+    ];
+    $stable=g7LeaseAdd($db,715,'c');
+    $stableReader=g7FreshReader($db,$stable,715,$freshCustomer);
+    $blockedFresh=Fresh::simulate(
+        $store,$ns,1,'customer',715,$stable,$token,
+        $origin,$sourceName,$stableReader,true,202
+    );
+    g7LeaseAssert($blockedFresh['state']==='claim_denied'
+        && !$blockedFresh['http_request_performed']
+        && !$blockedFresh['outbound_worker_authorized'],
+        'fresh_rehearsal_claimed_blocked_row');
+    g7LeaseReady($db,$stable);
+    $received=Fresh::simulate(
+        $store,$ns,1,'customer',715,$stable,$token,
+        $origin,$sourceName,g7FreshReader($db,$stable,715,$freshCustomer),
+        true,202
+    );
+    $st=$store->inspect($ns,1,'customer',715,$stable);
+    g7LeaseAssert($received['state']==='reconcile'
+        && $received['fresh_source_checked_after_claim']
+        && $received['simulated_outcome_state']
+            ==='accepted_asynchronously_unconfirmed'
+        && $st['last_http']===202 && $st['state']==='reconcile'
+        && !$received['record_persisted_certified']
+        && !$received['source_race_until_remote_io_closed']
+        && !$received['marketing_sends_authorized']
+        && !$store->claim($ns,1,'customer',715,$stable,$token,60),
+        'fresh_rehearsal_202_was_delivered_or_retried');
+
+    $optOut=g7LeaseAdd($db,716,'d');
+    g7LeaseReady($db,$optOut);
+    $negative=clone $freshCustomer;
+    $negative->id=716;
+    $negative->newsletter=0;
+    $notAllowed=Fresh::simulate(
+        $store,$ns,1,'customer',716,$optOut,$token,
+        $origin,$sourceName,g7FreshReader($db,$optOut,716,$negative),
+        true,202
+    );
+    g7LeaseAssert($notAllowed['state']==='source_hold_before_claim'
+        && !$notAllowed['lease_claimed']
+        && $store->inspect($ns,1,'customer',716,$optOut)['attempts']===0,
+        'fresh_negative_newsletter_claimed');
+
+    $changed=g7LeaseAdd($db,717,'e');
+    g7LeaseReady($db,$changed);
+    $becomesNegative=clone $freshCustomer;
+    $becomesNegative->id=717;
+    $changedReader=g7FreshReader(
+        $db,$changed,717,$becomesNegative,
+        function($current,&$ledger) { $current->active=0; }
+    );
+    $cancelled=Fresh::simulate(
+        $store,$ns,1,'customer',717,$changed,$token,
+        $origin,$sourceName,$changedReader,true,202
+    );
+    g7LeaseAssert($cancelled['state']==='source_changed_cancelled'
+        && $cancelled['lease_claimed']
+        && $store->inspect($ns,1,'customer',717,$changed)['state']
+            ==='cancelled'
+        && !$store->claim($ns,1,'customer',717,$changed,$token,60),
+        'fresh_customer_deactivated_did_not_cancel');
+
+    $modified=g7LeaseAdd($db,718,'f');
+    g7LeaseReady($db,$modified);
+    $dateChanged=clone $freshCustomer;
+    $dateChanged->id=718;
+    $dateReader=g7FreshReader(
+        $db,$modified,718,$dateChanged,
+        function($current,&$ledger) {
+            $current->date_upd='2026-11-18 10:00:01';
+        }
+    );
+    $newVersion=Fresh::simulate(
+        $store,$ns,1,'customer',718,$modified,$token,
+        $origin,$sourceName,$dateReader,false,null
+    );
+    g7LeaseAssert($newVersion['state']==='source_changed_cancelled'
+        && $store->inspect($ns,1,'customer',718,$modified)['state']
+            ==='cancelled',
+        'fresh_source_mutation_did_not_cancel');
+
+    $unknown=g7LeaseAdd($db,719,'1');
+    g7LeaseReady($db,$unknown);
+    $timeoutCustomer=clone $freshCustomer;
+    $timeoutCustomer->id=719;
+    $timeoutReport=Fresh::simulate(
+        $store,$ns,1,'customer',719,$unknown,$token,
+        $origin,$sourceName,g7FreshReader($db,$unknown,719,$timeoutCustomer),
+        false,null
+    );
+    g7LeaseAssert($timeoutReport['state']==='reconcile'
+        && $timeoutReport['simulated_outcome_state']
+            ==='unknown_after_transport'
+        && $store->inspect($ns,1,'customer',719,$unknown)['state']
+            ==='reconcile',
+        'fresh_timeout_not_quarantined');
+
+    $serialized=json_encode([
+        $blockedFresh,$received,$notAllowed,$cancelled,$newVersion,
+        $timeoutReport
+    ]);
+    foreach([
+        'PRIVATE_CANARY','PRIVATE_FIRST','PRIVATE_LAST',
+        'example.invalid','growth_g7_lease_ci','credencial.c360a',
+        'ABH_PrestaShop_Data_Cloud','715','717'
+    ] as $secret) {
+        g7LeaseAssert(strpos($serialized,$secret)===false,
+            'fresh_rehearsal_leaked_private_data');
+    }
 
     $safeReport=json_encode([$denied,$receipt,$lost,$bad,$skip]);
     g7LeaseAssert(is_string($safeReport)
