@@ -44,3 +44,12 @@ Después de instalar 0.8.5, el propietario confirmó con una captura del BO de P
 - Rearmar «Local Test capture» con la misma aprobación de staging y volver a pulsar el botón de diagnóstico **una sola vez**. No crear otro cliente ni pedido ni volver a ejecutar pruebas de compra.
 - Leer los códigos `customer: ... | order: ...` para decidir el ajuste mínimo. Una categoría bloqueada **no** es un envío ni una autorización de exportación.
 - CI valida el clasificador con una excepción que contiene PII sintética, y verifica que nunca aparece el contenido desconocido. Runtime PS 1.7/8/9 sigue manteniendo módulos en Test sin transporte.
+
+## Incidencia 0.8.6 — causa comprobada del código `setup_unavailable` (18/11/2026)
+
+El propietario ha instalado 0.8.6, ha armado local Test capture y al pulsar la comprobación G7 ha obtenido `G7 local PST check blocked (setup_unavailable). No records sent.`. Al revisar el **código exacto del controlador**, se ha identificado un fallo determinista: tras procesar individualmente el cliente y el pedido, `verifyStagingNativeReadback()` intentaba llamar a **`$this->escape()`**, método **no definido** en la clase `PsSalesforceBridge`. El `Error` se atrapaba por el `catch` externo y se mostraba como `setup_unavailable`, incluso si las verificaciones de origen habían concluido; no permite inferir si los datos fuente pasaron o fallaron.
+
+La versión **0.8.7** introduce la implementación concreta `escape()` con `htmlspecialchars(..., ENT_QUOTES, 'UTF-8')` para HTML BO, sin cambiar outbox, ledger, fuente, G4 ni Salesforce. Se ha incorporado una prueba de regresión que invoca el **método privado real del controlador** con modo Test y captura armada, y verifica que aparecen **dos códigos independientes** y que ya no puede salir `setup_unavailable` por un helper inexistente. Incluye una prueba adicional de escapado HTML frente a caracteres de etiquetas y comillas. La prueba de regresión no usa tiendas ni clientes reales; las pruebas runtime PrestaShop 1.7/8/9 y DB siguen aparte.
+
+Despliegue: actualizar **solo staging** a 0.8.7 **sin desinstalar**. El upgrade mantiene `test` y vuelve a poner captura local `off` por seguridad, sin borrar tablas ni HMAC; rearmarla con la frase de aprobación ya utilizada. Pulsar de nuevo **solo** `Check native customer and order (no sends)`. Enviar los dos códigos `customer: ... | order: ...`, que ahora distinguen la causa real del diagnóstico. **No crear nuevos pedidos/clientes; no exportar ni iniciar campañas**. Producción BC 0.7.1 Test permanece sin cambios.
+
