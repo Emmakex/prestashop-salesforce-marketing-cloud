@@ -55,3 +55,14 @@ El registro oficial de PrestaShop 9.1.5 llama `actionCustomerAccountAdd` **despu
 Esta es una **corrección preventiva de compatibilidad**, no una certificación de que la ausencia de esos campos fuera la causa real en la cuenta del usuario. Las pruebas PHP y MySQL/MariaDB introducen una creación con optin/newsletter/fecha nulos y validan dedupe, revocación y no envíos. **No se reejecuta el alta del cliente ID 4**, no se crea un backfill ni se activa envíos.
 
 Después de actualizar a 0.8.3 solo en el PrestaShop 9 staging, la captura vuelve a **OFF** por seguridad y requiere habilitación explícita en BO (las tablas y la identidad se conservan). Para verificar este cambio, crear **una nueva cuenta ficticia** con opciones promocionales desmarcadas y consultar `r1dn_growth_outbox_v1` desde SQL Manager. Los eventos antiguos no se completan automáticamente.
+
+
+### G7 — Pedido sin estado en el hook inicial (0.8.4, 18/11/2026)
+
+En el staging PS9, un pedido #8 quedó persistido el 18/11/2026 sin `ORDER_CREATED` en la outbox (CSV `request_sql_14.csv`). Las altas de clientes sí generan filas bloqueadas. Una incidencia de Sendmail/`proc_open` también provocó HTTP 500, pero el hook `actionValidateOrder` se invoca **antes** del cambio de estado y envío de correo, de modo que el fallo del correo no explica por sí solo la ausencia de fila.
+
+La fuente oficial `PaymentModule::validateOrder()` crea y guarda el pedido mediante `createOrderFromCart()`, ejecuta el hook con el objeto `Order`, y **solo después** llama a `OrderHistory::changeIdOrderState()`. El modelo `Order` permite `current_state` no asignado al crear. Antes de 0.8.4, G7 descartaba silenciosamente un objeto de pedido si cualquiera de los seis campos del snapshot, incluido `current_state`, era `null` o faltaba. **Hipótesis técnica contrastable, no causa demostrada con trace del capturador:** valor nulo de `current_state` en el instante de hook.
+
+0.8.4 acepta **solo** `current_state` ausente/nulo en `actionValidateOrder` y registra el marcador HMAC `source_value_available=false` (no infiere `paid`, estado de pago, opt-in ni instante fuente). El `id`, `id_shop`, campos obligatorios de pedido, Test, Merchant, namespace, binding y bloqueo siguen siendo necesarios. Las pruebas unitarias, CI DB y runtime PrestaShop 1.7/8/9 recrean ese instante antes de cambiar estado. No cambia el esquema ni la cola y los eventos siguen `blocked`.
+
+La actualización no destructiva a 0.8.4 deja `PS_GROWTH_LOCAL_CAPTURE=off` y `PS_SFMC_MODE=test`; preserva outbox/ledger/secretos, no realiza backfill del pedido #8 y nunca activa envíos. Solo tras validación de CI e instalación consciente en **staging** se puede rearmar la captura local y crear **un único nuevo pedido ficticio**. No actualizar BC producción (0.7.1 Test).
