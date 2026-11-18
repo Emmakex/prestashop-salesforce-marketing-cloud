@@ -141,6 +141,53 @@ growthRuntimeAssert(
     'native_customer_source_shape_rejected_or_side_effect'
 );
 
+// G7 order gate: native PrestaShop Order object must cross the same blocked
+// local capture boundary, not only a stdClass fixture. No real order, no
+// payment module, no Salesforce request and no new database table.
+$nativeOrder = new Order();
+$nativeOrder->id = 987654322; // Synthetic, never persisted.
+$nativeOrder->id_shop = 1;
+$nativeOrder->id_customer = 987654321;
+$nativeOrder->id_cart = 987654323;
+$nativeOrder->id_currency = 1;
+$nativeOrder->total_paid = 44.00;
+$nativeOrder->current_state = 2;
+$nativeOrder->date_upd = '2026-11-18 08:00:00';
+$orderDispatched = Hook::exec(
+    'actionValidateOrder',
+    ['order' => $nativeOrder],
+    (int) $module->id
+);
+growthRuntimeAssert(
+    !empty($orderDispatched) && growthRuntimeOldTableCount() === $after,
+    'native_order_hook_not_dispatched_or_legacy_queue_touched'
+);
+$nativeOrderStoreCalls = 0;
+$nativeOrderCapture = \Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthStagingHookCapture::capture(
+    'actionValidateOrder',
+    ['order' => $nativeOrder],
+    (string) _PS_VERSION_,
+    'ABH',
+    'growth_g7_ps_native_ci',
+    str_repeat('c', 64),
+    function ($identity, $factory) use (&$nativeOrderStoreCalls) {
+        ++$nativeOrderStoreCalls;
+        $row = $factory();
+        $row['accepted_sequence'] = 2;
+        return ['row' => $row, 'inserted' => true];
+    }
+);
+growthRuntimeAssert(
+    $nativeOrderStoreCalls === 1
+    && $nativeOrderCapture['status'] === 'blocked_local_only'
+    && $nativeOrderCapture['inserted'] === true
+    && $nativeOrderCapture['outbound_worker_authorized'] === false
+    && $nativeOrderCapture['marketing_sends_authorized'] === false
+    && growthRuntimeOldTableCount() === $after
+    && (string) Configuration::get('PS_GROWTH_LOCAL_CAPTURE') === 'off',
+    'native_order_source_shape_rejected_or_side_effect'
+);
+
 $health = $module->healthReport();
 $cron = $module->cronReport();
 growthRuntimeAssert($health['status'] === 'blocked_test'
