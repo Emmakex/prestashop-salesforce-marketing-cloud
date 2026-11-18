@@ -49,6 +49,7 @@ require_once dirname(__DIR__) . '/pssalesforcebridge/upgrade/upgrade-0.8.3.php';
 require_once dirname(__DIR__) . '/pssalesforcebridge/upgrade/upgrade-0.8.4.php';
 require_once dirname(__DIR__) . '/pssalesforcebridge/upgrade/upgrade-0.8.5.php';
 require_once dirname(__DIR__) . '/pssalesforcebridge/upgrade/upgrade-0.8.6.php';
+require_once dirname(__DIR__) . '/pssalesforcebridge/upgrade/upgrade-0.8.7.php';
 
 use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthOnlyHookPreflight as Hook;
 
@@ -121,7 +122,28 @@ growthAssert($safeReason->invoke(null,
         new RuntimeException('SQL private customer@fixture.invalid id=1234'))
         === 'unclassified_blocked',
     'readback_diagnostic_leaked_raw_exception');
-growthAssert($module->version === '0.8.6'
+// Regression for a real PrestaShop 9.1.5 BO click in 0.8.6:
+// The missing $this->escape() threw Error after the per-entity results had
+// been generated, and the outer catch misleadingly showed setup_unavailable.
+class Db {
+    public static function getInstance() { return new \stdClass(); }
+}
+Configuration::updateValue('PS_GROWTH_LOCAL_CAPTURE', 'staging_armed');
+$diagnostic=$readbackMethod->invoke($module);
+growthAssert(strpos($diagnostic, 'customer: blocked (')!==false
+    && strpos($diagnostic, 'order: blocked (')!==false
+    && strpos($diagnostic, 'setup_unavailable')===false
+    && strpos($diagnostic, '<script>')===false
+    && strpos($diagnostic, 'No records sent')!==false,
+    'g7_bo_diagnostic_regressed_to_setup_unavailable');
+Configuration::updateValue('PS_GROWTH_LOCAL_CAPTURE', 'off');
+Configuration::$writes=[];
+// Distinct from the read-only probe, HTML-escape must neutralize markup.
+$escapeMethod=new ReflectionMethod('PsSalesforceBridge', 'escape');
+$escapeMethod->setAccessible(true);
+growthAssert($escapeMethod->invoke($module, '<script>&"') ===
+    '&lt;script&gt;&amp;&quot;', 'g7_bo_escape_missing_or_unsafe');
+growthAssert($module->version === '0.8.7'
     && $module->author === 'ALFABH'
     && PsSalesforceBridge::PROVIDER === 'marketing_cloud_growth'
     && PsSalesforceBridge::DATA_PLATFORM === 'data_cloud',
