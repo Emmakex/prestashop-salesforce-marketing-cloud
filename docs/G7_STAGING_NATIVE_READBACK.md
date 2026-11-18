@@ -1,0 +1,31 @@
+# G7 — Diagnóstico nativo de cliente y pedido desde la misma outbox (0.8.5)
+
+**18/11/2026 — Solo staging, Growth + Data Cloud, Test.** Seguimos tras la captura real de `CUSTOMER_CREATED` cliente #7, `CUSTOMER_UPDATED` cliente #4 y `ORDER_CREATED` pedido #10 en la única outbox G3 de PrestaShop 9.1.5, versión 0.8.4. No es necesario crear más pedidos ni nuevas cuentas.
+
+## Qué añade 0.8.5
+
+La nueva acción del Back Office **«G7 - Read-only native PST source check»** permite ejecutar la primera lectura real controlada del **último cliente y del último pedido en la outbox**, sin exportarlos:
+
+1. Verifica que `PS_SFMC_MODE=test`, `PS_GROWTH_LOCAL_CAPTURE=staging_armed`, identidad Merchant+namespace estables y motor SQL con restricciones `CHECK` activas.
+2. Con el **plan G3 ya instalado** (ninguna tabla adicional), busca exclusivamente el evento local `blocked` más reciente por tipo, usando `Db::executeS(..., true, false)` para evitar caché SELECT.
+3. Lee la **misma tabla** `growth_entity_ledger_v1` y exige que la última secuencia de esa entidad coincide con el evento seleccionado y que ambos siguen `blocked`.
+4. Carga objetos nativos actuales `Customer`, `Order` y `Currency` mediante sus constructores PrestaShop. En pedidos exige relación cliente, tienda y moneda coherentes.
+5. Reutiliza **sin duplicar esquema** `GrowthNativeCustomerOrderDraft::buildCustomer / buildPair` y `GrowthTypedPstPayloadBuilder` para validar los 11 campos PST v0.4 de cada objeto, *solo en memoria*.
+6. Descarta los JSON y comprueba nuevamente el ledger **sin caché**. Si entre las dos lecturas cambió la última secuencia, aborta. Esta doble lectura **no es un fence transaccional** y no certifica datos fuente inalterables hasta un futuro POST.
+7. Muestra únicamente `customer: native_pst_shape_verified_blocked`, `order: native_pst_shape_verified_blocked` u otra condición genérica; **ningún nombre, email, pedido, importe, namespace, endpoint, token ni cuerpo JSON** aparece en el panel.
+
+Se puede ejecutar de nuevo sin efectos secundarios: **no hace INSERT/UPDATE/DELETE/DDL**, no reclama lease ni conecta HTTP, no abre el SMTP del hosting, ni permite envío o reintento. La instalación sigue sirviendo a otras tiendas PrestaShop 1.7/8/9; no se codifica ninguna tienda ni su origen Salesforce en la ruta.
+
+## Protocolo de prueba
+
+- Actualizar únicamente `/presta/` con ZIP **0.8.5** después de CI y runtime PS 1.7/8/9 verde. **Nunca desinstalar ni borrar tablas.** Upgrade 0.8.5 deja `PS_SFMC_MODE=test` y `PS_GROWTH_LOCAL_CAPTURE=off`; conserva HMAC, identidad, outbox y ledger.
+- Desde BO, rearmar captura local Test existente con la aprobación staging previamente usada. No se crean tablas adicionales.
+- Pulsar **«Check native customer and order (no sends)»**. El resultado certificado solo informa de *forma de datos fuente* vigente en ese instante; un fallo no toca la outbox.
+- Si algún cliente/pedido nativo no tiene campos completos (ej. `date_upd`, `current_state`, flag), fallar de forma segura y ajustar la compatibilidad de lectura sin inferir consentimiento, pagos ni fechas.
+- Se certifica por contrato PHP7.1/8.5 y por MySQL8/MariaDB10.11/11.8 desechables. La prueba PrestaShop runtime sigue verificando instalación/upgrade y que el diagnóstico está inerte al cargar el módulo. **Hasta recibir evidencia del BO del staging, la prueba en la tienda real se considera pendiente.**
+
+## Lo que sigue bloqueado
+
+**G5**: verificación de ingesta de un canary sintético (asíncrona: HTTP 202 no demuestra DLO/DMO). **G6**: Consent Check nativo Marketing/Email por contacto, Business Unit y ámbito. **G7/G8**: relectura fresca en el instante de despacho, lease/claim aprobado y conciliación real. La consulta BO no convierte `status=blocked` en ready ni autoriza POST. **BC producción permanece en 0.7.1 Test** sin cambios; el origen histórico no se mezcla con staging.
+
+Relacionado: [G7 outbox→PST sin IO](G7_CAPTURED_OUTBOX_PST_PREVIEW.md), [incidencia central #12](https://github.com/Emmakex/prestashop-salesforce-marketing-cloud/issues/12).
