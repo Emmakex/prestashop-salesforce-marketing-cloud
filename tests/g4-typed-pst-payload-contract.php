@@ -129,7 +129,17 @@ g4Reject(function () use ($bad) {
 $module = file_get_contents(dirname(__DIR__) . '/pssalesforcebridge/pssalesforcebridge.php');
 $source = file_get_contents(dirname(__DIR__)
     . '/pssalesforcebridge/src/DataCloud/GrowthTypedPstPayloadBuilder.php');
-g4Assert(strpos($module, 'GrowthTypedPstPayloadBuilder') === false,
+// 0.8.5 loads the canonical builder exclusively for the explicit
+// Back Office read-only diagnostic. The customer/order hooks and cron
+// must not project or transport any PII-bearing PST data.
+$hookStart=strpos($module,'public function hookActionCustomerAccountAdd');
+$hookEnd=strpos($module,'public function getContent');
+$cron=file_get_contents(dirname(__DIR__)
+    . '/pssalesforcebridge/controllers/front/cron.php');
+g4Assert($hookStart!==false && $hookEnd>$hookStart
+    && strpos(substr($module,$hookStart,$hookEnd-$hookStart),
+        'GrowthTypedPstPayloadBuilder')===false
+    && strpos($cron,'GrowthTypedPstPayloadBuilder')===false,
     'future_builder_wired_to_live_hooks');
 foreach (['curl_', 'file_get_contents(', 'Db::', 'Configuration::',
     '->execute(', '->insert(', '/api/v1/ingest/'] as $operation) {
