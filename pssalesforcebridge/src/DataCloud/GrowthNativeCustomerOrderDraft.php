@@ -105,19 +105,7 @@ final class GrowthNativeCustomerOrderDraft
         $base = $namespace . ':' . $shopId . ':';
         $customerKey = $base . 'customer:' . $customerId;
         $orderKey = $base . 'order:' . $orderId;
-        $customerRecord = [
-            'source_key'=>$customerKey,
-            'source_namespace'=>$namespace,
-            'shop_id'=>$shopId,
-            'customer_id'=>$customerId,
-            'email'=>trim($c['email']),
-            'first_name'=>$c['firstname'],
-            'last_name'=>$c['lastname'],
-            'newsletter_flag'=>self::boolFlag($c['newsletter']),
-            'partner_optin_flag'=>self::boolFlag($c['optin']),
-            'active_flag'=>self::boolFlag($c['active']),
-            'source_updated_local'=>$c['date_upd'],
-        ];
+        $customerRecord = self::customerRecord($namespace,$shopId,$customer);
         $orderRecord = [
             'source_key'=>$orderKey,
             'source_namespace'=>$namespace,
@@ -154,6 +142,88 @@ final class GrowthNativeCustomerOrderDraft
             'data_cloud_ingestion_authorized'=>false,
             'marketing_sends_authorized'=>false,
             'outbound_worker_authorized'=>false,
+        ];
+    }
+
+
+    /**
+     * Project a customer without fabricating an Order. CUSTOMER_CREATED and
+     * CUSTOMER_UPDATED must be eligible for a local PST shape preview before
+     * the customer has purchased. This is PII-bearing memory only, NOT egress.
+     */
+    public static function buildCustomer(
+        $namespace,$shopId,$customer,
+        $provider='marketing_cloud_growth',$mode='test'
+    ) {
+        if ($provider !== 'marketing_cloud_growth' || $mode !== 'test') {
+            throw new RuntimeException('g7_native_draft_test_growth_only');
+        }
+        if (!is_string($namespace)
+            || !preg_match('/^[a-z][a-z0-9_]{5,31}$/D',$namespace)
+            || !is_int($shopId) || $shopId < 1) {
+            throw new RuntimeException('g7_native_draft_namespace_or_shop_invalid');
+        }
+        $record=self::customerRecord($namespace,$shopId,$customer);
+        $json=GrowthTypedPstPayloadBuilder::encode(
+            'PSCustomer',[$record],$provider,$mode
+        );
+        return [
+            'status'=>'native_local_draft_only',
+            'schema'=>'PST_v0.4_customer',
+            'customer_json'=>$json,
+            'source_utc_provenance_certified'=>false,
+            'marketing_consent_certified'=>false,
+            'data_cloud_ingestion_authorized'=>false,
+            'marketing_sends_authorized'=>false,
+            'outbound_worker_authorized'=>false,
+        ];
+    }
+
+    /** Canonical customer row, shared by customer-only and customer+order. */
+    private static function customerRecord($namespace,$shopId,$customer)
+    {
+        if (!is_object($customer)) {
+            throw new RuntimeException('g7_native_draft_objects_required');
+        }
+        $c=get_object_vars($customer);
+        foreach ([
+            'id','id_shop','email','firstname','lastname','newsletter',
+            'optin','active','deleted','is_guest','date_upd'
+        ] as $key) {
+            if (!array_key_exists($key,$c)) {
+                throw new RuntimeException('g7_native_draft_customer_fields_missing');
+            }
+        }
+        $customerId=self::positiveId($c['id']);
+        if ($customerId===null
+            || self::positiveId($c['id_shop'])!==$shopId) {
+            throw new RuntimeException('g7_native_draft_cross_scope_or_orphan');
+        }
+        foreach (['newsletter','optin','active','deleted','is_guest'] as $flag) {
+            if (!in_array($c[$flag],[true,false,0,1,'0','1'],true)) {
+                throw new RuntimeException('g7_native_draft_customer_flag_invalid');
+            }
+        }
+        if (self::boolFlag($c['deleted']) || self::boolFlag($c['is_guest'])) {
+            throw new RuntimeException('g7_native_draft_customer_excluded');
+        }
+        if (!is_string($c['email']) || !is_string($c['firstname'])
+            || !is_string($c['lastname']) || !is_string($c['date_upd'])) {
+            throw new RuntimeException('g7_native_draft_source_field_invalid');
+        }
+        $base=$namespace.':'.$shopId.':';
+        return [
+            'source_key'=>$base.'customer:'.$customerId,
+            'source_namespace'=>$namespace,
+            'shop_id'=>$shopId,
+            'customer_id'=>$customerId,
+            'email'=>trim($c['email']),
+            'first_name'=>$c['firstname'],
+            'last_name'=>$c['lastname'],
+            'newsletter_flag'=>self::boolFlag($c['newsletter']),
+            'partner_optin_flag'=>self::boolFlag($c['optin']),
+            'active_flag'=>self::boolFlag($c['active']),
+            'source_updated_local'=>$c['date_upd'],
         ];
     }
 
