@@ -111,6 +111,36 @@ growthRuntimeAssert(
     'native_dispatch_mutated_legacy_queue_or_capture_mode'
 );
 
+// Verify the actual native Customer object (not stdClass) also crosses the
+// Growth capture boundary. Inject a disposable in-memory store; do NOT arm
+// local capture, create tables or export a record. This directly tests the
+// source shape of account-add on PS 1.7/8/9, including nullable fields.
+$nativeCaptureStoreCalls = 0;
+$nativeCapture = \Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthStagingHookCapture::capture(
+    'actionCustomerAccountAdd',
+    ['newCustomer' => $nativeCustomer],
+    (string) _PS_VERSION_,
+    'ABH',
+    'growth_g7_ps_native_ci',
+    str_repeat('c', 64),
+    function ($identity, $newRowFactory) use (&$nativeCaptureStoreCalls) {
+        ++$nativeCaptureStoreCalls;
+        $row = $newRowFactory();
+        $row['accepted_sequence'] = 1;
+        return ['row' => $row, 'inserted' => true];
+    }
+);
+growthRuntimeAssert(
+    $nativeCaptureStoreCalls === 1
+    && $nativeCapture['status'] === 'blocked_local_only'
+    && $nativeCapture['inserted'] === true
+    && $nativeCapture['outbound_worker_authorized'] === false
+    && $nativeCapture['marketing_sends_authorized'] === false
+    && growthRuntimeOldTableCount() === $after
+    && (string) Configuration::get('PS_GROWTH_LOCAL_CAPTURE') === 'off',
+    'native_customer_source_shape_rejected_or_side_effect'
+);
+
 $health = $module->healthReport();
 $cron = $module->cronReport();
 growthRuntimeAssert($health['status'] === 'blocked_test'
