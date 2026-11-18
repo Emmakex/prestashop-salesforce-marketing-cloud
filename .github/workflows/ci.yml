@@ -99,6 +99,7 @@ jobs:
           php tests/g3-growth-typed-identity-contract.php
           php tests/g4-typed-pst-payload-contract.php
           php tests/g7-native-customer-order-draft-contract.php
+          php tests/g7-captured-outbox-pst-preview-contract.php
           php tests/g7-streaming-ingestion-plan-contract.php
           php tests/g7-staging-hook-capture-contract.php
           php tests/g5-synthetic-actions-test-contract.php
