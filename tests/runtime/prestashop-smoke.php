@@ -151,7 +151,8 @@ $nativeOrder->id_customer = 987654321;
 $nativeOrder->id_cart = 987654323;
 $nativeOrder->id_currency = 1;
 $nativeOrder->total_paid = 44.00;
-$nativeOrder->current_state = 2;
+// PrestaShop dispatches actionValidateOrder before initial state is applied.
+$nativeOrder->current_state = null;
 $nativeOrder->date_upd = '2026-11-18 08:00:00';
 $orderDispatched = Hook::exec(
     'actionValidateOrder',
