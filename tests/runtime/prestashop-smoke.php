@@ -116,7 +116,7 @@ growthRuntimeAssert(
 // local capture, create tables or export a record. This directly tests the
 // source shape of account-add on PS 1.7/8/9, including nullable fields.
 $nativeCaptureStoreCalls = 0;
-$nativeCapture = \\Emmakex\\PrestaShopSalesforceMarketingCloud\\Growth\\GrowthStagingHookCapture::capture(
+$nativeCapture = \Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthStagingHookCapture::capture(
     'actionCustomerAccountAdd',
     ['newCustomer' => $nativeCustomer],
     (string) _PS_VERSION_,
