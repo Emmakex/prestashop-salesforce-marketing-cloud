@@ -79,9 +79,6 @@ $ns='growth_g7_stage_ci';
 Configuration::updateValue('PS_SFMC_MODE','test');
 Configuration::updateValue('PS_GROWTH_MERCHANT','ABH');
 Configuration::updateValue('PS_GROWTH_NAMESPACE',$ns);
-g7DbCheck((int)$db->getValue(
-    "SELECT COUNT(*) FROM `$tab` WHERE entity_id=905 AND entity_type='order'"
-)===1,'order_pre_state_not_recorded');
 Configuration::updateValue('PS_GROWTH_LOCAL_CAPTURE','off');
 $customer=(object)[
     'id'=>901,'id_shop'=>1,'email'=>'ci-synthetic@example.invalid',
@@ -153,6 +150,9 @@ g7DbCheck((int)$db->getValue(
 g7DbCheck((int)$db->getValue(
     "SELECT COUNT(*) FROM `$tab` WHERE entity_id=902 AND entity_type='order'"
 )===1,'order_not_recorded');
+g7DbCheck((int)$db->getValue(
+    "SELECT COUNT(*) FROM `$tab` WHERE entity_id=905 AND entity_type='order'"
+)===1,'order_pre_state_not_recorded');
 Configuration::updateValue('PS_GROWTH_LOCAL_CAPTURE','off');
 $off=Capture::captureFromShop('actionValidateOrder',['order'=>$order]);
 g7DbCheck($off['status']==='local_capture_disabled'
