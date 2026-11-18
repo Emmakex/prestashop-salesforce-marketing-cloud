@@ -3,6 +3,7 @@
 /**
  * PrestaShop -> Salesforce Marketing Cloud Growth + Data Cloud.
  *
+ * v0.8.6: per-entity safe diagnostics for native PST readback; no egress.
  * v0.8.5: staging-only read-only native PSCustomer/PSOrder shape check.
  * v0.8.4: capture initial ORDER_CREATED before PrestaShop applies order state.
  * v0.8.3: ALFABH publisher and MariaDB 11.8 database check.
@@ -65,7 +66,7 @@ class PsSalesforceBridge extends Module
     {
         $this->name = 'pssalesforcebridge';
         $this->tab = 'advertising_marketing';
-        $this->version = '0.8.5';
+        $this->version = '0.8.6';
         $this->author = 'ALFABH';
         $this->need_instance = 0;
         $this->bootstrap = true;
@@ -212,23 +213,80 @@ class PsSalesforceBridge extends Module
             $loadOrder=function($id) { return new \Order($id); };
             $loadCurrency=function($id) { return new \Currency($id); };
             $messages=[];
+            $blocked=false;
+            // Inspect each entity independently: a nullable Customer source
+            // field must not hide that the Order readback is valid (or vice
+            // versa). Never reveal raw SQL, exception text or source data.
             foreach (['customer','order'] as $type) {
-                $report=GrowthStagingNativeReadback::inspectLatest(
-                    $db,(string)_PS_VERSION_,$merchant,$namespace,_DB_PREFIX_,
-                    $type,$loadCustomer,$loadOrder,$loadCurrency
-                );
-                $messages[]=$type . ': ' . $report['status'];
+                try {
+                    $report=GrowthStagingNativeReadback::inspectLatest(
+                        $db,(string)_PS_VERSION_,$merchant,$namespace,_DB_PREFIX_,
+                        $type,$loadCustomer,$loadOrder,$loadCurrency
+                    );
+                    $status=(string)$report['status'];
+                    if (!in_array($status,[
+                        'native_pst_shape_verified_blocked','no_blocked_event'
+                    ],true)) {
+                        $status='unknown_status';
+                        $blocked=true;
+                    }
+                    $messages[]=$type . ': ' . $status;
+                } catch (\Throwable $e) {
+                    $blocked=true;
+                    $messages[]=$type . ': blocked ('
+                        . self::readbackSafeFailureCode($e) . ')';
+                }
             }
-            return $this->displayConfirmation(
-                $this->l('G7 local native PST check (no sends): ')
+            $message=$this->l('G7 local native PST check (no sends): ')
                 . $this->escape(implode(' | ',$messages))
-                . '. ' . $this->l('Source freshness, consent and all exports remain unapproved.')
-            );
+                . '. ' . $this->l('No records sent. Source freshness, consent and all exports remain unapproved.');
+            return $blocked ? $this->displayError($message)
+                : $this->displayConfirmation($message);
         } catch (\Throwable $e) {
             return $this->displayError(
-                $this->l('G7 local PST check blocked: missing or changed source, schema or ledger. No records sent. Review staging diagnostics locally.')
+                $this->l('G7 local PST check blocked (setup_unavailable). No records sent.')
             );
         }
+    }
+
+    /**
+     * Whitelist only STATIC source-condition identifiers in the BO. Never
+     * echo a raw Throwable message, SQL, arbitrary class or trace. Unknown
+     * errors become a single opaque marker, not false success.
+     */
+    private static function readbackSafeFailureCode(\Throwable $e)
+    {
+        $known=[
+            'g7_readback_not_authorized'=>'local_test_not_armed',
+            'g7_readback_sql_engine_unverified'=>'db_check_constraints_unverified',
+            'g7_readback_binding_unverified'=>'g3_binding_unverified',
+            'g7_readback_event_lookup_unverified'=>'outbox_query_unverified',
+            'g7_readback_event_invalid'=>'outbox_event_invalid',
+            'g7_readback_ledger_unverified'=>'ledger_query_unverified',
+            'g7_readback_ledger_outdated'=>'ledger_event_not_latest',
+            'g7_readback_ledger_changed'=>'ledger_changed_during_check',
+            'g7_readback_order_scope_invalid'=>'native_order_scope_invalid',
+            'g7_readback_order_relationship_invalid'=>'native_order_relation_missing',
+            'g7_native_draft_objects_required'=>'native_object_unavailable',
+            'g7_native_draft_customer_fields_missing'=>'native_customer_field_missing',
+            'g7_native_draft_order_fields_missing'=>'native_order_field_missing',
+            'g7_native_draft_currency_fields_missing'=>'native_currency_field_missing',
+            'g7_native_draft_customer_flag_invalid'=>'native_customer_flag_unverified',
+            'g7_native_draft_customer_excluded'=>'native_customer_excluded',
+            'g7_native_draft_source_field_invalid'=>'native_source_field_type_invalid',
+            'g7_native_draft_cross_scope_or_orphan'=>'native_source_scope_or_relation_invalid',
+            'g7_native_draft_total_unverified'=>'native_order_total_invalid',
+            'g4_pst_invalid_local_date'=>'native_source_date_invalid',
+            'g4_pst_invalid_email'=>'native_customer_email_invalid',
+            'g4_pst_field_inventory_invalid'=>'pst_fields_invalid',
+            'g4_pst_invalid_value_type'=>'pst_value_type_invalid',
+            'g4_pst_invalid_scope'=>'pst_scope_invalid',
+            'g4_pst_invalid_typed_pk'=>'pst_identity_invalid',
+            'g4_pst_cross_scope_fk'=>'pst_relation_invalid',
+            'g4_pst_invalid_order_values'=>'pst_order_values_invalid'
+        ];
+        $raw=$e->getMessage();
+        return isset($known[$raw]) ? $known[$raw] : 'unclassified_blocked';
     }
 
     private function renderReadbackForm()
