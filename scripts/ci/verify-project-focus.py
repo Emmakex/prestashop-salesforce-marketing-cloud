@@ -28,7 +28,7 @@ PILOT_EXPECTED = {
     "live_campaign_sends_authorized": False,
     "historical_backfill_authorized": False,
     "external_sender_provider": "not_implemented_for_pilot",
-    "target_module_version": "0.8.4",
+    "target_module_version": "0.8.5",
 }
 PROVIDER_EXPECTED = {
     "marketing_cloud_growth": {
@@ -116,7 +116,7 @@ def validate_repository(root=ROOT):
     for forbidden in ("curl_exec(", "stream_socket_client(", "fsockopen("):
         if forbidden in source:
             errors.append("unreviewed_runtime_transport_" + forbidden)
-    if " $this->version = '0.8.4';" not in source:
+    if " $this->version = '0.8.5';" not in source:
         errors.append("growth_only_module_version_mismatch")
     return errors
 
