@@ -66,6 +66,20 @@ $r3=Capture::capture('actionCustomerAccountUpdate',['customer'=>$changed],
     $args[0],$args[1],$args[2],$args[3],$args[4]);
 $r4=Capture::capture('actionValidateOrder',['order'=>$o],
     $args[0],$args[1],$args[2],$args[3],$args[4]);
+// A native order has no current_state until OrderHistory applies it,
+// AFTER actionValidateOrder. Missing and null are the same unavailable state.
+$orderPending=clone $o;
+$orderPending->id=52;
+$orderPending->current_state=null;
+$rPending=Capture::capture('actionValidateOrder',
+    ['order'=>$orderPending],...$args);
+$orderPendingUninitialized=clone $orderPending;
+unset($orderPendingUninitialized->current_state);
+$rPendingAgain=Capture::capture('actionValidateOrder',
+    ['order'=>$orderPendingUninitialized],...$args);
+g7StagingAssert($rPending['inserted'] && !$rPendingAgain['inserted']
+    && $rPending['accepted_sequence']===$rPendingAgain['accepted_sequence'],
+    'native_order_pre_state_not_captured_or_deduped');
 $justCreated=clone $c;
 $justCreated->id=92;
 $justCreated->newsletter=null;
@@ -81,7 +95,7 @@ g7StagingAssert($r5['inserted'] && !$r6['inserted']
 
 g7StagingAssert($r1['inserted'] && !$r2['inserted'] && $r3['inserted']
     && $r4['inserted'] && $r1['accepted_sequence']===$r2['accepted_sequence']
-    && $sequence===4 && $calls===6,'dedupe_or_incremental');
+    && $sequence===5 && $calls===8,'dedupe_or_incremental');
 foreach($records as $row){
     g7StagingAssert($row['clock_sync_verified']===false
         && $row['source_modified_provenance']==='unverified'
@@ -92,7 +106,7 @@ foreach($records as $row){
         g7StagingAssert(strpos($encoded,$bad)===false,'pii_in_local_row');
     }
 }
-foreach([$r1,$r2,$r3,$r4,$r5,$r6] as $result){
+foreach([$r1,$r2,$r3,$r4,$rPending,$rPendingAgain,$r5,$r6] as $result){
     g7StagingAssert($result['status']==='blocked_local_only'
         && $result['outbound_worker_authorized']===false
         && $result['marketing_sends_authorized']===false,
@@ -119,7 +133,7 @@ g7StagingReject(function()use($c,$args){
     Capture::capture('actionCustomerAccountAdd',['newCustomer'=>$c],
         $args[0],$args[1],$args[2],str_repeat('z',64),$args[4]);
 },'g7_staging_hook_not_eligible');
-g7StagingAssert($calls===6,'rejected_event_reached_store');
+g7StagingAssert($calls===8,'rejected_event_reached_store');
 $module=file_get_contents(dirname(__DIR__).'/pssalesforcebridge/pssalesforcebridge.php');
 g7StagingAssert(strpos($module,'GrowthStagingHookCapture::captureFromShop')!==false
     && strpos($module,"CONFIG_LOCAL_CAPTURE")!==false

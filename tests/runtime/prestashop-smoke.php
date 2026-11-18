@@ -39,7 +39,7 @@ growthRuntimeAssert(!getenv('EXPECTED_PS_VERSION') ||
     'wrong_prestashop_version');
 growthRuntimeAssert(Module::isInstalled('pssalesforcebridge'), 'module_not_installed');
 $module = Module::getInstanceByName('pssalesforcebridge');
-growthRuntimeAssert(is_object($module) && $module->version === '0.8.3'
+growthRuntimeAssert(is_object($module) && $module->version === '0.8.4'
     && $module->author === 'ALFABH',
     'wrong_growth_module_release');
 growthRuntimeAssert((string) Configuration::get('PS_SFMC_MODE') === 'test',
@@ -151,7 +151,8 @@ $nativeOrder->id_customer = 987654321;
 $nativeOrder->id_cart = 987654323;
 $nativeOrder->id_currency = 1;
 $nativeOrder->total_paid = 44.00;
-$nativeOrder->current_state = 2;
+// PrestaShop dispatches actionValidateOrder before initial state is applied.
+$nativeOrder->current_state = null;
 $nativeOrder->date_upd = '2026-11-18 08:00:00';
 $orderDispatched = Hook::exec(
     'actionValidateOrder',
@@ -192,7 +193,7 @@ $health = $module->healthReport();
 $cron = $module->cronReport();
 growthRuntimeAssert($health['status'] === 'blocked_test'
     && $health['mode'] === 'test'
-    && $health['module_version'] === '0.8.3'
+    && $health['module_version'] === '0.8.4'
     && $health['record_ingestion_allowed'] === false
     && $health['marketing_sends_allowed'] === false
     && $cron['status'] === 'blocked_test'

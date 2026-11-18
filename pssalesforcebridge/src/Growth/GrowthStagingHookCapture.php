@@ -59,13 +59,16 @@ final class GrowthStagingHookCapture
         $snapshot=[];
         foreach(self::$sourceFields[$hook] as $field) {
             if (!array_key_exists($field,$data) || $data[$field]===null) {
-                // A new native Customer can have optional fields unset at
-                // account-creation time (e.g. newsletter/optin). The saved
-                // entity ID and explicit shop are still required. Distinguish
-                // unavailable from false WITHOUT asserting any consent or
-                // creating a source update timestamp. Only a local HMAC of
-                // this snapshot is stored. Updates/orders remain strict.
-                if ($hook !== 'actionCustomerAccountAdd') {
+                // A new native Customer can have optional fields unset.
+                // Likewise, PaymentModule::validateOrder calls actionValidateOrder
+                // BEFORE OrderHistory::changeIdOrderState; current_state may
+                // therefore be null even on a successfully saved Order.
+                // Do not fabricate a payment status, consent or timestamp.
+                // All other order fields and customer updates remain strict.
+                $optionalAtThisHook = $hook === 'actionCustomerAccountAdd'
+                    || ($hook === 'actionValidateOrder'
+                        && $field === 'current_state');
+                if (!$optionalAtThisHook) {
                     throw new RuntimeException('g7_staging_hook_source_incomplete');
                 }
                 $snapshot[$field]=['source_value_available'=>false];

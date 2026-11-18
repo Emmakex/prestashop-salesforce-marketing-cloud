@@ -3,6 +3,7 @@
 /**
  * PrestaShop -> Salesforce Marketing Cloud Growth + Data Cloud.
  *
+ * v0.8.4: capture initial ORDER_CREATED before PrestaShop applies order state.
  * v0.8.3: ALFABH publisher and MariaDB 11.8 database check.
  * v0.8.1: staged local-only Growth event capture, explicitly armed in BO.
  * No Salesforce delivery, campaign, auto migration or production activation.
@@ -58,7 +59,7 @@ class PsSalesforceBridge extends Module
     {
         $this->name = 'pssalesforcebridge';
         $this->tab = 'advertising_marketing';
-        $this->version = '0.8.3';
+        $this->version = '0.8.4';
         $this->author = 'ALFABH';
         $this->need_instance = 0;
         $this->bootstrap = true;

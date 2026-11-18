@@ -95,19 +95,19 @@ fetch_endpoint() {
   fi
 }
 
-echo "==> Preparing historical 0.7.1 fixture and Growth-only 0.8.3"
+echo "==> Preparing historical 0.7.1 fixture and Growth-only 0.8.4"
 rm -rf /tmp/pssfmc-runtime-old /tmp/pssfmc-runtime-growth "$ROOT/build/runtime"
 mkdir -p /tmp/pssfmc-runtime-old /tmp/pssfmc-runtime-growth "$ROOT/build/runtime"
 git -C "$ROOT" archive "$BASE_071" pssalesforcebridge | tar -x -C /tmp/pssfmc-runtime-old
 (
   cd "$ROOT"
-  zip -qr build/runtime/pssalesforcebridge-0.8.3.zip pssalesforcebridge -x '*/vendor/*' '*.DS_Store'
+  zip -qr build/runtime/pssalesforcebridge-0.8.4.zip pssalesforcebridge -x '*/vendor/*' '*.DS_Store'
 )
-unzip -q "$ROOT/build/runtime/pssalesforcebridge-0.8.3.zip" -d /tmp/pssfmc-runtime-growth
+unzip -q "$ROOT/build/runtime/pssalesforcebridge-0.8.4.zip" -d /tmp/pssfmc-runtime-growth
 test -f /tmp/pssfmc-runtime-old/pssalesforcebridge/pssalesforcebridge.php
 test -f /tmp/pssfmc-runtime-growth/pssalesforcebridge/pssalesforcebridge.php
 grep -Fq "\$this->version = '0.7.1';" /tmp/pssfmc-runtime-old/pssalesforcebridge/pssalesforcebridge.php
-grep -Fq "\$this->version = '0.8.3';" /tmp/pssfmc-runtime-growth/pssalesforcebridge/pssalesforcebridge.php
+grep -Fq "\$this->version = '0.8.4';" /tmp/pssfmc-runtime-growth/pssalesforcebridge/pssalesforcebridge.php
 test ! -e /tmp/pssfmc-runtime-growth/pssalesforcebridge/src/Salesforce/AuthClient.php
 test ! -e /tmp/pssfmc-runtime-growth/pssalesforcebridge/src/Salesforce/RetiredFlowClient.php
 test ! -e /tmp/pssfmc-runtime-growth/pssalesforcebridge/controllers/front/recover.php
@@ -181,10 +181,10 @@ fi
 
 
 
-echo "==> Phase 0: first-time 0.8.3 install on a shop with no legacy module tables"
+echo "==> Phase 0: first-time 0.8.4 install on a shop with no legacy module tables"
 copy_module /tmp/pssfmc-runtime-growth/pssalesforcebridge
 console prestashop:module install pssalesforcebridge --no-interaction
-test "$(sql "SELECT version FROM ps_module WHERE name='pssalesforcebridge' LIMIT 1")" = '0.8.3'
+test "$(sql "SELECT version FROM ps_module WHERE name='pssalesforcebridge' LIMIT 1")" = '0.8.4'
 test "$(sql "SELECT value FROM ps_configuration WHERE name='PS_SFMC_MODE' ORDER BY id_configuration DESC LIMIT 1")" = 'test'
 test "$(sql "SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='ps_sfmc_log'")" = '0'
 test "$(sql "SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='ps_sfmc_queue'")" = '0'
@@ -204,10 +204,10 @@ docker exec "$DB_CONTAINER" mysqldump -uroot -padmin --single-transaction --quic
 test -s "$ROLLBACK_SQL"
 sql "UPDATE ps_configuration SET value='production' WHERE name='PS_SFMC_MODE'"
 
-echo "==> Phase B: upgrade to 0.8.3 with no historical data loss"
+echo "==> Phase B: upgrade to 0.8.4 with no historical data loss"
 copy_module /tmp/pssfmc-runtime-growth/pssalesforcebridge
 console prestashop:module upgrade pssalesforcebridge --no-interaction
-test "$(sql "SELECT version FROM ps_module WHERE name='pssalesforcebridge' LIMIT 1")" = '0.8.3'
+test "$(sql "SELECT version FROM ps_module WHERE name='pssalesforcebridge' LIMIT 1")" = '0.8.4'
 test "$(sql "SELECT value FROM ps_configuration WHERE name='PS_SFMC_MODE' ORDER BY id_configuration DESC LIMIT 1")" = 'test'
 test "$(sql "SELECT COUNT(*) FROM ps_sfmc_log WHERE event='CI_PRESERVE_MARKER'")" = '1'
 docker cp "$ROOT/tests/runtime/prestashop-smoke.php" "$PS_CONTAINER:/tmp/prestashop-smoke.php"
@@ -218,7 +218,7 @@ console prestashop:module uninstall pssalesforcebridge --no-interaction
 test "$(sql "SELECT COUNT(*) FROM ps_sfmc_log WHERE event='CI_PRESERVE_MARKER'")" = '1'
 copy_module /tmp/pssfmc-runtime-growth/pssalesforcebridge
 console prestashop:module install pssalesforcebridge --no-interaction
-test "$(sql "SELECT version FROM ps_module WHERE name='pssalesforcebridge' LIMIT 1")" = '0.8.3'
+test "$(sql "SELECT version FROM ps_module WHERE name='pssalesforcebridge' LIMIT 1")" = '0.8.4'
 test "$(sql "SELECT value FROM ps_configuration WHERE name='PS_SFMC_MODE' ORDER BY id_configuration DESC LIMIT 1")" = 'test'
 test "$(sql "SELECT COUNT(*) FROM ps_sfmc_log WHERE event='CI_PRESERVE_MARKER'")" = '1'
 docker exec -u www-data -e EXPECTED_PS_VERSION="$PS_VERSION" -e PS_ROOT=/var/www/html -w /var/www/html "$PS_CONTAINER" php /tmp/prestashop-smoke.php
@@ -235,7 +235,7 @@ python3 - <<'PY'
 import json
 with open('/tmp/pssfmc-growth-health.json', encoding='utf-8') as h: d=json.load(h)
 assert d['ok'] is True and d['status']=='blocked_test' and d['mode']=='test',d
-assert d['module_version']=='0.8.3' and d['provider']=='marketing_cloud_growth',d
+assert d['module_version']=='0.8.4' and d['provider']=='marketing_cloud_growth',d
 assert d['record_ingestion_allowed'] is False and d['marketing_sends_allowed'] is False,d
 PY
 fetch_endpoint 'cron' "http://127.0.0.1:${PORT}/module/pssalesforcebridge/cron?token=$TOKEN" /tmp/pssfmc-growth-cron.json 10
@@ -266,4 +266,4 @@ if (!is_object($m) || $m->version !== "0.7.1"
 }
 '
 echo "Rollback of historical 0.7.1 from snapshot PASS: Test gate and records preserved."
-echo "Growth-only 0.8.3 upgrade, clean install and rollback PASS on PrestaShop $PS_VERSION"
+echo "Growth-only 0.8.4 upgrade, clean install and rollback PASS on PrestaShop $PS_VERSION"
