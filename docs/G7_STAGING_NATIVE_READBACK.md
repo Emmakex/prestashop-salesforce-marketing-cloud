@@ -29,3 +29,18 @@ Se puede ejecutar de nuevo sin efectos secundarios: **no hace INSERT/UPDATE/DELE
 **G5**: verificación de ingesta de un canary sintético (asíncrona: HTTP 202 no demuestra DLO/DMO). **G6**: Consent Check nativo Marketing/Email por contacto, Business Unit y ámbito. **G7/G8**: relectura fresca en el instante de despacho, lease/claim aprobado y conciliación real. La consulta BO no convierte `status=blocked` en ready ni autoriza POST. **BC producción permanece en 0.7.1 Test** sin cambios; el origen histórico no se mezcla con staging.
 
 Relacionado: [G7 outbox→PST sin IO](G7_CAPTURED_OUTBOX_PST_PREVIEW.md), [incidencia central #12](https://github.com/Emmakex/prestashop-salesforce-marketing-cloud/issues/12).
+
+## Incidencia real de staging y corrección diagnóstica 0.8.6 (18/11/2026)
+
+Después de instalar 0.8.5, el propietario confirmó con una captura del BO de PrestaShop 9.1.5 que **Local Test capture estaba armado** (botón «Stop local capture») y que al pulsar «Check native customer and order» apareció el mensaje genérico:
+
+> G7 local PST check blocked: missing or changed source, schema or ledger. No records sent.
+
+**El origen exacto de la excepción NO se puede deducir de ese mensaje**, porque 0.8.5 englobaba cliente y pedido en un solo `try/catch` y descartaba deliberadamente su código. Los clientes y pedidos originales ya se capturaron en la outbox; este fallo es del nuevo diagnóstico de relectura, **no prueba una caída de capturas ni de Salesforce**.
+
+0.8.6 reemplaza ese mensaje por **dos estados independientes** (customer y order) e introduce un clasificador estricto de errores a categorías predefinidas, como `native_customer_flag_unverified`, `native_source_scope_or_relation_invalid`, `ledger_event_not_latest` o `unclassified_blocked`. Se usa exclusivamente una lista cerrada de errores del código; **jamás** se imprimen mensajes crudos de excepción, SQL, IDs, emails, importes o credenciales. Esto evita que un fallo de cliente oculte el resultado del pedido, y permite corregir la causa concreta a partir de su categoría, sin inventar flags, estado de pago ni consentimiento.
+
+- Instalación **solo staging** mediante actualización ZIP 0.8.6, **sin desinstalar**. La actualización no destructiva conserva outbox, ledger, binding, namespace y secreto HMAC; pone `PS_SFMC_MODE=test` y captura local `off`.
+- Rearmar «Local Test capture» con la misma aprobación de staging y volver a pulsar el botón de diagnóstico **una sola vez**. No crear otro cliente ni pedido ni volver a ejecutar pruebas de compra.
+- Leer los códigos `customer: ... | order: ...` para decidir el ajuste mínimo. Una categoría bloqueada **no** es un envío ni una autorización de exportación.
+- CI valida el clasificador con una excepción que contiene PII sintética, y verifica que nunca aparece el contenido desconocido. Runtime PS 1.7/8/9 sigue manteniendo módulos en Test sin transporte.

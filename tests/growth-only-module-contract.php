@@ -48,6 +48,7 @@ require_once dirname(__DIR__) . '/pssalesforcebridge/upgrade/upgrade-0.8.2.php';
 require_once dirname(__DIR__) . '/pssalesforcebridge/upgrade/upgrade-0.8.3.php';
 require_once dirname(__DIR__) . '/pssalesforcebridge/upgrade/upgrade-0.8.4.php';
 require_once dirname(__DIR__) . '/pssalesforcebridge/upgrade/upgrade-0.8.5.php';
+require_once dirname(__DIR__) . '/pssalesforcebridge/upgrade/upgrade-0.8.6.php';
 
 use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthOnlyHookPreflight as Hook;
 
@@ -73,7 +74,8 @@ growthAssert(upgrade_module_0_8_0(null) === true
     && upgrade_module_0_8_2(null) === true
     && upgrade_module_0_8_3(null) === true
     && upgrade_module_0_8_4(null) === true
-    && upgrade_module_0_8_5(null) === true, 'upgrade_failed');
+    && upgrade_module_0_8_5(null) === true
+    && upgrade_module_0_8_6(null) === true, 'upgrade_failed');
 growthAssert(Configuration::get('PS_SFMC_MODE') === 'test', 'upgrade_not_fail_closed');
 foreach ($old as $key => $value) {
     if ($key !== 'PS_SFMC_MODE') {
@@ -107,7 +109,19 @@ $readbackMethod->setAccessible(true);
 growthAssert(strpos($readbackMethod->invoke($module),
     'Local staging capture must be armed')!==false,
     'g7_readback_allowed_while_off');
-growthAssert($module->version === '0.8.5'
+$safeReason = new ReflectionMethod('PsSalesforceBridge', 'readbackSafeFailureCode');
+$safeReason->setAccessible(true);
+growthAssert($safeReason->invoke(null,
+    new RuntimeException('g7_native_draft_customer_flag_invalid'))
+    === 'native_customer_flag_unverified'
+    && $safeReason->invoke(null,
+        new RuntimeException('g7_readback_ledger_outdated'))
+        === 'ledger_event_not_latest'
+    && $safeReason->invoke(null,
+        new RuntimeException('SQL private customer@fixture.invalid id=1234'))
+        === 'unclassified_blocked',
+    'readback_diagnostic_leaked_raw_exception');
+growthAssert($module->version === '0.8.6'
     && $module->author === 'ALFABH'
     && PsSalesforceBridge::PROVIDER === 'marketing_cloud_growth'
     && PsSalesforceBridge::DATA_PLATFORM === 'data_cloud',
