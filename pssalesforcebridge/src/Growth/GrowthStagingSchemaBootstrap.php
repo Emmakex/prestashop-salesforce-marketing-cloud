@@ -97,15 +97,23 @@ final class GrowthStagingSchemaBootstrap
                 'latest_accepted_sequence','status'
             ],
         ];
+        $extendedOutbox=false;
         foreach ($plan['tables'] as $role=>$table) {
             $rows=$db->executeS(
                 "SELECT COLUMN_NAME FROM information_schema.COLUMNS "
                 . "WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='"
                 . $table . "' ORDER BY ORDINAL_POSITION", true, false
             );
-            if (!is_array($rows)
-                || array_map(function($r){ return $r['COLUMN_NAME']; },$rows)
-                    !== $expected[$role]) {
+            if (!is_array($rows)) {
+                throw new RuntimeException('g7_capture_setup_schema_drift');
+            }
+            $columns=array_map(function($r){return $r['COLUMN_NAME'];},$rows);
+            if ($role==='outbox') {
+                if (!GrowthG7StagingDeliveryMigration::outboxColumnsAllowed($columns)) {
+                    throw new RuntimeException('g7_capture_setup_schema_drift');
+                }
+                $extendedOutbox=($columns!==$expected['outbox']);
+            } elseif ($columns!==$expected[$role]) {
                 throw new RuntimeException('g7_capture_setup_schema_drift');
             }
             $engine = (string)$db->getValue(
@@ -134,6 +142,20 @@ final class GrowthStagingSchemaBootstrap
             . " AND prestashop_version='".$v[3]."'"
             . " AND mode='test' AND status='blocked'",false)!=='1') {
             throw new RuntimeException('g7_capture_setup_namespace_conflict');
+        }
+        if ($extendedOutbox) {
+            // Expanded schema is allowed only with the *entire* G7 shape
+            // (column types, defaults, index and invariant) re-certified.
+            $prefix=substr(
+                $plan['tables']['outbox'],0,
+                -strlen(GrowthOutboxSchemaPlan::OUTBOX)
+            );
+            $inventory=GrowthG7StagingDeliveryMigration::inspect(
+                $db,$v[3],$v[1],$v[0],$prefix
+            );
+            if ($inventory['status']!=='extended_g7_verified') {
+                throw new RuntimeException('g7_capture_setup_delivery_drift');
+            }
         }
     }
 
