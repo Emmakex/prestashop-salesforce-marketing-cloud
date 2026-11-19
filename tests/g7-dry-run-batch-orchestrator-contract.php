@@ -1,6 +1,8 @@
 <?php
 /** G7 unified G3 batch + exact CSC review: offline, no egress. */
 require_once dirname(__DIR__)
+    .'/pssalesforcebridge/src/Growth/GrowthG7CurrentEventBatch.php';
+require_once dirname(__DIR__)
     .'/pssalesforcebridge/src/Growth/GrowthG7DryRunBatchOrchestrator.php';
 
 use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthG7DryRunBatchOrchestrator as DryRun;
