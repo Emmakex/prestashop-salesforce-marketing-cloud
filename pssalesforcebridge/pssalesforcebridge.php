@@ -3,6 +3,7 @@
 /**
  * PrestaShop -> Salesforce Marketing Cloud Growth + Data Cloud.
  *
+ * v0.9.3: merchant-independent source binding for each shop (DOABH etc.).
  * v0.9.2: secure per-shop Salesforce credentials and OAuth-only BO test.
  * v0.9.0: simplified accessible Back Office pre-beta with one guided smoke.
  * v0.8.9: one-customer/one-order manual Test smoke, individual guarded
@@ -50,6 +51,7 @@ require_once __DIR__ . '/src/Growth/GrowthStagingNativeReadback.php';
 require_once __DIR__ . '/src/Growth/GrowthOneRecordSelection.php';
 require_once __DIR__ . '/src/Growth/GrowthOneRecordManualSender.php';
 require_once __DIR__ . '/src/Growth/GrowthShopCredentialVault.php';
+require_once __DIR__ . '/src/Growth/GrowthShopSourceBinding.php';
 require_once __DIR__ . '/src/DataCloud/GrowthStreamingIngestionPlan.php';
 require_once __DIR__ . '/src/DataCloud/GrowthDataCloudUpsertTransport.php';
 require_once __DIR__ . '/src/Growth/AuthClient.php';
@@ -67,6 +69,7 @@ use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthG7StagingDeliveryMig
 use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthOneRecordSelection;
 use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthOneRecordManualSender;
 use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthShopCredentialVault;
+use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthShopSourceBinding;
 use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\AuthClient;
 use Emmakex\PrestaShopSalesforceMarketingCloud\DataCloud\TokenExchangeClient;
 
@@ -87,7 +90,7 @@ class PsSalesforceBridge extends Module
     {
         $this->name = 'pssalesforcebridge';
         $this->tab = 'advertising_marketing';
-        $this->version = '0.9.2';
+        $this->version = '0.9.3';
         $this->author = 'ALFABH';
         $this->need_instance = 0;
         $this->bootstrap = true;
@@ -217,9 +220,14 @@ class PsSalesforceBridge extends Module
         $mode=(string)Configuration::get(self::CONFIG_MODE);
         $capture=(string)Configuration::get(self::CONFIG_LOCAL_CAPTURE);
         $shop=$this->credentialContextShopId();
-        $identity=in_array($merchant,['ABH','BCABH'],true)
-            && preg_match('/^[a-z][a-z0-9_]{5,31}$/D',$namespace)===1
+        $identity=GrowthShopSourceBinding::isMerchant($merchant)
+            && GrowthShopSourceBinding::isNamespace($namespace)
             && $shop>0;
+        $source=GrowthShopSourceBinding::inspect($shop,$merchant,$namespace);
+        // On a new independent installation, propose a random namespace.
+        // Do not overwrite one that has already been saved.
+        $suggestedNamespace=$namespace!==''?$namespace
+            :'pssfmc_'.bin2hex(random_bytes(8));
         $credentialStatus=GrowthShopCredentialVault::inspect($shop);
         $credentials=$credentialStatus['ready'];
         $canManage=$this->isCredentialAdmin($shop);
@@ -239,15 +247,19 @@ class PsSalesforceBridge extends Module
             'sfmc_action'=>$action,
             'sfmc_version'=>$this->version,
             'sfmc_merchant'=>$merchant,
-            'sfmc_namespace'=>$namespace,
+            'sfmc_namespace'=>$suggestedNamespace,
             'sfmc_identity_ready'=>$identity,
+            'sfmc_source_ready'=>$source['ready'],
+            'sfmc_source_name'=>$source['source'],
+            'sfmc_source_confirmation'=>GrowthShopSourceBinding::ATTEST,
             'sfmc_credentials_ready'=>$credentials,
             'sfmc_credentials_locked'=>$credentialStatus['status']==='unavailable',
             'sfmc_credentials_admin_allowed'=>$canManage,
             'sfmc_credentials_csrf'=>$canManage
                 ?$this->credentialCsrf($shop):'',
             'sfmc_capture_armed'=>$capture==='staging_armed',
-            'sfmc_can_send'=>$canManage && $identity && $credentials && $mode==='test'
+            'sfmc_can_send'=>$canManage && $identity && $source['ready']
+                && $credentials && $mode==='test'
                 && $capture==='off',
             'sfmc_customer_input'=>$customerInput,
             'sfmc_order_input'=>$orderInput,
@@ -749,33 +761,71 @@ class PsSalesforceBridge extends Module
 
     private function saveGrowthSettings()
     {
-        $merchant = Tools::getValue(self::CONFIG_MERCHANT);
-        $namespace = Tools::getValue(self::CONFIG_NAMESPACE);
-        if (!is_string($merchant) ||
-            !preg_match('/^[A-Z][A-Z0-9_]{1,31}$/D', $merchant) ||
-            !is_string($namespace) ||
-            !preg_match('/^[a-z][a-z0-9_]{5,31}$/D', $namespace)) {
+        $shop=$this->credentialContextShopId();
+        if (!$this->isCredentialAdmin($shop)) {
             return $this->displayError(
-                $this->l('Introduce el código del comercio en mayúsculas y un identificador de instalación válido en minúsculas.')
+                $this->l('Selecciona una tienda concreta y utiliza una cuenta administradora autorizada.')
             );
         }
-        // These are CANDIDATES. Saving them does not certify global uniqueness
-        // nor authorize shipping records to the connected PST source.
-        $oldMerchant = Configuration::get(self::CONFIG_MERCHANT);
-        $oldNamespace = Configuration::get(self::CONFIG_NAMESPACE);
-        if ((is_string($oldMerchant) && $oldMerchant !== '' && $oldMerchant !== $merchant)
-            || (is_string($oldNamespace) && $oldNamespace !== '' && $oldNamespace !== $namespace)) {
+        $merchant=Tools::getValue(self::CONFIG_MERCHANT);
+        $namespace=Tools::getValue(self::CONFIG_NAMESPACE);
+        $source=Tools::getValue('PS_GROWTH_SOURCE_API');
+        $confirmation=Tools::getValue('PS_GROWTH_SOURCE_ATTEST');
+        if (!GrowthShopSourceBinding::isMerchant($merchant)
+            || !GrowthShopSourceBinding::isNamespace($namespace)
+            || !is_string($source) || !is_string($confirmation)) {
             return $this->displayError(
-                $this->l('La identidad de esta instalación ya está fijada. No puede modificarse sin migración controlada.')
+                $this->l('Código comercial en mayúsculas e identificador de instalación en minúsculas, sin espacios ni guiones.')
             );
         }
-        if (!Configuration::updateValue(self::CONFIG_MODE, 'test')
-            || !Configuration::updateValue(self::CONFIG_MERCHANT, $merchant)
-            || !Configuration::updateValue(self::CONFIG_NAMESPACE, $namespace)) {
-            return $this->displayError($this->l('No se ha podido guardar la configuración.'));
+        $oldMerchant=Configuration::get(self::CONFIG_MERCHANT);
+        $oldNamespace=Configuration::get(self::CONFIG_NAMESPACE);
+        if ((is_string($oldMerchant) && $oldMerchant!=='' && $oldMerchant!==$merchant)
+            || (is_string($oldNamespace) && $oldNamespace!=='' && $oldNamespace!==$namespace)) {
+            return $this->displayError(
+                $this->l('La identidad ya está fijada. No se puede cambiar ni reutilizar para otra tienda.')
+            );
+        }
+        $current=GrowthShopSourceBinding::inspect($shop,$merchant,$namespace);
+        if ($current['status']==='source_invalid') {
+            return $this->displayError(
+                $this->l('La vinculación del origen Data Cloud no coincide con esta tienda. No se ha modificado.')
+            );
+        }
+        if ($source!=='' && $current['ready']
+            && $source!==$current['source']) {
+            return $this->displayError(
+                $this->l('El origen de Salesforce ya está vinculado. Para cambiarlo se requiere una migración controlada.')
+            );
+        }
+        if (!$current['ready']
+            && (!GrowthShopSourceBinding::isSource($source)
+                || $confirmation!==GrowthShopSourceBinding::ATTEST
+                || $source===GrowthShopSourceBinding::BC_SOURCE)) {
+            return $this->displayError(
+                $this->l('Para una tienda nueva, indica su origen Data Cloud existente y confirma el esquema PSCustomer/PSOrder. No se enviarán datos.')
+            );
+        }
+        if (!Configuration::updateValue(self::CONFIG_MODE,'test')
+            || !Configuration::updateValue(self::CONFIG_MERCHANT,$merchant)
+            || !Configuration::updateValue(self::CONFIG_NAMESPACE,$namespace)) {
+            return $this->displayError(
+                $this->l('No se pudo guardar la identidad. No se han enviado registros.')
+            );
+        }
+        if (!$current['ready']) {
+            try {
+                GrowthShopSourceBinding::bind(
+                    $shop,$merchant,$namespace,$source,$confirmation
+                );
+            } catch (\Throwable $ignored) {
+                return $this->displayError(
+                    $this->l('Identidad guardada, pero el origen Data Cloud sigue pendiente. No está autorizado ningún envío.')
+                );
+            }
         }
         return $this->displayConfirmation(
-            $this->l('Identidad guardada en modo Test. No se han enviado datos a Salesforce.')
+            $this->l('Tienda configurada y origen Data Cloud declarado. La comprobación del esquema real y el envío son pasos independientes.')
         );
     }
 
