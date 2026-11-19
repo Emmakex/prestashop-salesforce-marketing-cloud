@@ -106,6 +106,7 @@ jobs:
           php tests/g7-native-prestashop-lease-contract.php
           php tests/g7-native-preflight-contract.php
           php tests/g7-current-event-batch-contract.php
+          php tests/g7-dry-run-batch-orchestrator-contract.php
           php tests/g7-native-csc-presend-review-contract.php
           php tests/g7-streaming-ingestion-plan-contract.php
           php tests/g7-staging-hook-capture-contract.php

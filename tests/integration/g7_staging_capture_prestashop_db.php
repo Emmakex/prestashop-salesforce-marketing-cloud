@@ -60,6 +60,7 @@ foreach([
     'Growth/GrowthG7CurrentEventBatch.php',
     'Growth/GrowthCommunicationConsentHoldGate.php',
     'Growth/GrowthG7CscPreDispatchReview.php',
+    'Growth/GrowthG7DryRunBatchOrchestrator.php',
     'Growth/GrowthSqlEngineGate.php',
     'Growth/GrowthStagingSchemaBootstrap.php',
     'Growth/GrowthStagingOutboxStore.php',
@@ -82,6 +83,7 @@ use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthPrestaShopDeliveryLe
 use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthG7NativePreflight as Preflight;
 use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthG7CurrentEventBatch as Batch;
 use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthG7CscPreDispatchReview as CscReview;
+use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthG7DryRunBatchOrchestrator as DryRun;
 
 function g7DbCheck($ok,$code){
     if(!$ok)throw new RuntimeException('g7_real_staging_ci_'.$code);
@@ -636,6 +638,117 @@ foreach(['ci-synthetic@example.invalid',$ns,'901','902','905',
 g7DbCheck((int)$db->getValue("SELECT COUNT(*) FROM $tab"
     . " WHERE status='blocked' AND delivery_state='blocked'"
     . " AND delivery_attempts=0")===5,'g7_batch_mutated_merchant_events');
+
+// G7 unified bounded review: ALL four current synthetic events (not just
+// last global customer/order), exact CSC/ledger, no ready/claim/HTTP.
+$window=DryRun::reviewWindow(
+    $db,_PS_VERSION_,'ABH',$ns,_DB_PREFIX_,1,0,2,3,
+    $sourceLoader,$nativeOrder,$nativeCurrency,$localRows,
+    $subscription,$now,$readCsc,$origin,$sourceName
+);
+$publicWindow=DryRun::summarize($window);
+g7DbCheck($publicWindow['status']==='batch_review_only_no_sends'
+    && $publicWindow['reviewed_count']===4
+    && $publicWindow['reason_counts']['csc_candidate_not_authorized']===4
+    && !$publicWindow['more_pages_present']
+    && !isset($publicWindow['next_cursor_internal'])
+    && !$publicWindow['delivery_authorized']
+    && !$window['http_request_performed'],
+    'g7_dry_run_not_all_current_events');
+
+// Same cursor can resume multiple bounded windows without missing a row.
+$firstWindow=DryRun::reviewWindow(
+    $db,_PS_VERSION_,'ABH',$ns,_DB_PREFIX_,1,0,2,1,
+    $sourceLoader,$nativeOrder,$nativeCurrency,$localRows,
+    $subscription,$now,$readCsc,$origin,$sourceName
+);
+$secondWindow=DryRun::reviewWindow(
+    $db,_PS_VERSION_,'ABH',$ns,_DB_PREFIX_,1,
+    $firstWindow['next_cursor_internal'],2,1,
+    $sourceLoader,$nativeOrder,$nativeCurrency,$localRows,
+    $subscription,$now,$readCsc,$origin,$sourceName
+);
+g7DbCheck($firstWindow['reviewed_count']===2
+    && $secondWindow['reviewed_count']===2
+    && $firstWindow['more_pages_present']
+    && !$secondWindow['more_pages_present']
+    && $secondWindow['next_cursor_internal']
+        >$firstWindow['next_cursor_internal'],
+    'g7_dry_run_resume_window_not_bounded');
+
+// Suppress one customer's CSC but retain others, never borrow optin.
+$selectiveCsc=function($key,$sub,$channel)use($readCsc,$ns) {
+    $rows=$readCsc($key,$sub,$channel);
+    if ($key===$ns.':1:customer:904') {
+        $rows[0]['status']='opt_out';
+    }
+    return $rows;
+};
+$withOptout=DryRun::reviewWindow(
+    $db,_PS_VERSION_,'ABH',$ns,_DB_PREFIX_,1,0,2,3,
+    $sourceLoader,$nativeOrder,$nativeCurrency,$localRows,
+    $subscription,$now,$selectiveCsc,$origin,$sourceName
+);
+g7DbCheck($withOptout['status']==='batch_review_only_no_sends'
+    && $withOptout['reason_counts']['csc_denied_or_unverified_hold']===1
+    && $withOptout['reason_counts']['csc_candidate_not_authorized']===3
+    && !$withOptout['marketing_sends_authorized'],
+    'g7_dry_run_cross_customer_csc_leak');
+
+// One native customer (#901) is negative, including both orders whose
+// id_customer points to 901. The second customer (#904) stays reviewable.
+$oneNativeNegative=function($id)use($sourceLoader) {
+    $c=$sourceLoader($id);
+    if ($id===901)$c->newsletter=0;
+    return $c;
+};
+$withNativeNegative=DryRun::reviewWindow(
+    $db,_PS_VERSION_,'ABH',$ns,_DB_PREFIX_,1,0,2,3,
+    $oneNativeNegative,$nativeOrder,$nativeCurrency,$localRows,
+    $subscription,$now,$readCsc,$origin,$sourceName
+);
+g7DbCheck($withNativeNegative['status']==='batch_review_only_no_sends'
+    && $withNativeNegative['reason_counts']['local_or_source_hold']===3
+    && $withNativeNegative['reason_counts']['csc_candidate_not_authorized']===1,
+    'g7_dry_run_local_negative_not_applied_to_all_orders');
+
+// A failed scanner/guard must not return a partial success or cursor.
+Configuration::updateValue('PS_GROWTH_LOCAL_CAPTURE','staging_armed');
+$deniedWindow=DryRun::reviewWindow(
+    $db,_PS_VERSION_,'ABH',$ns,_DB_PREFIX_,1,0,2,3,
+    $sourceLoader,$nativeOrder,$nativeCurrency,$localRows,
+    $subscription,$now,$readCsc,$origin,$sourceName
+);
+Configuration::updateValue('PS_GROWTH_LOCAL_CAPTURE','off');
+$deniedSummary=DryRun::summarize($deniedWindow);
+g7DbCheck($deniedSummary['status']==='batch_review_failed_closed'
+    && $deniedSummary['reviewed_count']===null
+    && $deniedWindow['next_cursor_internal']===null
+    && !$deniedSummary['delivery_authorized'],
+    'g7_dry_run_test_gate_leaked_partial_success');
+$invalid=false;
+try {
+    DryRun::reviewWindow($db,_PS_VERSION_,'ABH',$ns,_DB_PREFIX_,
+        1,0,50,6,$sourceLoader,$nativeOrder,$nativeCurrency,$localRows,
+        $subscription,$now,$readCsc,$origin,$sourceName);
+} catch(RuntimeException $e) {
+    $invalid=$e->getMessage()==='g7_dry_run_window_invalid';
+}
+g7DbCheck($invalid,'g7_dry_run_unbounded_pages_accepted');
+$redacted=json_encode([
+    $publicWindow,DryRun::summarize($withOptout),
+    DryRun::summarize($withNativeNegative),$deniedSummary
+]);
+foreach (['ci-synthetic@example.invalid',$ns,'901','902','904','905',
+    'Fixture','marketing_email_test','credencial',
+    'ABH_PrestaShop_Data_Cloud'] as $needle) {
+    g7DbCheck(strpos($redacted,$needle)===false,
+        'g7_dry_run_public_summary_contains_private_data');
+}
+g7DbCheck((int)$db->getValue("SELECT COUNT(*) FROM $tab"
+    . " WHERE status='blocked' AND delivery_state='blocked'"
+    . " AND delivery_attempts=0")===5,
+    'g7_dry_run_modified_outbox');
 
 // Native PrestaShop Db CAS adapter on the same extended G3 outbox.
 $native=new NativeLease($db,_PS_VERSION_,'ABH',$ns,_DB_PREFIX_);
