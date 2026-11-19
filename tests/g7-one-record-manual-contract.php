@@ -1,6 +1,8 @@
 <?php
 /** G7 0.8.9: single native customer+order, explicit UAT, no network. */
 require_once dirname(__DIR__)
+    .'/pssalesforcebridge/src/DataCloud/IngestionPayloadBuilder.php';
+require_once dirname(__DIR__)
     .'/pssalesforcebridge/src/DataCloud/GrowthTypedPstPayloadBuilder.php';
 require_once dirname(__DIR__)
     .'/pssalesforcebridge/src/DataCloud/GrowthNativeCustomerOrderDraft.php';
