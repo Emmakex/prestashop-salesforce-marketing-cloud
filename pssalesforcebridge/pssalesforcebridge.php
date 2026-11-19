@@ -3,6 +3,7 @@
 /**
  * PrestaShop -> Salesforce Marketing Cloud Growth + Data Cloud.
  *
+ * v0.9.4: safe, distinct local preview vs real send diagnostics; no PII.
  * v0.9.3: merchant-independent source binding for each shop (DOABH etc.).
  * v0.9.2: secure per-shop Salesforce credentials and OAuth-only BO test.
  * v0.9.0: simplified accessible Back Office pre-beta with one guided smoke.
@@ -49,6 +50,7 @@ require_once __DIR__ . '/src/DataCloud/GrowthTypedPstPayloadBuilder.php';
 require_once __DIR__ . '/src/DataCloud/GrowthNativeCustomerOrderDraft.php';
 require_once __DIR__ . '/src/Growth/GrowthStagingNativeReadback.php';
 require_once __DIR__ . '/src/Growth/GrowthOneRecordSelection.php';
+require_once __DIR__ . '/src/Growth/GrowthOneRecordSafeDiagnosis.php';
 require_once __DIR__ . '/src/Growth/GrowthOneRecordManualSender.php';
 require_once __DIR__ . '/src/Growth/GrowthShopCredentialVault.php';
 require_once __DIR__ . '/src/Growth/GrowthShopSourceBinding.php';
@@ -67,6 +69,7 @@ use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthStagingSchemaBootstr
 use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthStagingNativeReadback;
 use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthG7StagingDeliveryMigration;
 use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthOneRecordSelection;
+use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthOneRecordSafeDiagnosis;
 use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthOneRecordManualSender;
 use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthShopCredentialVault;
 use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthShopSourceBinding;
@@ -90,7 +93,7 @@ class PsSalesforceBridge extends Module
     {
         $this->name = 'pssalesforcebridge';
         $this->tab = 'advertising_marketing';
-        $this->version = '0.9.3';
+        $this->version = '0.9.4';
         $this->author = 'ALFABH';
         $this->need_instance = 0;
         $this->bootstrap = true;
@@ -691,10 +694,74 @@ class PsSalesforceBridge extends Module
                 .$this->l('. Comprueba el registro en Salesforce Data Cloud antes de continuar. No se realizará otro intento ni se enviarán campañas.')
             );
         } catch (\Throwable $e) {
-            // No exception SQL, ID, email, token, payload or URL in BO.
+            // Never expose raw errors or source records. Local preview does
+            // not send; actual sends remain one-shot and must be reconciled.
             return $this->displayError(
-                $this->l('Prueba bloqueada o ya intentada. Comprueba cliente, pedido, tienda, permisos y recepción en Data Cloud. No se permite repetir automáticamente.')
+                $this->safeOneRecordFailureMessage(
+                    GrowthOneRecordSafeDiagnosis::classify($e,$action),
+                    $action
+                )
             );
+        }
+    }
+
+    /**
+     * All strings are static and translatable. No private exception text,
+     * email, order details, Data Cloud response or OAuth token leaks to BO.
+     */
+    private function safeOneRecordFailureMessage($diagnostic,$action)
+    {
+        if ($action==='preview') {
+            switch ($diagnostic) {
+                case 'shop_context':
+                    return $this->l('Validación local: selecciona una tienda concreta en PrestaShop. No se ha enviado nada.');
+                case 'invalid_selection':
+                    return $this->l('Validación local: los identificadores o la tienda no son válidos. No se ha enviado nada.');
+                case 'customer_shop':
+                    return $this->l('Validación local: el cliente no existe en la tienda seleccionada o no pertenece a ella. No se ha enviado nada.');
+                case 'order_shop':
+                    return $this->l('Validación local: el pedido no existe en la tienda seleccionada o no pertenece a ella. No se ha enviado nada.');
+                case 'customer_order_relation':
+                    return $this->l('Validación local: el pedido no pertenece al cliente seleccionado, o sus referencias de tienda no coinciden. No se ha enviado nada.');
+                case 'currency':
+                    return $this->l('Validación local: no se puede comprobar la moneda asociada al pedido. No se ha enviado nada.');
+                case 'customer_fields':
+                    return $this->l('Validación local: faltan datos obligatorios o indicadores válidos del cliente. No se ha enviado nada.');
+                case 'order_fields':
+                    return $this->l('Validación local: faltan datos obligatorios o válidos del pedido. No se ha enviado nada.');
+                case 'customer_excluded':
+                    return $this->l('Validación local: el cliente es invitado o está eliminado; no puede utilizarse en esta prueba. No se ha enviado nada.');
+                case 'email':
+                    return $this->l('Validación local: el correo asociado al cliente no supera la validación de formato. No se ha enviado nada.');
+                case 'local_date':
+                    return $this->l('Validación local: alguna fecha de origen del cliente o pedido no tiene un formato válido. No se ha enviado nada.');
+                case 'order_total':
+                    return $this->l('Validación local: el importe del pedido no se puede interpretar de forma segura. No se ha enviado nada.');
+                default:
+                    return $this->l('Validación local bloqueada: los datos nativos no cumplen el esquema PSCustomer/PSOrder. No se ha enviado nada a Salesforce. No es un error OAuth.');
+            }
+        }
+        switch ($diagnostic) {
+            case 'send_attempt_exists':
+                return $this->l('Envío bloqueado: ya existe un intento registrado para este objeto y tienda. Comprueba primero Data Cloud; no lo repitas.');
+            case 'send_approval':
+                return $this->l('Envío bloqueado: falta la autorización individual exacta. No se ha iniciado esta solicitud.');
+            case 'send_gate':
+                return $this->l('Envío bloqueado: cambió la identidad, el modo Test o la captura local. Revisa configuración antes de continuar.');
+            case 'send_source':
+                return $this->l('Envío bloqueado: el origen Data Cloud de esta tienda no está vinculado o ha cambiado. No repitas sin revisarlo.');
+            case 'send_dlo_required':
+                return $this->l('Pedido bloqueado: confirma primero en Data Cloud la recepción del cliente exacto. No se debe enviar el pedido todavía.');
+            case 'send_order_customer':
+                return $this->l('Pedido bloqueado: no coincide con el cliente del intento previamente aceptado. No se debe enviar el pedido.');
+            case 'send_locked':
+                return $this->l('Envío bloqueado: existe otra operación en curso. Revisa el estado de Data Cloud antes de tomar otra acción.');
+            case 'send_oauth':
+                return $this->l('Envío bloqueado: no se ha podido obtener el token OAuth. Usa Probar conexión y revisa Salesforce.');
+            case 'send_local':
+                return $this->l('Envío bloqueado: el cliente o pedido no supera la validación local actual. No se debe forzar el envío.');
+            default:
+                return $this->l('Envío sin resultado verificable. Comprueba la recepción en Salesforce y el estado local antes de cualquier otro intento. No se permiten reintentos automáticos.');
         }
     }
 
