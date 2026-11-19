@@ -42,8 +42,8 @@ final class GrowthOneRecordManualSender
         $customerKey=self::key($namespace,$shop,'PSCustomer');
         if ($object==='PSOrder'
             && ($dloAttestation!==self::CUSTOMER_DLO_ATTESTATION
-                || (string)\Configuration::get($customerKey)
-                    !=='accepted_unconfirmed_202')) {
+                || strpos((string)\Configuration::get($customerKey),
+                    'accepted_unconfirmed_202:')!==0)) {
             throw new RuntimeException('g7_one_send_customer_dlo_review_required');
         }
         if (\Configuration::get($key)!==false
@@ -72,8 +72,8 @@ final class GrowthOneRecordManualSender
                 throw new RuntimeException('g7_one_send_already_attempted');
             }
             if ($object==='PSOrder'
-                && ((string)\Configuration::get($customerKey)
-                        !=='accepted_unconfirmed_202'
+                && (strpos((string)\Configuration::get($customerKey),
+                        'accepted_unconfirmed_202:')!==0
                     || $dloAttestation!==self::CUSTOMER_DLO_ATTESTATION)) {
                 throw new RuntimeException('g7_one_send_customer_dlo_review_required');
             }
@@ -92,6 +92,20 @@ final class GrowthOneRecordManualSender
                 || $record['source_namespace']!==$namespace
                 || $record['shop_id']!==$shop) {
                 throw new RuntimeException('g7_one_send_record_scope_unverified');
+            }
+            // Tie the order to the EXACT customer already accepted: never
+            // borrow a different contact's successful 202 confirmation.
+            $secret=(string)\Configuration::get('PS_SFMC_CRON_TOKEN');
+            $sourceKey=$prepared['customer_record_private']['source_key'];
+            if (strlen($secret)<40 || !is_string($sourceKey)
+                || !preg_match('/^[a-z0-9_]+:[0-9]+:customer:[0-9]+$/D',$sourceKey)) {
+                throw new RuntimeException('g7_one_send_customer_binding_unverified');
+            }
+            $customerReceipt='accepted_unconfirmed_202:'
+                .hash_hmac('sha256',$sourceKey,$secret);
+            if ($object==='PSOrder' && !hash_equals($customerReceipt,
+                (string)\Configuration::get($customerKey))) {
+                throw new RuntimeException('g7_one_send_wrong_customer_for_order');
             }
             // Persist BEFORE any external POST: failures/timeout never
             // cause an automatic replay of a potentially accepted request.
@@ -115,7 +129,9 @@ final class GrowthOneRecordManualSender
                 ==='accepted_asynchronously_unconfirmed';
             // Configuration failure leaves attempt_reserved: also fail closed.
             if (!\Configuration::updateValue(
-                $key,$accepted?'accepted_unconfirmed_202':'held_reconcile'
+                $key,$accepted
+                    ?($object==='PSCustomer'?$customerReceipt:'accepted_unconfirmed_202')
+                    :'held_reconcile'
             )) {
                 throw new RuntimeException('g7_one_send_result_persist_unverified');
             }
