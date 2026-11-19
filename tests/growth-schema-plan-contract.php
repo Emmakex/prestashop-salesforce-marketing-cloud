@@ -119,7 +119,7 @@ $publicRoute=substr($module,$adminStart,$adminEnd-$adminStart);
 schemaCheck($adminStart!==false && $adminEnd>$adminStart
     && strpos($module, 'GrowthOutboxSchemaPlan') !== false
     && strpos($module, "GrowthStagingSchemaBootstrap::install(") !== false
-    && strpos($publicRoute,"Tools::isSubmit(\'submitPsGrowthStagingCapture\')")===false
+    && strpos($publicRoute,"Tools::isSubmit('submitPsGrowthStagingCapture')")===false
     && strpos($publicRoute,"submitPsG7SchemaPrepare")===false
     && strpos($publicRoute,"submitPsG7SchemaRollback")===false,
     'historical_schema_controls_reachable_from_client_admin');
