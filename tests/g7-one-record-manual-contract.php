@@ -121,6 +121,11 @@ g7OnceReject(function()use($db,$ns,$preview,$token,$mockHttp){
         $preview,$token,$mockHttp);
 },'g7_one_send_scope_or_approval_denied');
 g7OnceAssert(count($calls)===0,'post_before_approval');
+g7OnceReject(function()use($db,$ns,$preview,$token,$mockHttp){
+    SendOne::dispatch($db,$ns,'OTHER',2,'PSCustomer',SendOne::APPROVAL,'',
+        $preview,$token,$mockHttp);
+},'g7_one_send_scope_or_approval_denied');
+g7OnceAssert(count($calls)===0,'foreign_merchant_post_attempt');
 $r=SendOne::dispatch($db,$ns,'ABH',2,'PSCustomer',SendOne::APPROVAL,'',
     $preview,$token,$mockHttp);
 g7OnceAssert($r['status']==='one_record_accepted_unconfirmed_manual_dlo_check'
