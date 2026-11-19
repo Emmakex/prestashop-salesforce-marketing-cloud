@@ -55,6 +55,8 @@ foreach([
     'Growth/GrowthG7DeliverySchemaPlan.php',
     'Growth/GrowthG7StagingDeliveryMigration.php',
     'Growth/GrowthPrestaShopDeliveryLease.php',
+    'Growth/GrowthLocalCustomerHoldReader.php',
+    'Growth/GrowthG7NativePreflight.php',
     'Growth/GrowthSqlEngineGate.php',
     'Growth/GrowthStagingSchemaBootstrap.php',
     'Growth/GrowthStagingOutboxStore.php',
@@ -62,6 +64,8 @@ foreach([
     'DataCloud/IngestionPayloadBuilder.php',
     'DataCloud/GrowthTypedPstPayloadBuilder.php',
     'DataCloud/GrowthNativeCustomerOrderDraft.php',
+    'DataCloud/GrowthStreamingIngestionPlan.php',
+    'DataCloud/GrowthCapturedEventPstPreview.php',
     'Growth/GrowthStagingNativeReadback.php',
     'Growth/GrowthSandboxMigrationExecutor.php'
 ] as $path)require_once $root.$path;
@@ -72,6 +76,7 @@ use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthSandboxMigrationExec
 use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthStagingNativeReadback as Readback;
 use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthG7StagingDeliveryMigration as G7Migration;
 use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthPrestaShopDeliveryLease as NativeLease;
+use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthG7NativePreflight as Preflight;
 
 function g7DbCheck($ok,$code){
     if(!$ok)throw new RuntimeException('g7_real_staging_ci_'.$code);
@@ -170,7 +175,12 @@ $createdFresh->newsletter=0;
 $createdFresh->optin=0;
 $createdFresh->date_upd='2026-11-18 09:00:00';
 $loadCustomer=function($id)use($createdFresh,$customer) {
-    if ($id===904) return clone $createdFresh;
+    if ($id===904) {
+        $c=clone $createdFresh;
+        $c->newsletter=1;
+        $c->optin=1;
+        return $c;
+    }
     if ($id===901) return clone $customer;
     throw new RuntimeException('fixture_customer_unknown');
 };
@@ -272,6 +282,132 @@ g7DbCheck($applied['status']==='extended_blocked_no_sends'
         "SELECT COUNT(*) FROM $tab WHERE delivery_state='blocked'"
         . " AND delivery_attempts=0"
     )===5,'migration_changed_local_events');
+
+// G7 source/ledger/customer negative evidence on the extended G3 CI table.
+// Customer source is synthetic and injected: g3_ci has no merchant PII.
+$sourceReads=0;
+$freshCustomer=clone $customer;
+$freshCustomer->newsletter=1;
+$freshCustomer->optin=1;
+$sourceLoader=function($id)use($freshCustomer,$createdFresh,&$sourceReads) {
+    $sourceReads++;
+    if ($id===901) return clone $freshCustomer;
+    if ($id===904) {
+        $c=clone $createdFresh;
+        $c->newsletter=1;
+        $c->optin=1;
+        return $c;
+    }
+    throw new RuntimeException('test_customer_unknown');
+};
+$nativeOrder=function($id)use($order,$orderPending) {
+    if ($id===902) return clone $order;
+    if ($id===905) {
+        $result=clone $orderPending;
+        $result->current_state=2;
+        return $result;
+    }
+    throw new RuntimeException('test_order_unknown');
+};
+$nativeCurrency=function($id) {
+    return $id===1?(object)['id'=>1,'iso_code'=>'EUR']:null;
+};
+$localRows=function($sql) {
+    if (strpos($sql,'ci_customer')===false
+        || !preg_match('/([0-9]+) LIMIT 2$/',$sql,$match)) {
+        return false;
+    }
+    return [[
+        'id_customer'=>$match[1],'id_shop'=>'1',
+        'active'=>'1','deleted'=>'0','is_guest'=>'0',
+        'newsletter'=>'1','optin'=>'1'
+    ]];
+};
+$origin='https://credencial.c360a.salesforce.com';
+$sourceName='ABH_PrestaShop_Data_Cloud';
+$stableCustomer=Preflight::inspectLatest(
+    $db,_PS_VERSION_,'ABH',$ns,_DB_PREFIX_,1,'customer',
+    $sourceLoader,$nativeOrder,$nativeCurrency,$localRows,$origin,$sourceName
+);
+g7DbCheck($stableCustomer['status']==='hold_for_review'
+    && $stableCustomer['reason']==='local_consent_unverified_hold'
+    && $stableCustomer['local_customer_source_state']
+        ==='no_local_negative_observed'
+    && $stableCustomer['native_source_double_read_stable']
+    && !$stableCustomer['marketing_sends_authorized']
+    && !$stableCustomer['data_cloud_ingestion_authorized']
+    && $sourceReads>=2,
+    'g7_preflight_positive_local_is_not_growth_consent');
+$stableOrder=Preflight::inspectLatest(
+    $db,_PS_VERSION_,'ABH',$ns,_DB_PREFIX_,1,'order',
+    $sourceLoader,$nativeOrder,$nativeCurrency,$localRows,$origin,$sourceName
+);
+g7DbCheck($stableOrder['status']==='hold_for_review'
+    && $stableOrder['reason']==='local_consent_unverified_hold'
+    && $stableOrder['native_source_double_read_stable'],
+    'g7_preflight_order_not_projected');
+$negativeRows=function($sql)use($localRows) {
+    $rows=$localRows($sql);
+    if ($rows) $rows[0]['newsletter']='0';
+    return $rows;
+};
+$negative=Preflight::inspectLatest(
+    $db,_PS_VERSION_,'ABH',$ns,_DB_PREFIX_,1,'customer',
+    $sourceLoader,$nativeOrder,$nativeCurrency,$negativeRows,$origin,$sourceName
+);
+g7DbCheck($negative['reason']==='local_negative_hold'
+    && $negative['local_customer_source_state']==='known_negative'
+    && !$negative['marketing_sends_authorized'],
+    'g7_preflight_local_optout_not_blocked');
+// Native object may go negative while a scoped SQL reader looks positive.
+// Such a mismatch is a HOLD, never a clean local signal.
+$nativeNegativeLoader=function($id)use($sourceLoader) {
+    $c=$sourceLoader($id);
+    $c->newsletter=0;
+    return $c;
+};
+$nativeNegative=Preflight::inspectLatest(
+    $db,_PS_VERSION_,'ABH',$ns,_DB_PREFIX_,1,'customer',
+    $nativeNegativeLoader,$nativeOrder,$nativeCurrency,$localRows,
+    $origin,$sourceName
+);
+g7DbCheck($nativeNegative['reason']==='local_negative_hold'
+    && $nativeNegative['local_customer_source_state']==='known_negative',
+    'g7_preflight_native_negative_overridden_by_sql');
+
+$changingCalls=0;
+$changingLoader=function($id)use($sourceLoader,&$changingCalls) {
+    $result=$sourceLoader($id);
+    $changingCalls++;
+    if ($changingCalls===2) $result->date_upd='2026-11-19 10:01:00';
+    return $result;
+};
+$changed=Preflight::inspectLatest(
+    $db,_PS_VERSION_,'ABH',$ns,_DB_PREFIX_,1,'customer',
+    $changingLoader,$nativeOrder,$nativeCurrency,$localRows,$origin,$sourceName
+);
+g7DbCheck($changed['reason']==='native_source_changed_hold'
+    && !$changed['native_source_double_read_stable'],
+    'g7_preflight_double_read_missed_source_change');
+$invalidType=false;
+try {
+    Preflight::inspectLatest(
+        $db,_PS_VERSION_,'ABH',$ns,_DB_PREFIX_,1,'cart',
+        $sourceLoader,$nativeOrder,$nativeCurrency,$localRows,$origin,$sourceName
+    );
+} catch(RuntimeException $e) {
+    $invalidType=$e->getMessage()==='g7_preflight_input_invalid';
+}
+g7DbCheck($invalidType,'g7_preflight_cart_accepted');
+$private=json_encode([$stableCustomer,$stableOrder,$negative,$changed]);
+foreach(['ci-synthetic@example.invalid',$ns,'901','902','905',
+    'Fixture','credencial','ABH_PrestaShop_Data_Cloud'] as $word) {
+    g7DbCheck(strpos($private,$word)===false,'g7_preflight_leaked_private_data');
+}
+$stateCheck=(int)$db->getValue("SELECT COUNT(*) FROM $tab"
+    . " WHERE status='blocked' AND delivery_state='blocked'"
+    . " AND delivery_attempts=0");
+g7DbCheck($stateCheck===5,'g7_preflight_mutated_outbox');
 
 // Native PrestaShop Db CAS adapter on the same extended G3 outbox.
 $native=new NativeLease($db,_PS_VERSION_,'ABH',$ns,_DB_PREFIX_);
