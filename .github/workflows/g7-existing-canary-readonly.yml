@@ -1,0 +1,67 @@
+name: G7 Existing Canary Data Cloud Read Only Verification
+
+# Validate previously materialized G5 PSCustomer/PSOrder on the REAL tenant.
+# No new canary, no ingestion POST, no data extraction or contact/campaign send.
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/g7-existing-canary-readonly.yml'
+      - 'tests/live/g7-existing-canary-data-cloud-readonly.php'
+      - 'tests/review/G7ExistingCanaryReadOnly.php'
+      - 'tests/g7-live-existing-canary-readonly-contract.php'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: g7-existing-canary-tenant-readonly
+  cancel-in-progress: false
+
+jobs:
+  verify-existing-canary:
+    if: >-
+      github.repository == 'Emmakex/prestashop-salesforce-marketing-cloud' &&
+      github.ref == 'refs/heads/main' &&
+      (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    environment: salesforce-growth-certification
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Enforce correct repository, main, and exact commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REPOSITORY" = "Emmakex/prestashop-salesforce-marketing-cloud"
+          test "$GITHUB_REF" = "refs/heads/main"
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: curl
+          coverage: none
+      - name: Verify fixed canary and SQL safety contracts (offline)
+        run: |
+          php -l tests/live/g7-existing-canary-data-cloud-readonly.php
+          php tests/g7-live-existing-canary-readonly-contract.php
+      - name: Query already-present synthetic G5 DLO rows (no ingestion)
+        env:
+          G7_EXISTING_CANARY_MODE: READ_ONLY_EXISTING_CANARIES
+          G7_EXISTING_CANARY_EVIDENCE: g7-existing-canary-verified.json
+          SF_GROWTH_ORG_URL: ${{ vars.SF_GROWTH_ORG_URL }}
+          SF_GROWTH_CLIENT_ID: ${{ secrets.SF_GROWTH_CLIENT_ID }}
+          SF_GROWTH_CLIENT_SECRET: ${{ secrets.SF_GROWTH_CLIENT_SECRET }}
+        run: php tests/live/g7-existing-canary-data-cloud-readonly.php
+      - name: Store redacted verification outcome
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: g7-existing-canary-dlo-readonly-${{ github.run_id }}-${{ github.run_attempt }}
+          path: g7-existing-canary-verified.json
+          if-no-files-found: ignore
+          retention-days: 14
