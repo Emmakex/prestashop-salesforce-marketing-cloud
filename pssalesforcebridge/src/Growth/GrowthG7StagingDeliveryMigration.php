@@ -266,7 +266,12 @@ final class GrowthG7StagingDeliveryMigration
             || !preg_match('/^[A-Z][A-Z0-9_]{1,31}$/D',$merchant)
             || !is_string($namespace)
             || !preg_match('/^[a-z][a-z0-9_]{5,31}$/D',$namespace)
-            || ($writing && (string)\Configuration::get('PS_GROWTH_LOCAL_CAPTURE')!=='off')) {
+            || ($writing && (string)\Configuration::get('PS_GROWTH_LOCAL_CAPTURE')!=='off')
+            // An operator cannot accidentally run staging DDL on an
+            // unsuffixed production installation even if its mode is Test.
+            || ($writing && !preg_match(
+                '/(?:^|_)(?:stage|staging)(?:_|$)/D',$namespace
+            ))) {
             throw new RuntimeException('g7_delivery_test_gate_denied');
         }
     }
