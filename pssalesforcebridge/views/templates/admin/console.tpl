@@ -27,7 +27,7 @@
 .sfmc-console .sfmc-panel-title p{color:var(--sfmc-muted);margin-top:5px}
 .sfmc-console .sfmc-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin:18px 0}
 .sfmc-console label{display:block;font-size:13px;font-weight:700;color:#2d4057;margin-bottom:6px}
-.sfmc-console input[type=text],.sfmc-console input[type=number]{display:block;width:100%;min-height:43px;border:1px solid #aebdd0;border-radius:8px;background:#fff;padding:9px 12px;color:#132d46;font:inherit;box-shadow:none}
+.sfmc-console input[type=text],.sfmc-console input[type=number],.sfmc-console input[type=password],.sfmc-console input[type=url]{display:block;width:100%;min-height:43px;border:1px solid #aebdd0;border-radius:8px;background:#fff;padding:9px 12px;color:#132d46;font:inherit;box-shadow:none}
 .sfmc-console input:focus-visible,.sfmc-console button:focus-visible,.sfmc-console summary:focus-visible{outline:3px solid #86baff;outline-offset:3px}
 .sfmc-console input[readonly]{background:var(--sfmc-bg);color:var(--sfmc-muted)}
 .sfmc-console .sfmc-hint{font-size:12px;color:var(--sfmc-muted);margin:6px 0}
