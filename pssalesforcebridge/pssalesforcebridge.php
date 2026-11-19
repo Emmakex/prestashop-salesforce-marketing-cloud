@@ -216,7 +216,7 @@ class PsSalesforceBridge extends Module
         $namespace=(string)Configuration::get(self::CONFIG_NAMESPACE);
         $mode=(string)Configuration::get(self::CONFIG_MODE);
         $capture=(string)Configuration::get(self::CONFIG_LOCAL_CAPTURE);
-        $shop=class_exists('Shop') ? (int)\Shop::getContextShopID() : 0;
+        $shop=$this->credentialContextShopId();
         $identity=$merchant==='ABH'
             && preg_match('/^[a-z][a-z0-9_]{5,31}$/D',$namespace)===1
             && $shop>0;
@@ -264,6 +264,25 @@ class PsSalesforceBridge extends Module
      * secrets. A module-editor account alone is never sufficient.
      * Multi-shop "All shops" context is not a valid credential owner.
      */
+    /**
+     * A single-shop install may use CONTEXT_ALL internally. That is safe
+     * only when multistore is disabled; true multistore requires an exact
+     * selected shop and never accepts all/group context.
+     */
+    private function credentialContextShopId()
+    {
+        if (!class_exists('Shop') || !method_exists('Shop','isFeatureActive')) {
+            return 0;
+        }
+        $single=!Shop::isFeatureActive();
+        $shop=(int)Shop::getContextShopID();
+        if ($shop>0
+            && ($single || Shop::getContext()===Shop::CONTEXT_SHOP)) {
+            return $shop;
+        }
+        return $single?(int)Configuration::get('PS_SHOP_DEFAULT'):0;
+    }
+
     private function isCredentialAdmin($shop)
     {
         $employee=isset($this->context,$this->context->employee)
@@ -273,8 +292,7 @@ class PsSalesforceBridge extends Module
             && (int)$employee->id>0
             && (int)$employee->id_profile===1
             && is_int($shop) && $shop>0
-            && class_exists('Shop') && method_exists('Shop','getContext')
-            && \Shop::getContext()===\Shop::CONTEXT_SHOP;
+            && $shop===$this->credentialContextShopId();
     }
 
     private function credentialCsrf($shop)
@@ -291,7 +309,7 @@ class PsSalesforceBridge extends Module
      */
     private function handleSalesforceCredentials($operation)
     {
-        $shop=class_exists('Shop')?(int)\Shop::getContextShopID():0;
+        $shop=$this->credentialContextShopId();
         if (!in_array($operation,['save','test','remove'],true)
             || !$this->isCredentialAdmin($shop)) {
             return $this->displayError(
@@ -608,7 +626,7 @@ class PsSalesforceBridge extends Module
         }
         try {
             // A specific shop context is mandatory; All Shops is not safe.
-            $shop=(int)\Shop::getContextShopID();
+            $shop=$this->credentialContextShopId();
             if ($shop<1) {
                 throw new \RuntimeException('g7_one_record_invalid_shop_context');
             }
