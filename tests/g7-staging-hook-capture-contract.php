@@ -101,7 +101,13 @@ foreach($records as $row){
         && $row['source_modified_provenance']==='unverified'
         && !isset($row['email'],$row['first_name'],$row['total_paid'])
         && strlen($row['dedupe_fingerprint'])===64,'row_privacy_or_clock');
-    $encoded=json_encode($row);
+    // Captured timestamps are UTC with .000Z precision: at second 44,
+    // a legitimate "...:44.000Z" contains "44.00", the synthetic amount.
+    // Test private fields against all NON-clock metadata without discarding
+    // the legitimate captured_at_utc source evidence.
+    $piiFields=$row;
+    unset($piiFields['captured_at_utc']);
+    $encoded=json_encode($piiFields);
     foreach(['PRIVATE_SYNTHETIC','sensitive-in-memory','44.00'] as $bad){
         g7StagingAssert(strpos($encoded,$bad)===false,'pii_in_local_row');
     }
