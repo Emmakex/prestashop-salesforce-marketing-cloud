@@ -115,4 +115,8 @@ adminUxAssert(strpos($routes,'http')===false
     && strpos($routes,'curl_')===false
     && strpos($routes,'Db::')===false,
     'network_or_db_write_on_dashboard_route');
+adminUxAssert(strpos($module,"$"."identity=in_array(")!==false
+    && strpos($module,"['ABH','BCABH']")!==false
+    && strpos($module,"const SCHEMA_SOURCE = 'ABH_PrestaShop_Data_Cloud'")!==false,
+    'bcabh_must_share_existing_abh_source_without_new_connector');
 echo "Pre-beta BO UX PASS: 1 client + 1 order, scoped forms, accessible layout, no legacy diagnostics or new sender.\n";
