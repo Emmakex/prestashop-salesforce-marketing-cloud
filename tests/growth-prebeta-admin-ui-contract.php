@@ -73,6 +73,34 @@ foreach([
     adminUxAssert(strpos($template,$obsolete)===false,
         'obsolete_form_in_new_ui');
 }
+foreach ([
+    'submitPsGrowthOauthSave',
+    'submitPsGrowthOauthTest',
+    'submitPsGrowthOauthRemove'
+] as $action) {
+    adminUxAssert(substr_count($template,'name="'.$action.'"')===1,
+        'one_oauth_action_'.$action);
+    adminUxAssert(strpos($get,$action)!==false,
+        'oauth_action_not_guarded_in_bo_'.$action);
+}
+adminUxAssert(substr_count($template,'name="PS_GROWTH_OAUTH_CSRF"')===3
+    && strpos($template,'type="password" id="sfmc-oauth-secret"')!==false
+    && strpos($template,'name="PS_GROWTH_OAUTH_CLIENT_ID"')!==false
+    && strpos($template,'name="PS_GROWTH_OAUTH_ORG"')!==false
+    && strpos($template,'name="PS_GROWTH_OAUTH_CLIENT_SECRET"')!==false
+    && strpos($template,'{$sfmc_credentials_csrf|escape:')!==false
+    && strpos($template,'value="{$sfmc_oauth_')===false
+    && strpos($module,'GrowthShopCredentialVault::save(')!==false
+    && strpos($module,'GrowthShopCredentialVault::testConnection(')!==false
+    && strpos($module,'GrowthShopCredentialVault::obtainCloudToken($shop)')!==false
+    && strpos($module,'$this->isCredentialAdmin($shop)')!==false
+    && strpos($module,'hash_equals($this->credentialCsrf($shop),$csrf)')!==false
+    && strpos($module,"getenv('SF_GROWTH_CLIENT_SECRET')")===false,
+    'oauth_credentials_must_be_encrypted_and_admin_guarded');
+adminUxAssert(strpos($template,'Client Secret')!==false
+    && strpos($template,'Datos de cliente')===false,
+    'oauth_help_or_privacy');
+
 adminUxAssert(strpos($template,'{$sfmc_credentials_ready}')===false
     && strpos($template,'{$sfmc_customer_status|escape:')!==false
     && strpos($template,'{$sfmc_order_status|escape:')!==false
