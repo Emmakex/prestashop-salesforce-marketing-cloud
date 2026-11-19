@@ -160,6 +160,28 @@ final class GrowthOneRecordManualSender
         }
     }
 
+    /**
+     * Privacy-safe BO status for the single manual customer/order smoke.
+     * A received HTTP 202 never means the DLO was verified.
+     */
+    public static function statusForShop($namespace,$shop,$object)
+    {
+        if (!is_string($namespace)
+            || !preg_match('/^[a-z][a-z0-9_]{5,31}$/D',$namespace)
+            || !is_int($shop) || $shop<1
+            || !in_array($object,['PSCustomer','PSOrder'],true)
+            || !class_exists('Configuration')) {
+            return 'No disponible';
+        }
+        $value=(string)\Configuration::get(self::key($namespace,$shop,$object));
+        if ($value==='')return 'Sin enviar';
+        if ($value==='accepted_unconfirmed_202'
+            || strpos($value,'accepted_unconfirmed_202:')===0) {
+            return 'Aceptado · pendiente de verificar en Data Cloud';
+        }
+        return 'En revisión · no repetir el envío';
+    }
+
     private static function assertConfigured($merchant,$namespace)
     {
         if (!class_exists('Configuration')
