@@ -26,7 +26,7 @@ foreach([
     'GrowthPrestaShopDeliveryLease',
     'GrowthCapturedEventPstPreview::inspect',
     'GrowthLocalCustomerHoldReader::inspect',
-    "executeS($sql,true,false)",
+    'executeS($sql,true,false)',
     'hash_equals(',
     "delivery_state']!=='blocked'",
     'source_unverified_hold',
