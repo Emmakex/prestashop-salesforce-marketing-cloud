@@ -1,5 +1,5 @@
 <?php
-/** G7 0.9.3: single native customer+order, explicit UAT, no network. */
+/** G7 0.9.4: single native customer+order, explicit UAT, no network. */
 require_once dirname(__DIR__)
     .'/pssalesforcebridge/src/DataCloud/IngestionPayloadBuilder.php';
 require_once dirname(__DIR__)
@@ -95,7 +95,17 @@ g7OnceReject(function()use($ns,$customerLoader,$foreignOrder,$moneyLoader) {
 g7OnceReject(function()use($ns,$customerLoader,$orderLoader,$moneyLoader) {
     SelectOne::prepareInternal($ns,3,44,77,
         $customerLoader,$orderLoader,$moneyLoader);
-},'g7_one_record_customer_order_mismatch');
+},'g7_one_record_customer_not_in_shop');
+g7OnceReject(function()use($ns,$customerLoader,$orderLoader,$moneyLoader) {
+    SelectOne::prepareInternal($ns,2,45,77,$customerLoader,
+        $orderLoader,$moneyLoader);
+},'g7_one_record_customer_not_in_shop');
+g7OnceReject(function()use($ns,$customerLoader,$orderLoader,$moneyLoader) {
+    SelectOne::prepareInternal($ns,2,44,78,$customerLoader,
+        $orderLoader,$moneyLoader);
+},'g7_one_record_order_not_in_shop');
+
+
 
 Configuration::$values=[
     'PS_SFMC_MODE'=>'test',
@@ -266,7 +276,7 @@ $hooks=substr($module,strpos($module,'public function hookActionCustomerAccountA
     -strpos($module,'public function hookActionCustomerAccountAdd'));
 g7OnceAssert(strpos($module,'renderManualOneRecordForms')!==false
     && strpos($module,'runManualOneRecord')!==false
-    && strpos($module,"$"."this->version = '0.9.3'")!==false
+    && strpos($module,"$"."this->version = '0.9.4'")!==false
     && strpos($hooks,'GrowthOneRecordManualSender')===false
     && strpos($cron,'GrowthOneRecordManualSender')===false,
     'unapproved_auto_wiring');

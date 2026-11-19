@@ -29,12 +29,17 @@ final class GrowthOneRecordSelection
         }
         $customer=call_user_func($loadCustomer,$customerId);
         $order=call_user_func($loadOrder,$orderId);
-        if (!is_object($customer) || !is_object($order)
+        if (!is_object($customer)
             || (int)(isset($customer->id)?$customer->id:0)!==$customerId
-            || (int)(isset($customer->id_shop)?$customer->id_shop:0)!==$shop
+            || (int)(isset($customer->id_shop)?$customer->id_shop:0)!==$shop) {
+            throw new RuntimeException('g7_one_record_customer_not_in_shop');
+        }
+        if (!is_object($order)
             || (int)(isset($order->id)?$order->id:0)!==$orderId
-            || (int)(isset($order->id_shop)?$order->id_shop:0)!==$shop
-            || (int)(isset($order->id_customer)?$order->id_customer:0)!==$customerId) {
+            || (int)(isset($order->id_shop)?$order->id_shop:0)!==$shop) {
+            throw new RuntimeException('g7_one_record_order_not_in_shop');
+        }
+        if ((int)(isset($order->id_customer)?$order->id_customer:0)!==$customerId) {
             throw new RuntimeException('g7_one_record_customer_order_mismatch');
         }
         $currencyId=isset($order->id_currency)?(int)$order->id_currency:0;
