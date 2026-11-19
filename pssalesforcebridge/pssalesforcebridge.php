@@ -951,7 +951,14 @@ class PsSalesforceBridge extends Module
 
     public function healthReport()
     {
-        // A healthy local module is not a Data Cloud export authorization.
+        // Status must reflect this merchant's binding, not always BC's.
+        // No SQL, HTTP or other side effects in health diagnostics.
+        $shop=$this->credentialContextShopId();
+        $binding=GrowthShopSourceBinding::inspect(
+            $shop,
+            (string)Configuration::get(self::CONFIG_MERCHANT),
+            (string)Configuration::get(self::CONFIG_NAMESPACE)
+        );
         return [
             'ok' => true,
             'status' => 'blocked_test',
@@ -960,7 +967,8 @@ class PsSalesforceBridge extends Module
             'prestashop_version' => defined('_PS_VERSION_') ? (string) _PS_VERSION_ : 'unknown',
             'provider' => self::PROVIDER,
             'data_platform' => self::DATA_PLATFORM,
-            'source' => self::SCHEMA_SOURCE,
+            'source' => $binding['ready'] ? $binding['source'] : '',
+            'source_binding_ready' => $binding['ready'],
             'identity_candidate_present' =>
                 (string) Configuration::get(self::CONFIG_MERCHANT) !== ''
                 && (string) Configuration::get(self::CONFIG_NAMESPACE) !== '',
