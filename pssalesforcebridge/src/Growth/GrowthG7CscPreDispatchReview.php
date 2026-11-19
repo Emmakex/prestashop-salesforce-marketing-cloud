@@ -20,6 +20,58 @@ final class GrowthG7CscPreDispatchReview
         $loadCustomer,$loadOrder,$loadCurrency,$selectLocalRows,
         $subscriptionId,$asOfUtc,$readCsc,$origin,$sourceName
     ) {
+        return self::inspectMatching(
+            $db,$version,$merchant,$namespace,$prefix,$shop,$type,
+            $loadCustomer,$loadOrder,$loadCurrency,$selectLocalRows,
+            $subscriptionId,$asOfUtc,$readCsc,$origin,$sourceName,null,null
+        );
+    }
+
+    /**
+     * Review ONE exact current G3 event from the bounded keyset scan.
+     * Denies stale sequences instead of inspecting the newest global row.
+     */
+    public static function inspectSelected(
+        $db,$version,$merchant,$namespace,$prefix,$shop,$type,
+        $id,$sequence,$loadCustomer,$loadOrder,$loadCurrency,$selectLocalRows,
+        $subscriptionId,$asOfUtc,$readCsc,$origin,$sourceName
+    ) {
+        if (!is_int($id) || $id<1 || !is_int($sequence) || $sequence<1) {
+            throw new RuntimeException('g7_csc_selected_scope_invalid');
+        }
+        return self::inspectMatching(
+            $db,$version,$merchant,$namespace,$prefix,$shop,$type,
+            $loadCustomer,$loadOrder,$loadCurrency,$selectLocalRows,
+            $subscriptionId,$asOfUtc,$readCsc,$origin,$sourceName,$id,$sequence
+        );
+    }
+
+    private static function nativeReview(
+        $db,$version,$merchant,$namespace,$prefix,$shop,$type,
+        $loadCustomer,$loadOrder,$loadCurrency,$selectLocalRows,
+        $origin,$sourceName,$requestedId,$requestedSequence
+    ) {
+        if ($requestedId!==null) {
+            return GrowthG7NativePreflight::inspectSelected(
+                $db,$version,$merchant,$namespace,$prefix,$shop,$type,
+                $requestedId,$requestedSequence,
+                $loadCustomer,$loadOrder,$loadCurrency,$selectLocalRows,
+                $origin,$sourceName
+            );
+        }
+        return GrowthG7NativePreflight::inspectLatest(
+            $db,$version,$merchant,$namespace,$prefix,$shop,$type,
+            $loadCustomer,$loadOrder,$loadCurrency,$selectLocalRows,
+            $origin,$sourceName
+        );
+    }
+
+    private static function inspectMatching(
+        $db,$version,$merchant,$namespace,$prefix,$shop,$type,
+        $loadCustomer,$loadOrder,$loadCurrency,$selectLocalRows,
+        $subscriptionId,$asOfUtc,$readCsc,$origin,$sourceName,
+        $requestedId,$requestedSequence
+    ) {
         if (!is_int($shop) || $shop<1
             || !in_array($type,['customer','order'],true)
             || !is_callable($loadCustomer)
@@ -30,10 +82,10 @@ final class GrowthG7CscPreDispatchReview
             throw new RuntimeException('g7_csc_presend_input_invalid');
         }
         try {
-            $first=GrowthG7NativePreflight::inspectLatest(
+            $first=self::nativeReview(
                 $db,$version,$merchant,$namespace,$prefix,$shop,$type,
                 $loadCustomer,$loadOrder,$loadCurrency,$selectLocalRows,
-                $origin,$sourceName
+                $origin,$sourceName,$requestedId,$requestedSequence
             );
             if (!self::stableLocal($first)) {
                 return self::hold('local_or_source_hold','not_checked',false);
@@ -42,7 +94,8 @@ final class GrowthG7CscPreDispatchReview
             // A shop-local event's customer must be derived, never accepted
             // as a separately supplied, potentially unrelated customer ID.
             $before=self::current($db,$version,$merchant,$namespace,$prefix,
-                $shop,$type,$loadCustomer,$loadOrder);
+                $shop,$type,$loadCustomer,$loadOrder,
+                $requestedId,$requestedSequence);
             $csc=GrowthCommunicationConsentHoldGate::inspect(
                 $shop,$before['customer_id'],$namespace,$subscriptionId,
                 $asOfUtc,$selectLocalRows,$prefix,$readCsc
@@ -51,17 +104,18 @@ final class GrowthG7CscPreDispatchReview
             // A recent CSC opt_in cannot override a local negative, and
             // neither a forged injected callback nor a 300s observation
             // proves a future send-time consent state.
-            $second=GrowthG7NativePreflight::inspectLatest(
+            $second=self::nativeReview(
                 $db,$version,$merchant,$namespace,$prefix,$shop,$type,
                 $loadCustomer,$loadOrder,$loadCurrency,$selectLocalRows,
-                $origin,$sourceName
+                $origin,$sourceName,$requestedId,$requestedSequence
             );
             if (!self::stableLocal($second)) {
                 return self::hold('source_changed_or_suppressed_hold',
                     'unverified',false);
             }
             $after=self::current($db,$version,$merchant,$namespace,$prefix,
-                $shop,$type,$loadCustomer,$loadOrder);
+                $shop,$type,$loadCustomer,$loadOrder,
+                $requestedId,$requestedSequence);
             if ($before['sequence']!==$after['sequence']
                 || $before['entity_id']!==$after['entity_id']
                 || $before['customer_id']!==$after['customer_id']
@@ -110,21 +164,23 @@ final class GrowthG7CscPreDispatchReview
      */
     private static function current(
         $db,$version,$merchant,$namespace,$prefix,$shop,$type,
-        $loadCustomer,$loadOrder
+        $loadCustomer,$loadOrder,$requestedId,$requestedSequence
     ) {
         $plan=GrowthOutboxSchemaPlan::preview(
             $version,$merchant,'marketing_cloud_growth',$namespace,
             'test',$prefix
         );
         $table=self::q($plan['tables']['outbox']);
-        $rows=$db->executeS(
-            'SELECT accepted_sequence,source_namespace,shop_id,entity_type,'
+        $sql='SELECT accepted_sequence,source_namespace,shop_id,entity_type,'
             . 'entity_id,original_event_type,status,delivery_state FROM '.$table
             . " WHERE source_namespace='$namespace' AND shop_id=$shop"
-            . " AND entity_type='$type' AND status='blocked'"
-            . ' ORDER BY accepted_sequence DESC LIMIT 1',
-            true,false
-        );
+            . " AND entity_type='$type' AND status='blocked'";
+        if ($requestedId!==null) {
+            $sql.=" AND entity_id=$requestedId"
+                . " AND accepted_sequence=$requestedSequence";
+        }
+        $sql.=' ORDER BY accepted_sequence DESC LIMIT 1';
+        $rows=$db->executeS($sql,true,false);
         if (!is_array($rows) || count($rows)!==1) {
             throw new RuntimeException('g7_csc_event_unverified');
         }
@@ -132,6 +188,8 @@ final class GrowthG7CscPreDispatchReview
         $id=self::id($row['entity_id']);
         $sequence=self::id($row['accepted_sequence']);
         if ($id===null || $sequence===null
+            || ($requestedId!==null
+                && ($id!==$requestedId || $sequence!==$requestedSequence))
             || $row['delivery_state']!=='blocked'
             || $row['source_namespace']!==$namespace
             || self::id($row['shop_id'])!==$shop
