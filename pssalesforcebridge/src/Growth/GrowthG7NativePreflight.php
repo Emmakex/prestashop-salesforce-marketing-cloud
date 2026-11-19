@@ -15,10 +15,43 @@ use Throwable;
  */
 final class GrowthG7NativePreflight
 {
+    /** Legacy single-most-recent snapshot. New worker scans exact events. */
     public static function inspectLatest(
         $db,$version,$merchant,$namespace,$prefix,$shop,$type,
         $loadCustomer,$loadOrder,$loadCurrency,$selectLocalRows,
         $origin,$sourceName
+    ) {
+        return self::inspectMatching(
+            $db,$version,$merchant,$namespace,$prefix,$shop,$type,
+            $loadCustomer,$loadOrder,$loadCurrency,$selectLocalRows,
+            $origin,$sourceName,null,null
+        );
+    }
+
+    /**
+     * Inspect a specific G3 candidate from the current-event batch.
+     * The ledger must still point to this exact sequence; never promote
+     * an old customer/order version to a new source snapshot.
+     */
+    public static function inspectSelected(
+        $db,$version,$merchant,$namespace,$prefix,$shop,$type,
+        $id,$sequence,$loadCustomer,$loadOrder,$loadCurrency,$selectLocalRows,
+        $origin,$sourceName
+    ) {
+        if (!is_int($id) || $id<1 || !is_int($sequence) || $sequence<1) {
+            throw new RuntimeException('g7_preflight_selected_scope_invalid');
+        }
+        return self::inspectMatching(
+            $db,$version,$merchant,$namespace,$prefix,$shop,$type,
+            $loadCustomer,$loadOrder,$loadCurrency,$selectLocalRows,
+            $origin,$sourceName,$id,$sequence
+        );
+    }
+
+    private static function inspectMatching(
+        $db,$version,$merchant,$namespace,$prefix,$shop,$type,
+        $loadCustomer,$loadOrder,$loadCurrency,$selectLocalRows,
+        $origin,$sourceName,$requestedId,$requestedSequence
     ) {
         if (!is_int($shop) || $shop<1
             || !in_array($type,['customer','order'],true)
@@ -44,7 +77,12 @@ final class GrowthG7NativePreflight
             . 'entity_id,original_event_type,status,delivery_state FROM '
             . $outbox." WHERE source_namespace='$namespace'"
             . " AND shop_id=$shop AND entity_type='$type'"
-            . " AND status='blocked' ORDER BY accepted_sequence DESC LIMIT 1";
+            . " AND status='blocked'";
+        if ($requestedId!==null) {
+            $sql.=" AND entity_id=$requestedId"
+                . " AND accepted_sequence=$requestedSequence";
+        }
+        $sql.=' ORDER BY accepted_sequence DESC LIMIT 1';
         try {
             $rows=$db->executeS($sql,true,false);
             if (!is_array($rows) || count($rows)>1) {
@@ -58,7 +96,10 @@ final class GrowthG7NativePreflight
             $sequence=self::id(isset($event['accepted_sequence'])
                 ?$event['accepted_sequence']:null);
             if ($id===null || $sequence===null
-                || $event['delivery_state']!=='blocked') {
+                || $event['delivery_state']!=='blocked'
+                || ($requestedId!==null
+                    && ($id!==$requestedId
+                        || $sequence!==$requestedSequence))) {
                 return self::report('delivery_state_hold','unknown',false);
             }
             $state=$lease->inspect($shop,$type,$id,$sequence);
