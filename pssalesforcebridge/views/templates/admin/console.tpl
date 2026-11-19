@@ -261,15 +261,15 @@
                     {if !$sfmc_source_ready}
                         <div class="sfmc-divider"></div>
                         <p class="sfmc-subhead">{l s='Origen de Data Cloud de esta tienda' mod='pssalesforcebridge'}</p>
-                        <p class="sfmc-hint">{l s='Introduce el API Name de un origen de ingesta Salesforce ya existente y compatible con PSCustomer y PSOrder. Debe ser propio de esta tienda: DO no puede utilizar el origen de BC.' mod='pssalesforcebridge'}</p>
+                        <p class="sfmc-hint">{l s='Para BC (ABH/BCABH) se reutiliza automáticamente su fuente histórica: deja estos dos campos vacíos. Para otras tiendas como DOABH introduce el API Name de una fuente Salesforce ya existente y confirma el esquema PSCustomer/PSOrder; DO no puede utilizar el origen de BC.' mod='pssalesforcebridge'}</p>
                         <div class="sfmc-fields">
                             <div>
                                 <label for="sfmc-source">{l s='Nombre API del origen de ingesta' mod='pssalesforcebridge'}</label>
-                                <input type="text" id="sfmc-source" name="PS_GROWTH_SOURCE_API" maxlength="96" pattern="[A-Za-z][A-Za-z0-9_]{literal}{2,95}{/literal}" autocomplete="off" spellcheck="false" required />
+                                <input type="text" id="sfmc-source" name="PS_GROWTH_SOURCE_API" maxlength="96" autocomplete="off" spellcheck="false" />
                             </div>
                             <div>
                                 <label for="sfmc-source-attest">{l s='Confirmación del origen y esquema' mod='pssalesforcebridge'}</label>
-                                <input type="text" id="sfmc-source-attest" name="PS_GROWTH_SOURCE_ATTEST" placeholder="{$sfmc_source_confirmation|escape:'html':'UTF-8'}" autocomplete="off" spellcheck="false" required />
+                                <input type="text" id="sfmc-source-attest" name="PS_GROWTH_SOURCE_ATTEST" placeholder="{$sfmc_source_confirmation|escape:'html':'UTF-8'}" autocomplete="off" spellcheck="false" />
                                 <p class="sfmc-hint">{l s='Esta declaración no comprueba Salesforce automáticamente. Debes validar que el origen y su esquema existen antes del primer envío.' mod='pssalesforcebridge'}</p>
                             </div>
                         </div>
