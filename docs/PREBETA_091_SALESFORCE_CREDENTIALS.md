@@ -27,7 +27,7 @@ En **Módulos → Salesforce Growth + Data Cloud → Configurar → Conexión co
 
 1. Instalar **0.9.1** primero en el PrestaShop 9.1.5 de pruebas; verificar que aparecen las tres acciones de conexión en el nuevo Back Office, con los secretos siempre ocultos.
 2. En BC producción, tras copia de seguridad verificada y aprobación del despliegue, **actualizar** el módulo 0.7.1 a 0.9.1 sin desinstalar. Confirmar Test y ausencia de campañas.
-3. Introducir las credenciales de la Connected App **de Growth/Core**, no Engagement. Hacer clic en **Guardar conexión cifrada** y luego en **Probar conexión OAuth + Data Cloud**. Revisar el mensaje de Core y de token exchange, sin facilitar credenciales por chat.
+3. Introducir las credenciales de la Connected App **de Salesforce Core para Marketing Cloud Growth**. Hacer clic en **Guardar conexión cifrada** y luego en **Probar conexión OAuth + Data Cloud**. Revisar el mensaje de Core y de token exchange, sin facilitar credenciales por chat.
 4. Elegir un cliente y su pedido de BC autorizados para la prueba; usar **Validar datos sin enviar**. Tras la autorización específica, enviar un único PSCustomer y verificar su DLO. Después enviar un único PSOrder y verificar su FK.
 5. HTTP 202 es **solo aceptación asíncrona**, no confirma DLO/DMO. Si hay timeout o error, no repetir el envío: revisar en Salesforce antes de ninguna nueva acción.
 
