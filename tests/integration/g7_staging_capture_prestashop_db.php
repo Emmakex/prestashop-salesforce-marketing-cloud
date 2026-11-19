@@ -54,6 +54,7 @@ foreach([
     'Growth/GrowthOutboxSchemaPlan.php',
     'Growth/GrowthG7DeliverySchemaPlan.php',
     'Growth/GrowthG7StagingDeliveryMigration.php',
+    'Growth/GrowthPrestaShopDeliveryLease.php',
     'Growth/GrowthSqlEngineGate.php',
     'Growth/GrowthStagingSchemaBootstrap.php',
     'Growth/GrowthStagingOutboxStore.php',
@@ -70,6 +71,7 @@ use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthStagingSchemaBootstr
 use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthSandboxMigrationExecutor as SandMigration;
 use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthStagingNativeReadback as Readback;
 use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthG7StagingDeliveryMigration as G7Migration;
+use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthPrestaShopDeliveryLease as NativeLease;
 
 function g7DbCheck($ok,$code){
     if(!$ok)throw new RuntimeException('g7_real_staging_ci_'.$code);
@@ -270,6 +272,122 @@ g7DbCheck($applied['status']==='extended_blocked_no_sends'
         "SELECT COUNT(*) FROM $tab WHERE delivery_state='blocked'"
         . " AND delivery_attempts=0"
     )===5,'migration_changed_local_events');
+
+// Native PrestaShop Db CAS adapter on the same extended G3 outbox.
+$native=new NativeLease($db,_PS_VERSION_,'ABH',$ns,_DB_PREFIX_);
+$current=$db->executeS("SELECT accepted_sequence FROM $tab"
+    . " WHERE entity_type='customer' AND entity_id=901"
+    . " ORDER BY accepted_sequence DESC LIMIT 1",true,false);
+g7DbCheck(count($current)===1,'native_current_event_missing');
+$currentSeq=(int)$current[0]['accepted_sequence'];
+$token=str_repeat('e',64);
+$blockedLease=$native->inspect(1,'customer',901,$currentSeq);
+g7DbCheck($blockedLease['state']==='blocked'
+    && $blockedLease['ledger_current']
+    && !$blockedLease['data_cloud_ingestion_authorized']
+    && !$native->claim(1,'customer',901,$currentSeq,$token,60)
+    && $native->inspect(1,'customer',901,$currentSeq)['attempts']===0,
+    'native_adapter_claimed_blocked_row');
+
+// ONLY CI may create a synthetic ready row: no module call does this.
+$db->execute("UPDATE $tab SET delivery_state='ready'"
+    . " WHERE accepted_sequence=$currentSeq");
+$second=new NativeLease($db,_PS_VERSION_,'ABH',$ns,_DB_PREFIX_);
+g7DbCheck($native->claim(1,'customer',901,$currentSeq,$token,60)
+    && !$second->claim(1,'customer',901,$currentSeq,str_repeat('f',64),60)
+    && !$native->markAcceptedUnconfirmed(
+        1,'customer',901,$currentSeq,str_repeat('a',64)
+    ), 'native_lease_cas_or_wrong_token');
+$claimed=$second->inspect(1,'customer',901,$currentSeq);
+g7DbCheck($claimed['state']==='claimed'
+    && $claimed['attempts']===1
+    && $claimed['lease_active']
+    && !$claimed['record_delivered_certified'],
+    'native_lease_not_durable');
+g7DbCheck($native->markAcceptedUnconfirmed(
+        1,'customer',901,$currentSeq,$token
+    ) && !$native->claim(1,'customer',901,$currentSeq,$token,60),
+    'native_202_requeued');
+$receipt=$native->inspect(1,'customer',901,$currentSeq);
+g7DbCheck($receipt['state']==='reconcile'
+    && $receipt['last_http']===202
+    && !$receipt['record_delivered_certified']
+    && !$receipt['http_request_performed'],
+    'native_202_incorrectly_delivered');
+
+// A row with a stale event/ledger version can never be claimed.
+$oldest=$db->executeS("SELECT accepted_sequence FROM $tab"
+    . " WHERE entity_type='customer' AND entity_id=901"
+    . " ORDER BY accepted_sequence ASC LIMIT 1",true,false);
+$oldSeq=(int)$oldest[0]['accepted_sequence'];
+g7DbCheck($oldSeq!==$currentSeq,'fixture_has_no_revision');
+$db->execute("UPDATE $tab SET delivery_state='ready'"
+    . " WHERE accepted_sequence=$oldSeq");
+g7DbCheck(!$native->claim(1,'customer',901,$oldSeq,$token,60)
+    && !$native->inspect(1,'customer',901,$oldSeq)['ledger_current'],
+    'stale_ledger_revision_claimed');
+
+// Lost-response, cancellation and expired-lease quarantine.
+$orderSeq=(int)$db->getValue("SELECT accepted_sequence FROM $tab"
+    . " WHERE entity_type='order' AND entity_id=902 LIMIT 1",false);
+g7DbCheck($orderSeq>0,'native_order_missing');
+$db->execute("UPDATE $tab SET delivery_state='ready'"
+    . " WHERE accepted_sequence=$orderSeq");
+g7DbCheck($native->claim(1,'order',902,$orderSeq,$token,60)
+    && $native->markUnknownUnconfirmed(1,'order',902,$orderSeq,$token)
+    && $native->inspect(1,'order',902,$orderSeq)['state']==='reconcile',
+    'native_timeout_not_quarantined');
+$db->execute("UPDATE $tab SET delivery_state='ready'"
+    . " WHERE accepted_sequence=$orderSeq");
+g7DbCheck($native->cancel(1,'order',902,$orderSeq)
+    && !$native->claim(1,'order',902,$orderSeq,$token,60)
+    && $native->inspect(1,'order',902,$orderSeq)['state']==='cancelled',
+    'native_cancelled_row_replayed');
+
+$otherSeq=(int)$db->getValue("SELECT accepted_sequence FROM $tab"
+    . " WHERE entity_type='order' AND entity_id=905 LIMIT 1",false);
+g7DbCheck($otherSeq>0,'native_other_order_missing');
+$db->execute("UPDATE $tab SET delivery_state='ready'"
+    . " WHERE accepted_sequence=$otherSeq");
+g7DbCheck($native->claim(1,'order',905,$otherSeq,$token,60),
+    'native_expired_fixture_not_claimed');
+$db->execute("UPDATE $tab SET lease_until_epoch=UNIX_TIMESTAMP()-1"
+    . " WHERE accepted_sequence=$otherSeq");
+g7DbCheck($native->quarantineExpired(1,'order',905,$otherSeq)
+    && !$native->markAcceptedUnconfirmed(
+        1,'order',905,$otherSeq,$token
+    ) && $native->inspect(1,'order',905,$otherSeq)['state']==='reconcile',
+    'native_expired_lease_resumed');
+
+// Stage Test revocation must deny all DB access and writes.
+Configuration::updateValue('PS_GROWTH_LOCAL_CAPTURE','staging_armed');
+$revoked=false;
+try {
+    $native->inspect(1,'customer',901,$currentSeq);
+} catch(RuntimeException $e) {
+    $revoked=$e->getMessage()==='g7_native_lease_stage_gate_denied';
+}
+g7DbCheck($revoked,'native_test_gate_not_revoked');
+Configuration::updateValue('PS_GROWTH_LOCAL_CAPTURE','off');
+
+// No customer IDs, source keys, email, token or payload in diagnostics.
+$report=json_encode([$blockedLease,$claimed,$receipt]);
+foreach(['ci-synthetic@example.invalid',$ns,'901',$token,'growth_g5_canary']
+    as $secret) {
+    g7DbCheck(strpos($report,$secret)===false,
+        'native_lease_report_leaked_private_identity');
+}
+
+// Restore *disposable CI fixtures* to all-blocked and zero attempts
+// before testing the existing safety constraints and 0.8.8 rollback.
+$db->execute("UPDATE $tab SET delivery_state='blocked',"
+    . "delivery_attempts=0,lease_token_hash=NULL,"
+    . "lease_until_epoch=NULL,delivery_last_http=NULL");
+g7DbCheck((int)$db->getValue(
+    "SELECT COUNT(*) FROM $tab WHERE delivery_state='blocked'"
+    . " AND delivery_attempts=0 AND lease_token_hash IS NULL"
+    . " AND delivery_last_http IS NULL"
+)===5,'native_adapter_fixture_not_restored');
 
 $rearmed=Setup::install(
     $db,_PS_VERSION_,'ABH',$ns,_DB_PREFIX_,Setup::CONFIRM
