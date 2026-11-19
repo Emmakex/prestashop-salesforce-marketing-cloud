@@ -98,7 +98,8 @@ Configuration::$values=[
     'PS_SFMC_MODE'=>'test',
     'PS_GROWTH_LOCAL_CAPTURE'=>'off',
     'PS_GROWTH_MERCHANT'=>'ABH',
-    'PS_GROWTH_NAMESPACE'=>$ns
+    'PS_GROWTH_NAMESPACE'=>$ns,
+    'PS_SFMC_CRON_TOKEN'=>str_repeat('b',64)
 ];
 $db=new G7OnceDb();
 $token=function(){return [
@@ -138,6 +139,20 @@ g7OnceReject(function()use($db,$ns,$preview,$token,$mockHttp){
         $preview,$token,$mockHttp);
 },'g7_one_send_customer_dlo_review_required');
 g7OnceAssert(count($calls)===1,'order_before_dlo');
+
+$wrongPair=function()use($preview) {
+    $p=$preview();
+    $p['customer_record_private']['source_key']='growth_ci_abhtwo:2:customer:999';
+    $p['order_record_private']['customer_source_key']='growth_ci_abhtwo:2:customer:999';
+    return $p;
+};
+g7OnceReject(function()use($db,$ns,$wrongPair,$token,$mockHttp) {
+    SendOne::dispatch($db,$ns,'ABH',2,'PSOrder',
+        SendOne::APPROVAL,SendOne::CUSTOMER_DLO_ATTESTATION,
+        $wrongPair,$token,$mockHttp);
+},'g7_one_send_wrong_customer_for_order');
+g7OnceAssert(count($calls)===1,'foreign_customer_receipt_reused');
+
 $r2=SendOne::dispatch(
     $db,$ns,'ABH',2,'PSOrder',SendOne::APPROVAL,
     SendOne::CUSTOMER_DLO_ATTESTATION,$preview,$token,$mockHttp
