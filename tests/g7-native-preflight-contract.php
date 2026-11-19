@@ -26,6 +26,7 @@ foreach([
     'GrowthPrestaShopDeliveryLease',
     'GrowthCapturedEventPstPreview::inspect',
     'GrowthLocalCustomerHoldReader::inspect',
+    'nativeCustomerState',
     'executeS($sql,true,false)',
     'hash_equals(',
     "delivery_state']!=='blocked'",
