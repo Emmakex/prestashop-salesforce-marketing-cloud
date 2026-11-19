@@ -3,6 +3,7 @@
 /**
  * PrestaShop -> Salesforce Marketing Cloud Growth + Data Cloud.
  *
+ * v0.8.8: owner-gated additive staging G7 lease columns (no outbound).
  * v0.8.7: fix missing BO escape helper to reveal safe G7 diagnoses.
  * v0.8.6: per-entity safe diagnostics for native PST readback; no egress.
  * v0.8.5: staging-only read-only native PSCustomer/PSOrder shape check.
@@ -32,6 +33,8 @@ require_once __DIR__ . '/src/Compatibility/CustomerHookAdapter.php';
 require_once __DIR__ . '/src/Compatibility/OrderHookAdapter.php';
 require_once __DIR__ . '/src/Growth/GrowthBlockedHookAdapter.php';
 require_once __DIR__ . '/src/Growth/GrowthOutboxSchemaPlan.php';
+require_once __DIR__ . '/src/Growth/GrowthG7DeliverySchemaPlan.php';
+require_once __DIR__ . '/src/Growth/GrowthG7StagingDeliveryMigration.php';
 require_once __DIR__ . '/src/Growth/GrowthSqlEngineGate.php';
 require_once __DIR__ . '/src/Growth/GrowthStagingSchemaBootstrap.php';
 require_once __DIR__ . '/src/Growth/GrowthStagingOutboxStore.php';
@@ -49,6 +52,7 @@ use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthOnlyHookPreflight;
 use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthStagingHookCapture;
 use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthStagingSchemaBootstrap;
 use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthStagingNativeReadback;
+use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthG7StagingDeliveryMigration;
 
 class PsSalesforceBridge extends Module
 {
@@ -67,7 +71,7 @@ class PsSalesforceBridge extends Module
     {
         $this->name = 'pssalesforcebridge';
         $this->tab = 'advertising_marketing';
-        $this->version = '0.8.7';
+        $this->version = '0.8.8';
         $this->author = 'ALFABH';
         $this->need_instance = 0;
         $this->bootstrap = true;
@@ -162,7 +166,13 @@ class PsSalesforceBridge extends Module
     public function getContent()
     {
         $message = '';
-        if (Tools::isSubmit('submitPsGrowthReadback')) {
+        if (Tools::isSubmit('submitPsG7SchemaInspect')) {
+            $message = $this->reviewG7DeliverySchema('inspect');
+        } elseif (Tools::isSubmit('submitPsG7SchemaPrepare')) {
+            $message = $this->reviewG7DeliverySchema('apply');
+        } elseif (Tools::isSubmit('submitPsG7SchemaRollback')) {
+            $message = $this->reviewG7DeliverySchema('rollback');
+        } elseif (Tools::isSubmit('submitPsGrowthReadback')) {
             $message = $this->verifyStagingNativeReadback();
         } elseif (Tools::isSubmit('submitPsGrowthBridge')) {
             $message = $this->saveGrowthSettings();
@@ -189,7 +199,114 @@ class PsSalesforceBridge extends Module
             );
         }
         return $html . $this->renderGrowthForm() . $this->renderCaptureForm()
-            . $this->renderReadbackForm();
+            . $this->renderReadbackForm() . $this->renderG7DeliverySchemaForms();
+    }
+
+    /**
+     * Stage-only schema administration. No output includes identifiers,
+     * field values, SQL strings or throwable messages. There is NO sender.
+     * Upgrades never invoke this action automatically.
+     */
+    private function reviewG7DeliverySchema($action)
+    {
+        if (!in_array($action,['inspect','apply','rollback'],true)) {
+            return $this->displayError($this->l('G7 schema action unavailable.'));
+        }
+        try {
+            $db=Db::getInstance();
+            $args=[
+                $db,(string)_PS_VERSION_,
+                (string)Configuration::get(self::CONFIG_MERCHANT),
+                (string)Configuration::get(self::CONFIG_NAMESPACE),_DB_PREFIX_
+            ];
+            if ($action==='inspect') {
+                $report=call_user_func_array(
+                    [GrowthG7StagingDeliveryMigration::class,'inspect'],$args
+                );
+            } else {
+                $isApply=$action==='apply';
+                $confirm=Tools::getValue(
+                    $isApply?'PS_G7_SCHEMA_CONFIRM':'PS_G7_ROLLBACK_CONFIRM'
+                );
+                $backup=Tools::getValue(
+                    $isApply?'PS_G7_BACKUP_CONFIRM':'PS_G7_ROLLBACK_BACKUP'
+                );
+                $args[]=$confirm;
+                $args[]=$backup==='I_HAVE_A_VERIFIED_STAGING_BACKUP';
+                $report=call_user_func_array([
+                    GrowthG7StagingDeliveryMigration::class,
+                    $isApply?'apply':'rollback'
+                ],$args);
+            }
+            $status=(string)$report['status'];
+            if (!in_array($status,[
+                'original_g3_verified','extended_g7_verified',
+                'already_extended_verified','extended_blocked_no_sends',
+                'already_original_verified','rolled_back_no_sends'
+            ],true)) {
+                return $this->displayError(
+                    $this->l('G7 schema inspection returned an unverified status.')
+                );
+            }
+            $message=$this->l('G7 staging outbox: ')
+                . $this->escape($status)
+                . '. ' . $this->l('Only local blocked records. No Salesforce requests or campaign sends.');
+            return $this->displayConfirmation($message);
+        } catch (\Throwable $e) {
+            // A SQL/DDL exception might contain private identifiers or full
+            // SQL. Never show its raw text even with debug mode enabled.
+            return $this->displayError(
+                $this->l('G7 schema action blocked. Confirm Test, local capture OFF, exact approval, verified external backup and original G3 schema. If an ALTER failed, inspect staging SQL metadata before retrying. No sends.')
+            );
+        }
+    }
+
+    private function renderG7DeliverySchemaForms()
+    {
+        $result='';
+        foreach (['inspect','apply','rollback'] as $type) {
+            $helper=new HelperForm();
+            $helper->module=$this;
+            $helper->name_controller=$this->name;
+            $helper->token=Tools::getAdminTokenLite('AdminModules');
+            $helper->currentIndex=AdminController::$currentIndex
+                .'&configure='.$this->name;
+            $helper->submit_action= $type==='inspect'?'submitPsG7SchemaInspect':
+                ($type==='apply'?'submitPsG7SchemaPrepare':'submitPsG7SchemaRollback');
+            $helper->default_form_language=(int)Configuration::get('PS_LANG_DEFAULT');
+            $helper->allow_employee_form_lang=(int)Configuration::get('PS_BO_ALLOW_EMPLOYEE_FORM_LANG');
+            $inputs=[];
+            if ($type!=='inspect') {
+                $name=$type==='apply'?'PS_G7_SCHEMA_CONFIRM':'PS_G7_ROLLBACK_CONFIRM';
+                $backup=$type==='apply'?'PS_G7_BACKUP_CONFIRM':'PS_G7_ROLLBACK_BACKUP';
+                $inputs=[
+                    ['type'=>'text','name'=>$name,
+                        'label'=>$this->l('Exact staging-only approval phrase'),
+                        'required'=>true,
+                        'desc'=>$type==='apply'
+                            ?GrowthG7StagingDeliveryMigration::APPROVE
+                            :GrowthG7StagingDeliveryMigration::UNDO],
+                    ['type'=>'text','name'=>$backup,
+                        'label'=>$this->l('External backup verification'),
+                        'required'=>true,
+                        'desc'=>$this->l('Type I_HAVE_A_VERIFIED_STAGING_BACKUP. This module does NOT create or verify a backup.')]
+                ];
+                $helper->fields_value=[$name=>'', $backup=>''];
+            }
+            $label=$type==='inspect'?'Inspect G3/G7 outbox (read only)':
+                ($type==='apply'?'Extend G3 outbox on staging (no sends)':
+                    'Rollback G7 columns on staging (only if unused)');
+            $result.=$helper->generateForm([['form'=>[
+                'legend'=>[
+                    'title'=>$this->l('G7 - Same outbox delivery schema (Test only)'),
+                    'icon'=>'icon-lock'
+                ],
+                'description'=>$this->l('Stage only. First STOP local capture. No table is added; only five optional columns in the current G3 outbox. All events and sends stay blocked. Neither install nor upgrade changes the SQL schema.'),
+                'input'=>$inputs,
+                'submit'=>['title'=>$this->l($label)]
+            ]]]);
+        }
+        return $result;
     }
 
     /**
