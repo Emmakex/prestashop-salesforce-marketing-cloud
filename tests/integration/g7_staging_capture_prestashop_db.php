@@ -57,6 +57,7 @@ foreach([
     'Growth/GrowthPrestaShopDeliveryLease.php',
     'Growth/GrowthLocalCustomerHoldReader.php',
     'Growth/GrowthG7NativePreflight.php',
+    'Growth/GrowthG7CurrentEventBatch.php',
     'Growth/GrowthCommunicationConsentHoldGate.php',
     'Growth/GrowthG7CscPreDispatchReview.php',
     'Growth/GrowthSqlEngineGate.php',
@@ -79,6 +80,7 @@ use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthStagingNativeReadbac
 use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthG7StagingDeliveryMigration as G7Migration;
 use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthPrestaShopDeliveryLease as NativeLease;
 use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthG7NativePreflight as Preflight;
+use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthG7CurrentEventBatch as Batch;
 use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthG7CscPreDispatchReview as CscReview;
 
 function g7DbCheck($ok,$code){
@@ -533,6 +535,107 @@ g7DbCheck((int)$db->getValue("SELECT COUNT(*) FROM $tab"
     . " WHERE status='blocked' AND delivery_state='blocked'"
     . " AND delivery_attempts=0")===5,
     'g7_csc_review_modified_same_outbox');
+
+// G7 multi-entity event scanner: exact latest ledger version per entity,
+// bounded keyset pages on the SAME outbox. No READY/claim or outbound.
+$page1=Batch::scan($db,_PS_VERSION_,'ABH',$ns,_DB_PREFIX_,1,0,2);
+$page2=Batch::scan($db,_PS_VERSION_,'ABH',$ns,_DB_PREFIX_,
+    1,$page1['next_cursor'],2);
+$page3=Batch::scan($db,_PS_VERSION_,'ABH',$ns,_DB_PREFIX_,
+    1,$page2['next_cursor'],2);
+$refs=array_merge($page1['candidate_refs_internal'],
+    $page2['candidate_refs_internal']);
+$summary=Batch::summarize($page1);
+g7DbCheck(count($refs)===4
+    && count($page1['candidate_refs_internal'])===2
+    && count($page2['candidate_refs_internal'])===2
+    && $page1['has_more'] && !$page2['has_more']
+    && $page3['candidate_refs_internal']===[]
+    && count(array_unique(array_column($refs,'accepted_sequence')))===4
+    && $summary['candidate_count']===2
+    && !isset($summary['next_cursor'])
+    && !isset($summary['candidate_refs_internal'])
+    && !$summary['data_cloud_ingestion_authorized'],
+    'g7_batch_cursor_or_privacy_invalid');
+$types=array_column($refs,'entity_type');
+g7DbCheck(count(array_filter($types,function($x){return $x==='customer';}))===2
+    && count(array_filter($types,function($x){return $x==='order';}))===2,
+    'g7_batch_types_wrong');
+$customerCandidate=null;
+$orderCandidate=null;
+foreach($refs as $ref) {
+    if ($ref['entity_type']==='customer' && $ref['entity_id']===901)
+        $customerCandidate=$ref;
+    if ($ref['entity_type']==='order' && $ref['entity_id']===902)
+        $orderCandidate=$ref;
+}
+g7DbCheck($customerCandidate!==null && $orderCandidate!==null,
+    'g7_batch_missing_current_entities');
+$customerCheck=Preflight::inspectSelected(
+    $db,_PS_VERSION_,'ABH',$ns,_DB_PREFIX_,1,'customer',
+    $customerCandidate['entity_id'],$customerCandidate['accepted_sequence'],
+    $sourceLoader,$nativeOrder,$nativeCurrency,$localRows,$origin,$sourceName
+);
+$orderCheck=Preflight::inspectSelected(
+    $db,_PS_VERSION_,'ABH',$ns,_DB_PREFIX_,1,'order',
+    $orderCandidate['entity_id'],$orderCandidate['accepted_sequence'],
+    $sourceLoader,$nativeOrder,$nativeCurrency,$localRows,$origin,$sourceName
+);
+g7DbCheck($customerCheck['reason']==='local_consent_unverified_hold'
+    && $customerCheck['native_source_double_read_stable']
+    && $orderCheck['reason']==='local_consent_unverified_hold'
+    && !$orderCheck['marketing_sends_authorized'],
+    'g7_batch_exact_candidate_preflight_failed');
+$oldSeq=(int)$db->getValue("SELECT MIN(accepted_sequence) FROM $tab"
+    . " WHERE entity_type='customer' AND entity_id=901",false);
+g7DbCheck($oldSeq<$customerCandidate['accepted_sequence'],
+    'g7_batch_no_stale_revision_fixture');
+$staleCheck=Preflight::inspectSelected(
+    $db,_PS_VERSION_,'ABH',$ns,_DB_PREFIX_,1,'customer',901,$oldSeq,
+    $sourceLoader,$nativeOrder,$nativeCurrency,$localRows,$origin,$sourceName
+);
+g7DbCheck($staleCheck['reason']==='not_current_blocked_hold',
+    'g7_batch_stale_revision_accepted');
+$crossShop=Preflight::inspectSelected(
+    $db,_PS_VERSION_,'ABH',$ns,_DB_PREFIX_,2,'customer',
+    $customerCandidate['entity_id'],$customerCandidate['accepted_sequence'],
+    $sourceLoader,$nativeOrder,$nativeCurrency,$localRows,$origin,$sourceName
+);
+g7DbCheck($crossShop['reason']==='no_local_event_hold',
+    'g7_batch_cross_shop_accepted');
+$target=$customerCandidate['accepted_sequence'];
+$db->execute("UPDATE $tab SET delivery_state='ready'"
+    . " WHERE accepted_sequence=$target");
+$omitted=Batch::scan($db,_PS_VERSION_,'ABH',$ns,_DB_PREFIX_,1,0,50);
+g7DbCheck(count($omitted['candidate_refs_internal'])===3,
+    'g7_batch_selected_ready_not_excluded');
+$db->execute("UPDATE $tab SET delivery_state='blocked'"
+    . " WHERE accepted_sequence=$target");
+$invalid=false;
+try {
+    Batch::scan($db,_PS_VERSION_,'ABH',$ns,_DB_PREFIX_,1,0,51);
+} catch(RuntimeException $e) {
+    $invalid=$e->getMessage()==='g7_batch_input_invalid';
+}
+g7DbCheck($invalid,'g7_batch_unbounded_query_accepted');
+Configuration::updateValue('PS_GROWTH_LOCAL_CAPTURE','staging_armed');
+$revoked=false;
+try {
+    Batch::scan($db,_PS_VERSION_,'ABH',$ns,_DB_PREFIX_,1,0,2);
+} catch(RuntimeException $e) {
+    $revoked=$e->getMessage()==='g7_native_lease_stage_gate_denied';
+}
+g7DbCheck($revoked,'g7_batch_open_when_capture_armed');
+Configuration::updateValue('PS_GROWTH_LOCAL_CAPTURE','off');
+$public=json_encode([$summary,$customerCheck,$orderCheck,$staleCheck,$crossShop]);
+foreach(['ci-synthetic@example.invalid',$ns,'901','902','905',
+    'Fixture','credencial','ABH_PrestaShop_Data_Cloud'] as $secret) {
+    g7DbCheck(strpos($public,$secret)===false,
+        'g7_batch_summary_leaked_identifier');
+}
+g7DbCheck((int)$db->getValue("SELECT COUNT(*) FROM $tab"
+    . " WHERE status='blocked' AND delivery_state='blocked'"
+    . " AND delivery_attempts=0")===5,'g7_batch_mutated_merchant_events');
 
 // Native PrestaShop Db CAS adapter on the same extended G3 outbox.
 $native=new NativeLease($db,_PS_VERSION_,'ABH',$ns,_DB_PREFIX_);
