@@ -78,7 +78,11 @@
             <span class="sfmc-stat-label">{l s='Identidad de la tienda' mod='pssalesforcebridge'}</span>
             {if $sfmc_identity_ready}
                 <strong><span class="sfmc-dot good" aria-hidden="true"></span>{l s='Configurada' mod='pssalesforcebridge'}</strong>
-                <p class="sfmc-hint">{l s='Conector del piloto ABH' mod='pssalesforcebridge'}</p>
+                {if $sfmc_source_ready}
+                    <p class="sfmc-hint">{l s='Origen Data Cloud:' mod='pssalesforcebridge'} {$sfmc_source_name|escape:'html':'UTF-8'}</p>
+                {else}
+                    <p class="sfmc-hint">{l s='Falta vincular el origen Data Cloud para esta tienda.' mod='pssalesforcebridge'}</p>
+                {/if}
             {else}
                 <strong><span class="sfmc-dot" aria-hidden="true"></span>{l s='Pendiente de configurar' mod='pssalesforcebridge'}</strong>
                 <p class="sfmc-hint">{l s='Abre Configuración de tienda.' mod='pssalesforcebridge'}</p>
@@ -202,7 +206,7 @@
                         <p>{l s='Requiere autorización para tratar el registro seleccionado. Solo hay un intento por objeto y tienda: una respuesta HTTP 202 no confirma que aparezca en Data Cloud. No se permite repetir automáticamente.' mod='pssalesforcebridge'}</p>
                     </div>
                     {if !$sfmc_can_send}
-                        <div class="sfmc-note info" role="status">{l s='Antes de enviar: configura la identidad ABH y las credenciales cifradas en este módulo y mantén Test con captura local desactivada.' mod='pssalesforcebridge'}</div>
+                        <div class="sfmc-note info" role="status">{l s='Antes de enviar: configura identidad, origen Data Cloud de esta tienda y conexión cifrada; mantén el modo Test con captura desactivada.' mod='pssalesforcebridge'}</div>
                     {/if}
 
                     <label for="sfmc-approval">{l s='Autorización expresa para el envío individual' mod='pssalesforcebridge'}</label>
@@ -238,7 +242,7 @@
                 <p>{l s='La identidad queda vinculada a esta instalación; no se cambia sin una migración controlada.' mod='pssalesforcebridge'}</p>
             </div>
         </div>
-        <details {if !$sfmc_identity_ready}open{/if}>
+        <details {if !$sfmc_identity_ready || !$sfmc_source_ready}open{/if}>
             <summary>
                 <span class="sfmc-settings-summary">{l s='Ver configuración de identidad' mod='pssalesforcebridge'}</span>
             </summary>
@@ -254,10 +258,28 @@
                             <input type="text" id="sfmc-namespace" name="PS_GROWTH_NAMESPACE" value="{$sfmc_namespace|escape:'html':'UTF-8'}" required maxlength="32" {if $sfmc_identity_ready}readonly{/if} />
                         </div>
                     </div>
-                    {if !$sfmc_identity_ready}
-                        <button type="submit" name="submitPsGrowthBridge" value="1" class="sfmc-btn sfmc-btn-secondary">{l s='Guardar identidad de la tienda' mod='pssalesforcebridge'}</button>
+                    {if !$sfmc_source_ready}
+                        <div class="sfmc-divider"></div>
+                        <p class="sfmc-subhead">{l s='Origen de Data Cloud de esta tienda' mod='pssalesforcebridge'}</p>
+                        <p class="sfmc-hint">{l s='Introduce el API Name de un origen de ingesta Salesforce ya existente y compatible con PSCustomer y PSOrder. Debe ser propio de esta tienda: DO no puede utilizar el origen de BC.' mod='pssalesforcebridge'}</p>
+                        <div class="sfmc-fields">
+                            <div>
+                                <label for="sfmc-source">{l s='Nombre API del origen de ingesta' mod='pssalesforcebridge'}</label>
+                                <input type="text" id="sfmc-source" name="PS_GROWTH_SOURCE_API" maxlength="96" pattern="[A-Za-z][A-Za-z0-9_]{literal}{2,95}{/literal}" autocomplete="off" spellcheck="false" required />
+                            </div>
+                            <div>
+                                <label for="sfmc-source-attest">{l s='Confirmación del origen y esquema' mod='pssalesforcebridge'}</label>
+                                <input type="text" id="sfmc-source-attest" name="PS_GROWTH_SOURCE_ATTEST" placeholder="{$sfmc_source_confirmation|escape:'html':'UTF-8'}" autocomplete="off" spellcheck="false" required />
+                                <p class="sfmc-hint">{l s='Esta declaración no comprueba Salesforce automáticamente. Debes validar que el origen y su esquema existen antes del primer envío.' mod='pssalesforcebridge'}</p>
+                            </div>
+                        </div>
                     {else}
-                        <p class="sfmc-hint">{l s='Identidad ya guardada. Para evitar duplicados entre tiendas, no puede modificarse desde aquí.' mod='pssalesforcebridge'}</p>
+                        <p class="sfmc-hint">{l s='Origen asociado (no editable):' mod='pssalesforcebridge'} {$sfmc_source_name|escape:'html':'UTF-8'}</p>
+                    {/if}
+                    {if !$sfmc_identity_ready || !$sfmc_source_ready}
+                        <button type="submit" name="submitPsGrowthBridge" value="1" class="sfmc-btn sfmc-btn-secondary">{l s='Guardar configuración de la tienda' mod='pssalesforcebridge'}</button>
+                    {else}
+                        <p class="sfmc-hint">{l s='Identidad y origen guardados. No pueden cambiarse desde aquí para evitar mezclas de datos entre tiendas.' mod='pssalesforcebridge'}</p>
                     {/if}
                 </form>
             </div>
