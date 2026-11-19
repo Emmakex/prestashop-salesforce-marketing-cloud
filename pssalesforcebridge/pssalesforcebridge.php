@@ -217,7 +217,7 @@ class PsSalesforceBridge extends Module
         $mode=(string)Configuration::get(self::CONFIG_MODE);
         $capture=(string)Configuration::get(self::CONFIG_LOCAL_CAPTURE);
         $shop=$this->credentialContextShopId();
-        $identity=$merchant==='ABH'
+        $identity=in_array($merchant,['ABH','BCABH'],true)
             && preg_match('/^[a-z][a-z0-9_]{5,31}$/D',$namespace)===1
             && $shop>0;
         $credentialStatus=GrowthShopCredentialVault::inspect($shop);
