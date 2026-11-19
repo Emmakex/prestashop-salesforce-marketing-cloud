@@ -22,11 +22,14 @@ if (PHP_SAPI!=='cli'
     fwrite(STDERR,"G7 protected main verification denied.\n");
     exit(2);
 }
-function g7RemoteJson($url,$token,$sql=null)
+function g7RemoteJson($url,$token,$stage,$sql=null)
 {
     if (!is_string($token) || $token===''
         || !is_string($url) || strpos($url,'https://')!==0) {
         throw new RuntimeException('g7_live_request_unverified');
+    }
+    if (!in_array($stage,['metadata_entities','metadata_detail','query_select'],true)) {
+        throw new RuntimeException('g7_live_stage_invalid');
     }
     $method=$sql===null?'GET':'POST';
     $handle=curl_init($url);
@@ -60,8 +63,11 @@ function g7RemoteJson($url,$token,$sql=null)
         curl_setopt_array($handle,$opts);
         $ok=curl_exec($handle);
         $http=(int)curl_getinfo($handle,CURLINFO_HTTP_CODE);
-        if ($ok===false || $http!==200) {
-            throw new RuntimeException('g7_live_remote_http_unverified');
+        if ($ok===false) {
+            throw new RuntimeException('g7_live_'.$stage.'_transport_unverified');
+        }
+        if ($http!==200) {
+            throw new RuntimeException('g7_live_'.$stage.'_http_'.($http>=100 && $http<=599?$http:0));
         }
         $parsed=json_decode($response,true);
         if (!is_array($parsed)) {
@@ -100,16 +106,16 @@ try {
     $token=$cloud['access_token'];
     // URL is the canonical Salesforce-owned c360a origin validated by token exchange.
     $entities=g7RemoteJson(
-        $origin.'/api/v1/metadataEntities?entityType=DataLakeObject',$token
+        $origin.'/api/v1/metadataEntities?entityType=DataLakeObject',$token,'metadata_entities'
     );
     $status=Verifier::verify(
         $entities,
         function($entityName)use($origin,$token) {
             return g7RemoteJson($origin.'/api/v1/metadata/?entityType=DataLakeObject'
-                .'&entityName='.rawurlencode($entityName),$token);
+                .'&entityName='.rawurlencode($entityName),$token,'metadata_detail');
         },
         function($sql)use($origin,$token) {
-            return g7RemoteJson($origin.'/api/v2/query',$token,$sql);
+            return g7RemoteJson($origin.'/api/v2/query',$token,'query_select',$sql);
         }
     );
     unset($cloud,$origin,$token,$entities);
