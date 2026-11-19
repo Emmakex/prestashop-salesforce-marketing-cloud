@@ -551,7 +551,7 @@ g7DbCheck(count($refs)===4
     && count($page2['candidate_refs_internal'])===2
     && $page1['has_more'] && !$page2['has_more']
     && $page3['candidate_refs_internal']===[]
-    && count(array_unique(array_column($refs,'accepted_sequence'))===4)
+    && count(array_unique(array_column($refs,'accepted_sequence')))===4
     && $summary['candidate_count']===2
     && !isset($summary['next_cursor'])
     && !isset($summary['candidate_refs_internal'])
