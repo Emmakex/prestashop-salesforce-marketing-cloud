@@ -223,6 +223,10 @@ test "$(sql "SELECT value FROM ps_configuration WHERE name='PS_SFMC_MODE' ORDER 
 test "$(sql "SELECT COUNT(*) FROM ps_sfmc_log WHERE event='CI_PRESERVE_MARKER'")" = '1'
 docker exec -u www-data -e EXPECTED_PS_VERSION="$PS_VERSION" -e PS_ROOT=/var/www/html -w /var/www/html "$PS_CONTAINER" php /tmp/prestashop-smoke.php
 
+echo "==> Encrypted per-shop OAuth credentials on real disposable PrestaShop Configuration (no network)"
+docker cp "$ROOT/tests/runtime/prestashop-shop-credential-smoke.php" "$PS_CONTAINER:/tmp/prestashop-shop-credential-smoke.php"
+docker exec -u www-data -e GITHUB_ACTIONS=true -e GROWTH_CRED_RUNTIME_DISPOSABLE=yes -e EXPECTED_PS_VERSION="$PS_VERSION" -e PS_ROOT=/var/www/html -w /var/www/html "$PS_CONTAINER" php /tmp/prestashop-shop-credential-smoke.php
+
 echo "==> Real PrestaShop Db Growth SQL CHECK preflight (MySQL5.7, no new tables)"
 docker cp "$ROOT/tests/runtime/prestashop-growth-db-api-contract.php" "$PS_CONTAINER:/tmp/prestashop-growth-db-api-contract.php"
 docker exec -u www-data -e GITHUB_ACTIONS=true -e G3_RUNTIME_CI_ONLY=yes_disposable_prestashop -e EXPECTED_PS_VERSION="$PS_VERSION" -e PS_ROOT=/var/www/html -w /var/www/html "$PS_CONTAINER" php /tmp/prestashop-growth-db-api-contract.php
