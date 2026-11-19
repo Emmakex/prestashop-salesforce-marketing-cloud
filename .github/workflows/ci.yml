@@ -111,6 +111,7 @@ jobs:
           php tests/g7-streaming-ingestion-plan-contract.php
           php tests/g7-streaming-transport-contract.php
           php tests/g7-one-record-manual-contract.php
+          php tests/growth-shop-credential-vault-contract.php
           php tests/growth-prebeta-admin-ui-contract.php
           php tests/g7-live-existing-canary-readonly-contract.php
           php tests/g7-staging-hook-capture-contract.php
@@ -282,13 +283,13 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          VERSION=0.9.0
+          VERSION=0.9.1
           mkdir -p build
           ZIP="build/pssalesforcebridge-${VERSION}.zip"
           zip -r "$ZIP" pssalesforcebridge \
             -x '*/vendor/*' '*.DS_Store'
           unzip -Z1 "$ZIP" | grep -qx 'pssalesforcebridge/pssalesforcebridge.php'
-          unzip -Z1 "$ZIP" | grep -qx 'pssalesforcebridge/upgrade/upgrade-0.9.0.php'
+          unzip -Z1 "$ZIP" | grep -qx 'pssalesforcebridge/upgrade/upgrade-0.9.1.php'
           if unzip -Z1 "$ZIP" | awk -F/ '$1=="pssalesforcebridge" && $2=="src" && NF>=4 {print $3}' | sort -u | grep -Ev '^(Compatibility|DataCloud|Growth|Provider)$'; then
             echo 'Unrecognized package source directory'
             exit 1
@@ -301,15 +302,15 @@ jobs:
             echo 'vendor directory must not be packaged'
             exit 1
           fi
-          unzip -p "$ZIP" pssalesforcebridge/pssalesforcebridge.php | grep -Fq "\$this->version = '0.9.0';"
+          unzip -p "$ZIP" pssalesforcebridge/pssalesforcebridge.php | grep -Fq "\$this->version = '0.9.1';"
           unzip -p "$ZIP" pssalesforcebridge/pssalesforcebridge.php | grep -Fq "\$this->author = 'ALFABH';"
           unzip -p "$ZIP" pssalesforcebridge/composer.json | grep -Fq '"name": "ALFABH"'
           unzip -p "$ZIP" pssalesforcebridge/composer.json | grep -Fq '"php": ">=7.1"'
           sha256sum "$ZIP" > "${ZIP}.sha256"
       - uses: actions/upload-artifact@v4
         with:
-          name: pssalesforcebridge-0.9.0
+          name: pssalesforcebridge-0.9.1
           path: |
-            build/pssalesforcebridge-0.9.0.zip
-            build/pssalesforcebridge-0.9.0.zip.sha256
+            build/pssalesforcebridge-0.9.1.zip
+            build/pssalesforcebridge-0.9.1.zip.sha256
           if-no-files-found: error
