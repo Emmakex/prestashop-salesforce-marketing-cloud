@@ -324,6 +324,10 @@ $stableCustomer=Preflight::inspectLatest(
     $db,_PS_VERSION_,'ABH',$ns,_DB_PREFIX_,1,'customer',
     $sourceLoader,$nativeOrder,$nativeCurrency,$localRows,$origin,$sourceName
 );
+// Diagnostic contains only the strictly redacted preflight report.
+if ($stableCustomer['reason']!=='local_consent_unverified_hold') {
+    fwrite(STDERR,'G7 CI preflight customer status: '.json_encode($stableCustomer)."\n");
+}
 g7DbCheck($stableCustomer['status']==='hold_for_review'
     && $stableCustomer['reason']==='local_consent_unverified_hold'
     && $stableCustomer['local_customer_source_state']
