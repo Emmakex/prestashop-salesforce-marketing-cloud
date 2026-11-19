@@ -170,8 +170,40 @@ final class GrowthG7NativePreflight
         ];
         $hash=hash('sha256',serialize($source));
         $localState=$customerHold['local_customer_source_state'];
+        // A native object can change between the object loader and its
+        // scoped SQL SELECT. Never ignore a negative on EITHER source.
+        $nativeState=self::nativeCustomerState($customer);
+        if ($nativeState==='known_negative') {
+            $localState='known_negative';
+        } elseif ($nativeState==='unknown') {
+            $localState='unknown';
+        }
         unset($source,$event,$ledger,$customer,$order,$currency,$customerHold,$preview);
         return ['hash'=>$hash,'local_state'=>$localState];
+    }
+
+    /**
+     * Native object flags are an independent local veto, not proof of
+     * Growth consent. Missing/malformed fields fail closed.
+     */
+    private static function nativeCustomerState($customer)
+    {
+        if (!is_object($customer))return 'unknown';
+        $values=get_object_vars($customer);
+        foreach (['active','deleted','is_guest','newsletter','optin'] as $field) {
+            if (!array_key_exists($field,$values)
+                || !in_array($values[$field],[0,1,'0','1',false,true],true)) {
+                return 'unknown';
+            }
+        }
+        if (!in_array($values['active'],[1,'1',true],true)
+            || in_array($values['deleted'],[1,'1',true],true)
+            || in_array($values['is_guest'],[1,'1',true],true)
+            || !in_array($values['newsletter'],[1,'1',true],true)
+            || !in_array($values['optin'],[1,'1',true],true)) {
+            return 'known_negative';
+        }
+        return 'no_local_negative_observed';
     }
 
     private static function id($value)
