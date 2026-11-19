@@ -32,7 +32,7 @@ El Back Office del módulo, dentro de **G7 — Controlled one-record Data Cloud 
 
 ## Resultado que NO se debe afirmar
 
-Esta función es un **canary de producción manual acotado**, no ingesta continua ni sincronización automática. La aceptación de un HTTP 202 **no certifica DLO**, y el test de 1+1 no certifica campañas o carritos abandonados. Ninguna ejecución desde el Back Office inicia un cron, worker, Journey/Flow o correo. No eliminar la 0.7.1 histórica ni desplegar en otras tiendas sin probar este piloto.
+Esta función es un **canary de producción manual acotado**, no ingesta continua ni sincronización automática. La aceptación de un HTTP 202 **no certifica DLO**, y el test de 1+1 no certifica campañas o carritos abandonados. Ninguna ejecución desde el Back Office inicia un cron, worker, Flow Growth o correo. No eliminar la 0.7.1 histórica ni desplegar en otras tiendas sin probar este piloto.
 
 ## Última incidencia de lectura remota
 
