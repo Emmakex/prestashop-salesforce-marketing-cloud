@@ -93,10 +93,11 @@ final class GrowthShopCredentialVault
         if ($confirmation!==self::DELETE_CONFIRM) {
             throw new RuntimeException('growth_vault_delete_confirmation_required');
         }
-        // PrestaShop deleteFromContext targets the exact shop, unlike
-        // Configuration::deleteByName which would remove all shop records.
-        if (!method_exists('Configuration','deleteFromContext')
-            || !\Configuration::deleteFromContext(self::CONFIG_KEY,$shop)) {
+        // Overwrite just this shop's envelope with an explicit tombstone.
+        // deleteByName could erase the credentials of all other shops.
+        if (!\Configuration::updateValue(
+            self::CONFIG_KEY,'revoked:v1',false,null,$shop
+        )) {
             throw new RuntimeException('growth_vault_delete_failed');
         }
         return true;
@@ -186,7 +187,7 @@ final class GrowthShopCredentialVault
     {
         self::validateShop($shop);
         $encoded=\Configuration::get(self::CONFIG_KEY,null,null,$shop);
-        if ($encoded===false || $encoded===null || $encoded==='') {
+        if ($encoded===false || $encoded===null || $encoded==='' || $encoded==='revoked:v1') {
             throw new RuntimeException('growth_vault_missing');
         }
         if (!is_string($encoded) || strlen($encoded)>16384
