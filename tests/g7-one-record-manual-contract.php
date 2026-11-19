@@ -13,10 +13,13 @@ require_once dirname(__DIR__)
 require_once dirname(__DIR__)
     .'/pssalesforcebridge/src/Growth/GrowthOneRecordSelection.php';
 require_once dirname(__DIR__)
+    .'/pssalesforcebridge/src/Growth/GrowthShopSourceBinding.php';
+require_once dirname(__DIR__)
     .'/pssalesforcebridge/src/Growth/GrowthOneRecordManualSender.php';
 
 use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthOneRecordSelection as SelectOne;
 use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthOneRecordManualSender as SendOne;
+use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthShopSourceBinding as SourceBinding;
 
 class Configuration {
     public static $values=[];
@@ -111,6 +114,7 @@ $mockHttp=function($url,$body,$gotToken)use(&$calls) {
     $item=json_decode($body,true)['data'][0];
     $calls[]=[
         'object'=>strpos($url,'/PSOrder')!==false?'order':'customer',
+        'url'=>$url,
         'source_key'=>$item['source_key']
     ];
     g7OnceAssert($gotToken==='synthetic-private-token','token_changed');
@@ -124,7 +128,7 @@ g7OnceAssert(count($calls)===0,'post_before_approval');
 g7OnceReject(function()use($db,$ns,$preview,$token,$mockHttp){
     SendOne::dispatch($db,$ns,'OTHER',2,'PSCustomer',SendOne::APPROVAL,'',
         $preview,$token,$mockHttp);
-},'g7_one_send_scope_or_approval_denied');
+},'g7_one_send_test_mode_gate_denied');
 g7OnceAssert(count($calls)===0,'foreign_merchant_post_attempt');
 $r=SendOne::dispatch($db,$ns,'ABH',2,'PSCustomer',SendOne::APPROVAL,'',
     $preview,$token,$mockHttp);
@@ -202,7 +206,7 @@ Configuration::updateValue('PS_GROWTH_MERCHANT','BCABH');
 g7OnceReject(function()use($db,$ns,$preview,$token,$mockHttp){
     SendOne::dispatch($db,$ns,'SHOP_OTHER',2,'PSCustomer',SendOne::APPROVAL,'',
         $preview,$token,$mockHttp);
-},'g7_one_send_scope_or_approval_denied');
+},'g7_one_send_test_mode_gate_denied');
 g7OnceReject(function()use($db,$ns,$preview,$token,$mockHttp){
     SendOne::dispatch($db,$ns,'ABH',2,'PSCustomer',SendOne::APPROVAL,'',
         $preview,$token,$mockHttp);
@@ -220,6 +224,34 @@ $bcOrder=SendOne::dispatch($db,$ns,'BCABH',2,'PSOrder',
 g7OnceAssert(count($calls)===$bcBefore+2
     && $bcOrder['status']==='one_record_accepted_unconfirmed_manual_dlo_check',
     'bcabh_same_source_order');
+
+// Second merchant / second site: cannot borrow BC's source.
+$ns='do_online_prod_20261119';
+Configuration::updateValue('PS_GROWTH_NAMESPACE',$ns);
+Configuration::updateValue('PS_GROWTH_MERCHANT','DOABH');
+$beforeDo=count($calls);
+g7OnceReject(function()use($db,$ns,$preview,$token,$mockHttp) {
+    SendOne::dispatch($db,$ns,'DOABH',2,'PSCustomer',
+        SendOne::APPROVAL,'',$preview,$token,$mockHttp);
+},'growth_source_unverified_for_send');
+g7OnceAssert(count($calls)===$beforeDo,'do_not_sent_to_bc');
+SourceBinding::bind(2,'DOABH',$ns,'DO_PrestaShop_Data_Cloud',
+    SourceBinding::ATTEST);
+$do=SendOne::dispatch($db,$ns,'DOABH',2,'PSCustomer',
+    SendOne::APPROVAL,'',$preview,$token,$mockHttp);
+g7OnceAssert($do['status']==='one_record_accepted_unconfirmed_manual_dlo_check'
+    && count($calls)===$beforeDo+1
+    && strpos($calls[$beforeDo]['url'],
+        '/api/v1/ingest/sources/DO_PrestaShop_Data_Cloud/PSCustomer')!==false
+    && strpos($calls[$beforeDo]['url'],'ABH_PrestaShop_Data_Cloud')===false,
+    'do_source_not_selected');
+$doOrder=SendOne::dispatch($db,$ns,'DOABH',2,'PSOrder',
+    SendOne::APPROVAL,SendOne::CUSTOMER_DLO_ATTESTATION,
+    $preview,$token,$mockHttp);
+g7OnceAssert(count($calls)===$beforeDo+2
+    && strpos($calls[$beforeDo+1]['url'],
+        '/api/v1/ingest/sources/DO_PrestaShop_Data_Cloud/PSOrder')!==false,
+    'do_order_source_not_selected');
 
 Configuration::updateValue('PS_SFMC_MODE','production');
 g7OnceReject(function()use($db,$ns,$preview,$token,$mockHttp){
