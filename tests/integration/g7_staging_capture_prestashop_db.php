@@ -292,7 +292,12 @@ $freshCustomer->optin=1;
 $sourceLoader=function($id)use($freshCustomer,$createdFresh,&$sourceReads) {
     $sourceReads++;
     if ($id===901) return clone $freshCustomer;
-    if ($id===904) return clone $createdFresh;
+    if ($id===904) {
+        $c=clone $createdFresh;
+        $c->newsletter=1;
+        $c->optin=1;
+        return $c;
+    }
     throw new RuntimeException('test_customer_unknown');
 };
 $nativeOrder=function($id)use($order,$orderPending) {
@@ -324,10 +329,6 @@ $stableCustomer=Preflight::inspectLatest(
     $db,_PS_VERSION_,'ABH',$ns,_DB_PREFIX_,1,'customer',
     $sourceLoader,$nativeOrder,$nativeCurrency,$localRows,$origin,$sourceName
 );
-// Diagnostic contains only the strictly redacted preflight report.
-if ($stableCustomer['reason']!=='local_consent_unverified_hold') {
-    fwrite(STDERR,'G7 CI preflight customer status: '.json_encode($stableCustomer)."\n");
-}
 g7DbCheck($stableCustomer['status']==='hold_for_review'
     && $stableCustomer['reason']==='local_consent_unverified_hold'
     && $stableCustomer['local_customer_source_state']
