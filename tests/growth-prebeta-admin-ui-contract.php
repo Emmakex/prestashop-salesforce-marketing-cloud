@@ -38,7 +38,7 @@ adminUxAssert(strpos($get,'renderClientConsole()')!==false
     'required_client_or_safe_stop_routing_missing');
 adminUxAssert(strpos($module,
     "'views/templates/admin/console.tpl'")!==false
-    && strpos($module,"$"."this->version = '0.9.0'")!==false
+    && strpos($module,"$"."this->version = '0.9.1'")!==false
     && strpos($module,"$"."this->author = 'ALFABH'")!==false,
     'wrong_module_version_or_template');
 
