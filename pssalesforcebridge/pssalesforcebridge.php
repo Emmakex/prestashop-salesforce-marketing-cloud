@@ -3,6 +3,7 @@
 /**
  * PrestaShop -> Salesforce Marketing Cloud Growth + Data Cloud.
  *
+ * v0.9.1: secure per-shop Salesforce credentials and OAuth-only BO test.
  * v0.9.0: simplified accessible Back Office pre-beta with one guided smoke.
  * v0.8.9: one-customer/one-order manual Test smoke, individual guarded
  * Data Cloud upsert only on explicit BO authorization. No auto sends.
@@ -48,6 +49,7 @@ require_once __DIR__ . '/src/DataCloud/GrowthNativeCustomerOrderDraft.php';
 require_once __DIR__ . '/src/Growth/GrowthStagingNativeReadback.php';
 require_once __DIR__ . '/src/Growth/GrowthOneRecordSelection.php';
 require_once __DIR__ . '/src/Growth/GrowthOneRecordManualSender.php';
+require_once __DIR__ . '/src/Growth/GrowthShopCredentialVault.php';
 require_once __DIR__ . '/src/DataCloud/GrowthStreamingIngestionPlan.php';
 require_once __DIR__ . '/src/DataCloud/GrowthDataCloudUpsertTransport.php';
 require_once __DIR__ . '/src/Growth/AuthClient.php';
@@ -64,6 +66,7 @@ use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthStagingNativeReadbac
 use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthG7StagingDeliveryMigration;
 use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthOneRecordSelection;
 use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthOneRecordManualSender;
+use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthShopCredentialVault;
 use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\AuthClient;
 use Emmakex\PrestaShopSalesforceMarketingCloud\DataCloud\TokenExchangeClient;
 
@@ -84,7 +87,7 @@ class PsSalesforceBridge extends Module
     {
         $this->name = 'pssalesforcebridge';
         $this->tab = 'advertising_marketing';
-        $this->version = '0.9.0';
+        $this->version = '0.9.1';
         $this->author = 'ALFABH';
         $this->need_instance = 0;
         $this->bootstrap = true;
@@ -179,7 +182,13 @@ class PsSalesforceBridge extends Module
     public function getContent()
     {
         $message = '';
-        if (Tools::isSubmit('submitPsGrowthOnePreview')) {
+        if (Tools::isSubmit('submitPsGrowthOauthSave')) {
+            $message = $this->handleSalesforceCredentials('save');
+        } elseif (Tools::isSubmit('submitPsGrowthOauthTest')) {
+            $message = $this->handleSalesforceCredentials('test');
+        } elseif (Tools::isSubmit('submitPsGrowthOauthRemove')) {
+            $message = $this->handleSalesforceCredentials('remove');
+        } elseif (Tools::isSubmit('submitPsGrowthOnePreview')) {
             $message = $this->runManualOneRecord('preview');
         } elseif (Tools::isSubmit('submitPsGrowthOneCustomerSend')) {
             $message = $this->runManualOneRecord('customer');
@@ -207,13 +216,13 @@ class PsSalesforceBridge extends Module
         $namespace=(string)Configuration::get(self::CONFIG_NAMESPACE);
         $mode=(string)Configuration::get(self::CONFIG_MODE);
         $capture=(string)Configuration::get(self::CONFIG_LOCAL_CAPTURE);
-        $shop=class_exists('Shop') ? (int)\Shop::getContextShopID() : 0;
+        $shop=$this->credentialContextShopId();
         $identity=$merchant==='ABH'
             && preg_match('/^[a-z][a-z0-9_]{5,31}$/D',$namespace)===1
             && $shop>0;
-        $credentials=(string)getenv('SF_GROWTH_ORG_URL')!==''
-            && (string)getenv('SF_GROWTH_CLIENT_ID')!==''
-            && (string)getenv('SF_GROWTH_CLIENT_SECRET')!=='';
+        $credentialStatus=GrowthShopCredentialVault::inspect($shop);
+        $credentials=$credentialStatus['ready'];
+        $canManage=$this->isCredentialAdmin($shop);
         $customerInput=Tools::getValue('PS_GROWTH_ONE_CUSTOMER_ID');
         $orderInput=Tools::getValue('PS_GROWTH_ONE_ORDER_ID');
         // Render only normalized numeric IDs from the current request, not
@@ -233,8 +242,12 @@ class PsSalesforceBridge extends Module
             'sfmc_namespace'=>$namespace,
             'sfmc_identity_ready'=>$identity,
             'sfmc_credentials_ready'=>$credentials,
+            'sfmc_credentials_locked'=>$credentialStatus['status']==='unavailable',
+            'sfmc_credentials_admin_allowed'=>$canManage,
+            'sfmc_credentials_csrf'=>$canManage
+                ?$this->credentialCsrf($shop):'',
             'sfmc_capture_armed'=>$capture==='staging_armed',
-            'sfmc_can_send'=>$identity && $credentials && $mode==='test'
+            'sfmc_can_send'=>$canManage && $identity && $credentials && $mode==='test'
                 && $capture==='off',
             'sfmc_customer_input'=>$customerInput,
             'sfmc_order_input'=>$orderInput,
@@ -244,6 +257,111 @@ class PsSalesforceBridge extends Module
                 $namespace,$shop,'PSOrder')
         ]);
         return $this->display(__FILE__,'views/templates/admin/console.tpl');
+    }
+
+    /**
+     * Only the primary Back Office administrator may change or test OAuth
+     * secrets. A module-editor account alone is never sufficient.
+     * Multi-shop "All shops" context is not a valid credential owner.
+     */
+    /**
+     * A single-shop install may use CONTEXT_ALL internally. That is safe
+     * only when multistore is disabled; true multistore requires an exact
+     * selected shop and never accepts all/group context.
+     */
+    private function credentialContextShopId()
+    {
+        if (!class_exists('Shop') || !method_exists('Shop','isFeatureActive')) {
+            return 0;
+        }
+        $single=!Shop::isFeatureActive();
+        $shop=(int)Shop::getContextShopID();
+        if ($shop>0
+            && ($single || Shop::getContext()===Shop::CONTEXT_SHOP)) {
+            return $shop;
+        }
+        return $single?(int)Configuration::get('PS_SHOP_DEFAULT'):0;
+    }
+
+    private function isCredentialAdmin($shop)
+    {
+        $employee=isset($this->context,$this->context->employee)
+            ?$this->context->employee:null;
+        return is_object($employee)
+            && isset($employee->id,$employee->id_profile)
+            && (int)$employee->id>0
+            && (int)$employee->id_profile===1
+            && is_int($shop) && $shop>0
+            && $shop===$this->credentialContextShopId();
+    }
+
+    private function credentialCsrf($shop)
+    {
+        $employee=$this->context->employee;
+        $adminToken=(string)Tools::getAdminTokenLite('AdminModules');
+        return hash_hmac('sha256','pssfmc-credentials-v1:shop:'.$shop
+            .':employee:'.(int)$employee->id,$adminToken);
+    }
+
+    /**
+     * Explicit one-shop secret management. Tokens, input and exceptions
+     * never reach the browser or a logger; only allowlisted labels do.
+     */
+    private function handleSalesforceCredentials($operation)
+    {
+        $shop=$this->credentialContextShopId();
+        if (!in_array($operation,['save','test','remove'],true)
+            || !$this->isCredentialAdmin($shop)) {
+            return $this->displayError(
+                $this->l('Solo un administrador principal puede gestionar la conexión de una tienda concreta.')
+            );
+        }
+        $csrf=Tools::getValue('PS_GROWTH_OAUTH_CSRF');
+        if (!is_string($csrf) || !hash_equals($this->credentialCsrf($shop),$csrf)) {
+            return $this->displayError(
+                $this->l('La autorización del formulario ha caducado. Vuelve a abrir la configuración.')
+            );
+        }
+        try {
+            if ($operation==='save') {
+                $url=Tools::getValue('PS_GROWTH_OAUTH_ORG');
+                $id=Tools::getValue('PS_GROWTH_OAUTH_CLIENT_ID');
+                $secret=Tools::getValue('PS_GROWTH_OAUTH_CLIENT_SECRET');
+                GrowthShopCredentialVault::save($shop,$url,$id,$secret);
+                return $this->displayConfirmation(
+                    $this->l('Conexión cifrada guardada para esta tienda. Ahora pulsa Probar conexión para verificar OAuth.')
+                );
+            }
+            if ($operation==='remove') {
+                GrowthShopCredentialVault::remove(
+                    $shop,Tools::getValue('PS_GROWTH_OAUTH_DELETE_CONFIRM')
+                );
+                return $this->displayConfirmation(
+                    $this->l('Conexión revocada únicamente en esta tienda. No se ha enviado ningún registro.')
+                );
+            }
+            GrowthShopCredentialVault::testConnection($shop);
+            return $this->displayConfirmation(
+                $this->l('Conexión correcta: OAuth Core y token de Data Cloud comprobados. Sin envíos de clientes ni campañas.')
+            );
+        } catch (\Throwable $e) {
+            // Strict, human-actionable allowlist. Never show exception text.
+            $code=$e->getMessage();
+            $known=[
+                'growth_vault_missing'=> $this->l('No hay credenciales guardadas en esta tienda.'),
+                'growth_vault_input_invalid'=> $this->l('Revisa los tres campos. El Client ID y el secreto no pueden estar vacíos.'),
+                'growth_oauth_invalid_org_url'=> $this->l('La URL debe ser HTTPS y pertenecer al dominio Salesforce My Domain de tu organización.'),
+                'growth_vault_server_key_unavailable'=> $this->l('La clave privada del servidor PrestaShop no está disponible. No se ha guardado nada.'),
+                'growth_vault_crypto_unavailable'=> $this->l('El servidor necesita OpenSSL para cifrar la conexión.'),
+                'growth_vault_core_auth_failed'=> $this->l('Salesforce Core no ha aceptado el inicio de sesión OAuth. Comprueba la Connected App y sus permisos.'),
+                'growth_vault_cloud_exchange_failed'=> $this->l('Salesforce Core respondió, pero no se pudo obtener el token de Data Cloud. Revisa permisos de la integración.'),
+                'growth_vault_delete_confirmation_required'=> $this->l('Para revocar, escribe exactamente la frase de confirmación indicada.'),
+            ];
+            return $this->displayError(
+                isset($known[$code])?$known[$code]
+                    :$this->l('No se pudo completar la operación de conexión. Comprueba el servidor y la configuración; ningún dato se ha enviado.')
+            );
+        }
     }
 
     /**
@@ -508,7 +626,7 @@ class PsSalesforceBridge extends Module
         }
         try {
             // A specific shop context is mandatory; All Shops is not safe.
-            $shop=(int)\Shop::getContextShopID();
+            $shop=$this->credentialContextShopId();
             if ($shop<1) {
                 throw new \RuntimeException('g7_one_record_invalid_shop_context');
             }
@@ -532,22 +650,14 @@ class PsSalesforceBridge extends Module
                     $this->l('Cliente y pedido validados. Los datos y su vinculación son correctos para la prueba. No se ha enviado nada a Salesforce.')
                 );
             }
-            $orgUrl=(string)getenv('SF_GROWTH_ORG_URL');
-            $clientId=(string)getenv('SF_GROWTH_CLIENT_ID');
-            $clientSecret=(string)getenv('SF_GROWTH_CLIENT_SECRET');
-            if ($orgUrl==='' || $clientId==='' || $clientSecret==='') {
+            if (!$this->isCredentialAdmin($shop)
+                || !GrowthShopCredentialVault::inspect($shop)['ready']) {
                 return $this->displayError(
-                    $this->l('Las credenciales de Salesforce no están disponibles en el servidor PHP. No las introduzcas en este formulario. No se ha enviado nada.')
+                    $this->l('Configura primero la conexión Salesforce desde un administrador autorizado. No se ha enviado ningún registro.')
                 );
             }
-            $getToken=function()use($orgUrl,$clientId,$clientSecret) {
-                $core=(new AuthClient($orgUrl,$clientId,$clientSecret))
-                    ->requestAccessToken();
-                $cloud=(new TokenExchangeClient())->exchange(
-                    $core['instance_url'],$core['access_token']
-                );
-                unset($core);
-                return $cloud;
+            $getToken=function()use($shop) {
+                return GrowthShopCredentialVault::obtainCloudToken($shop);
             };
             $report=GrowthOneRecordManualSender::dispatch(
                 \Db::getInstance(),$namespace,$merchant,$shop,
