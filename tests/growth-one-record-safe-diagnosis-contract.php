@@ -68,11 +68,11 @@ $module=file_get_contents(
 assertDiagnosis(strpos($module,
     "GrowthOneRecordSafeDiagnosis::classify(")!==false
     && strpos($module,"safeOneRecordFailureMessage(")!==false
-    && strpos($module,"\\$this->version = '0.9.4';")!==false
+    && strpos($module,"$"."this->version = '0.9.4';")!==false
     && strpos($module,"Prueba bloqueada o ya intentada.")===false,
     'module_old_generic_error_still_reachable');
 assertDiagnosis(strpos($module,
-    "if (\\$action==='preview')")!==false
+    "if ("."$"."action==='preview')")!==false
     && strpos($module,'No se ha enviado nada.')!==false
     && strpos($module,'No se permiten reintentos automáticos.')!==false,
     'local_and_send_not_differentiated');
