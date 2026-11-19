@@ -112,7 +112,12 @@ g7TransportAssert($broken['outcome_state']==='unknown_after_transport'
 
 $module=file_get_contents(dirname(__DIR__).'/pssalesforcebridge/pssalesforcebridge.php');
 $cron=file_get_contents(dirname(__DIR__).'/pssalesforcebridge/controllers/front/cron.php');
-g7TransportAssert(strpos($module,'GrowthDataCloudUpsertTransport')===false
-    && strpos($cron,'GrowthDataCloudUpsertTransport')===false,
-    'unapproved_live_wiring');
+$hookSection=substr($module,
+    strpos($module,'public function hookActionCustomerAccountAdd'),
+    strpos($module,'public function getContent')
+        -strpos($module,'public function hookActionCustomerAccountAdd'));
+g7TransportAssert(strpos($hookSection,'GrowthDataCloudUpsertTransport')===false
+    && strpos($cron,'GrowthDataCloudUpsertTransport')===false
+    && strpos($module,'runManualOneRecord')!==false,
+    'unapproved_automatic_live_wiring');
 echo "G7 gated streaming transport PASS: 202, 401/429/timeout, no retry, no exposure, no unapproved runtime wiring.\n";
