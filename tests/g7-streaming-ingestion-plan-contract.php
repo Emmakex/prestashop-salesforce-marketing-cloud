@@ -164,9 +164,14 @@ $moduleCode=file_get_contents(dirname(__DIR__)
     . '/pssalesforcebridge/pssalesforcebridge.php');
 $cronCode=file_get_contents(dirname(__DIR__)
     . '/pssalesforcebridge/controllers/front/cron.php');
-g7PlanAssert(strpos($moduleCode,'GrowthStreamingIngestionPlan')===false
-    && strpos($cronCode,'GrowthStreamingIngestionPlan')===false,
-    'streaming_boundary_wired_to_runtime');
+$hookSection=substr($moduleCode,
+    strpos($moduleCode,'public function hookActionCustomerAccountAdd'),
+    strpos($moduleCode,'public function getContent')
+        -strpos($moduleCode,'public function hookActionCustomerAccountAdd'));
+g7PlanAssert(strpos($hookSection,'GrowthStreamingIngestionPlan')===false
+    && strpos($cronCode,'GrowthStreamingIngestionPlan')===false
+    && strpos($moduleCode,'runManualOneRecord')!==false,
+    'streaming_boundary_wired_to_unapproved_runtime');
 foreach(['curl_','file_get_contents(', 'Db::',
     '->execute(', '->insert(', 'file_put_contents('] as $io) {
     g7PlanAssert(strpos($sourceCode,$io)===false,

@@ -44,7 +44,7 @@ function growthDbRuntimeRun()
     growthDbRuntimeAssert((string) _PS_VERSION_ === getenv('EXPECTED_PS_VERSION')
         && defined('_DB_PREFIX_') && _DB_PREFIX_ === 'ps_'
         && Module::isInstalled('pssalesforcebridge')
-        && (string) Module::getInstanceByName('pssalesforcebridge')->version === '0.8.8'
+        && (string) Module::getInstanceByName('pssalesforcebridge')->version === '0.8.9'
         && (string) Configuration::get('PS_SFMC_MODE') === 'test',
         'unexpected_shop_or_module_state');
     $db = Db::getInstance();

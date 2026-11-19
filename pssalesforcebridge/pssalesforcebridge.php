@@ -3,6 +3,8 @@
 /**
  * PrestaShop -> Salesforce Marketing Cloud Growth + Data Cloud.
  *
+ * v0.8.9: one-customer/one-order manual Test smoke, individual guarded
+ * Data Cloud upsert only on explicit BO authorization. No auto sends.
  * v0.8.8: owner-gated additive staging G7 lease columns (no outbound).
  * v0.8.7: fix missing BO escape helper to reveal safe G7 diagnoses.
  * v0.8.6: per-entity safe diagnostics for native PST readback; no egress.
@@ -43,6 +45,12 @@ require_once __DIR__ . '/src/DataCloud/IngestionPayloadBuilder.php';
 require_once __DIR__ . '/src/DataCloud/GrowthTypedPstPayloadBuilder.php';
 require_once __DIR__ . '/src/DataCloud/GrowthNativeCustomerOrderDraft.php';
 require_once __DIR__ . '/src/Growth/GrowthStagingNativeReadback.php';
+require_once __DIR__ . '/src/Growth/GrowthOneRecordSelection.php';
+require_once __DIR__ . '/src/Growth/GrowthOneRecordManualSender.php';
+require_once __DIR__ . '/src/DataCloud/GrowthStreamingIngestionPlan.php';
+require_once __DIR__ . '/src/DataCloud/GrowthDataCloudUpsertTransport.php';
+require_once __DIR__ . '/src/Growth/AuthClient.php';
+require_once __DIR__ . '/src/DataCloud/TokenExchangeClient.php';
 
 use Emmakex\PrestaShopSalesforceMarketingCloud\Compatibility\Platform;
 use Emmakex\PrestaShopSalesforceMarketingCloud\Compatibility\ShopResolver;
@@ -53,6 +61,10 @@ use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthStagingHookCapture;
 use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthStagingSchemaBootstrap;
 use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthStagingNativeReadback;
 use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthG7StagingDeliveryMigration;
+use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthOneRecordSelection;
+use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthOneRecordManualSender;
+use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\AuthClient;
+use Emmakex\PrestaShopSalesforceMarketingCloud\DataCloud\TokenExchangeClient;
 
 class PsSalesforceBridge extends Module
 {
@@ -71,7 +83,7 @@ class PsSalesforceBridge extends Module
     {
         $this->name = 'pssalesforcebridge';
         $this->tab = 'advertising_marketing';
-        $this->version = '0.8.8';
+        $this->version = '0.8.9';
         $this->author = 'ALFABH';
         $this->need_instance = 0;
         $this->bootstrap = true;
@@ -166,7 +178,13 @@ class PsSalesforceBridge extends Module
     public function getContent()
     {
         $message = '';
-        if (Tools::isSubmit('submitPsG7SchemaInspect')) {
+        if (Tools::isSubmit('submitPsGrowthOnePreview')) {
+            $message = $this->runManualOneRecord('preview');
+        } elseif (Tools::isSubmit('submitPsGrowthOneCustomerSend')) {
+            $message = $this->runManualOneRecord('customer');
+        } elseif (Tools::isSubmit('submitPsGrowthOneOrderSend')) {
+            $message = $this->runManualOneRecord('order');
+        } elseif (Tools::isSubmit('submitPsG7SchemaInspect')) {
             $message = $this->reviewG7DeliverySchema('inspect');
         } elseif (Tools::isSubmit('submitPsG7SchemaPrepare')) {
             $message = $this->reviewG7DeliverySchema('apply');
@@ -199,7 +217,8 @@ class PsSalesforceBridge extends Module
             );
         }
         return $html . $this->renderGrowthForm() . $this->renderCaptureForm()
-            . $this->renderReadbackForm() . $this->renderG7DeliverySchemaForms();
+            . $this->renderReadbackForm() . $this->renderG7DeliverySchemaForms()
+            . $this->renderManualOneRecordForms();
     }
 
     /**
@@ -436,6 +455,161 @@ class PsSalesforceBridge extends Module
             'input'=>[],
             'submit'=>['title'=>$this->l('Check native customer and order (no sends)')]
         ]]]);
+    }
+
+
+    /**
+     * Owner-operated Test UAT. One customer + its exact order, one explicit
+     * Data Cloud upsert per object. NO campaign send, cron or batch.
+     * All sources/JSON/credentials remain private to the PHP request.
+     */
+    private function runManualOneRecord($action)
+    {
+        if (!in_array($action,['preview','customer','order'],true)
+            || (string)Configuration::get(self::CONFIG_MODE)!=='test'
+            || (string)Configuration::get(self::CONFIG_LOCAL_CAPTURE)!=='off') {
+            return $this->displayError(
+                $this->l('Manual single-record Test requires Test mode and local capture OFF. No record sent.')
+            );
+        }
+        $rawCustomer=Tools::getValue('PS_GROWTH_ONE_CUSTOMER_ID');
+        $rawOrder=Tools::getValue('PS_GROWTH_ONE_ORDER_ID');
+        if (!is_scalar($rawCustomer) || !is_scalar($rawOrder)
+            || !preg_match('/^[1-9][0-9]{0,14}$/D',(string)$rawCustomer)
+            || !preg_match('/^[1-9][0-9]{0,14}$/D',(string)$rawOrder)) {
+            return $this->displayError(
+                $this->l('Select one valid customer ID and its existing order ID. No record sent.')
+            );
+        }
+        try {
+            // A specific shop context is mandatory; All Shops is not safe.
+            $shop=(int)\Shop::getContextShopID();
+            if ($shop<1) {
+                throw new \RuntimeException('g7_one_record_invalid_shop_context');
+            }
+            $customerId=(int)$rawCustomer;
+            $orderId=(int)$rawOrder;
+            $merchant=(string)Configuration::get(self::CONFIG_MERCHANT);
+            $namespace=(string)Configuration::get(self::CONFIG_NAMESPACE);
+            $prepare=function()use($namespace,$shop,$customerId,$orderId) {
+                return GrowthOneRecordSelection::prepareInternal(
+                    $namespace,$shop,$customerId,$orderId,
+                    function($id){return new \Customer($id);},
+                    function($id){return new \Order($id);},
+                    function($id){return new \Currency($id);}
+                );
+            };
+            if ($action==='preview') {
+                $private=$prepare();
+                $report=GrowthOneRecordSelection::summarize($private);
+                unset($private);
+                return $this->displayConfirmation(
+                    $this->l('Selected customer and linked order: local PST v0.4 shape verified. No Salesforce POST and no campaign sent.')
+                );
+            }
+            $orgUrl=(string)getenv('SF_GROWTH_ORG_URL');
+            $clientId=(string)getenv('SF_GROWTH_CLIENT_ID');
+            $clientSecret=(string)getenv('SF_GROWTH_CLIENT_SECRET');
+            if ($orgUrl==='' || $clientId==='' || $clientSecret==='') {
+                return $this->displayError(
+                    $this->l('Server-side Salesforce OAuth credentials unavailable. Never enter secrets in this form. No record sent.')
+                );
+            }
+            $getToken=function()use($orgUrl,$clientId,$clientSecret) {
+                $core=(new AuthClient($orgUrl,$clientId,$clientSecret))
+                    ->requestAccessToken();
+                $cloud=(new TokenExchangeClient())->exchange(
+                    $core['instance_url'],$core['access_token']
+                );
+                unset($core);
+                return $cloud;
+            };
+            $report=GrowthOneRecordManualSender::dispatch(
+                \Db::getInstance(),$namespace,$merchant,$shop,
+                $action==='customer'?'PSCustomer':'PSOrder',
+                Tools::getValue('PS_GROWTH_ONE_APPROVAL'),
+                Tools::getValue('PS_GROWTH_DLO_CUSTOMER_CONFIRM'),
+                $prepare,$getToken
+            );
+            $status=(string)$report['status'];
+            if (!in_array($status,[
+                'one_record_accepted_unconfirmed_manual_dlo_check',
+                'one_record_unverified_manual_reconciliation_required'
+            ],true)) {
+                throw new \RuntimeException('g7_one_send_result_unverified');
+            }
+            return $this->displayInformation(
+                $this->l('Data Cloud individual test: ')
+                .$this->escape($status)
+                .$this->l('. Check this exact record in Salesforce DLO/DMO. No automatic retry or marketing sends.')
+            );
+        } catch (\Throwable $e) {
+            // No exception SQL, ID, email, token, payload or URL in BO.
+            return $this->displayError(
+                $this->l('Single-record test blocked or already attempted. No automatic retry. Verify the selected customer/order, the shop, authorization, and Salesforce ingestion receipts before proceeding.')
+            );
+        }
+    }
+
+    private function renderManualOneRecordForms()
+    {
+        $result='';
+        foreach (['preview','customer','order'] as $action) {
+            $helper=new HelperForm();
+            $helper->module=$this;
+            $helper->name_controller=$this->name;
+            $helper->token=Tools::getAdminTokenLite('AdminModules');
+            $helper->currentIndex=AdminController::$currentIndex
+                .'&configure='.$this->name;
+            $helper->submit_action=$action==='preview'
+                ?'submitPsGrowthOnePreview'
+                :($action==='customer'
+                    ?'submitPsGrowthOneCustomerSend'
+                    :'submitPsGrowthOneOrderSend');
+            $helper->default_form_language=(int)Configuration::get('PS_LANG_DEFAULT');
+            $helper->allow_employee_form_lang=(int)Configuration::get('PS_BO_ALLOW_EMPLOYEE_FORM_LANG');
+            $inputs=[
+                ['type'=>'text','name'=>'PS_GROWTH_ONE_CUSTOMER_ID',
+                    'label'=>$this->l('Customer ID (same shop)'), 'required'=>true],
+                ['type'=>'text','name'=>'PS_GROWTH_ONE_ORDER_ID',
+                    'label'=>$this->l('Linked order ID (same customer)'), 'required'=>true]
+            ];
+            if ($action!=='preview') {
+                $inputs[]=[
+                    'type'=>'text','name'=>'PS_GROWTH_ONE_APPROVAL',
+                    'label'=>$this->l('One-record personal data ingestion approval'),
+                    'required'=>true,
+                    'desc'=>GrowthOneRecordManualSender::APPROVAL
+                ];
+            }
+            if ($action==='order') {
+                $inputs[]=[
+                    'type'=>'text','name'=>'PS_GROWTH_DLO_CUSTOMER_CONFIRM',
+                    'label'=>$this->l('Customer DLO verified in Salesforce'),
+                    'required'=>true,
+                    'desc'=>GrowthOneRecordManualSender::CUSTOMER_DLO_ATTESTATION
+                ];
+            }
+            $helper->fields_value=[
+                'PS_GROWTH_ONE_CUSTOMER_ID'=>'',
+                'PS_GROWTH_ONE_ORDER_ID'=>'',
+                'PS_GROWTH_ONE_APPROVAL'=>'',
+                'PS_GROWTH_DLO_CUSTOMER_CONFIRM'=>''
+            ];
+            $label=$action==='preview'
+                ?$this->l('1. Validate one customer and its order (no sends)')
+                :($action==='customer'
+                    ?$this->l('2. Send exactly one selected customer to Data Cloud')
+                    :$this->l('3. Send exactly one linked order after customer DLO verification'));
+            $result.=$helper->generateForm([['form'=>[
+                'legend'=>['title'=>$this->l('G7 - Controlled one-record Data Cloud UAT'),
+                    'icon'=>'icon-lock'],
+                'description'=>$this->l('Pilot Test only. Manual intervention. Each send is an irreversible single attempt, even on timeout; no retry, no customer marketing or batch. Credentials must exist server-side, not in this panel. Check DLO/DMO after every HTTP 202.'),
+                'input'=>$inputs,
+                'submit'=>['title'=>$label]
+            ]]]);
+        }
+        return $result;
     }
 
     private function saveGrowthSettings()
