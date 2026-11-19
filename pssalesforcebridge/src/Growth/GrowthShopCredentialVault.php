@@ -141,6 +141,13 @@ final class GrowthShopCredentialVault
                     :call_user_func($coreAuth,$data['org_url'],
                         $data['client_id'],$data['client_secret']);
             } catch (Throwable $ignored) {
+                // Preserve ONLY a fixed diagnostic code already classified by
+                // our AuthClient. Never propagate raw exceptions or HTTP body.
+                if ($ignored instanceof RuntimeException) {
+                    throw new RuntimeException(self::coreFailureCode(
+                        $ignored->getMessage()
+                    ));
+                }
                 throw new RuntimeException('growth_vault_core_auth_failed');
             }
             if (!is_array($core) || !isset($core['instance_url'],$core['access_token'])
@@ -181,6 +188,37 @@ final class GrowthShopCredentialVault
         } finally {
             unset($data);
         }
+    }
+
+    /**
+     * Compact, fixed allowlist of OAuth failure classes for administrators.
+     * Raw body/description is NEVER shown. Unknown messages => generic.
+     */
+    private static function coreFailureCode($reason)
+    {
+        $codes=[
+            'growth_oauth_http_400_invalid_client'=>'growth_vault_core_invalid_client',
+            'growth_oauth_http_401_invalid_client'=>'growth_vault_core_invalid_client',
+            'growth_oauth_http_400_invalid_client_id'=>'growth_vault_core_invalid_client',
+            'growth_oauth_http_401_invalid_client_id'=>'growth_vault_core_invalid_client',
+            'growth_oauth_http_400_invalid_grant'=>'growth_vault_core_invalid_grant',
+            'growth_oauth_http_400_unauthorized_client'=>'growth_vault_core_unauthorized_client',
+            'growth_oauth_http_400_invalid_app_access'=>'growth_vault_core_unauthorized_client',
+            'growth_oauth_http_400_invalid_scope'=>'growth_vault_core_invalid_scope',
+            'growth_oauth_http_400_unsupported_grant_type'=>'growth_vault_core_invalid_grant',
+            'growth_oauth_http_400_invalid_request'=>'growth_vault_core_invalid_request',
+            'growth_oauth_http_403_access_denied'=>'growth_vault_core_access_denied',
+            'growth_oauth_http_401'=>'growth_vault_core_http_401',
+            'growth_oauth_http_403'=>'growth_vault_core_http_403',
+            'growth_oauth_http_429'=>'growth_vault_core_http_429',
+            'growth_oauth_transport_error'=>'growth_vault_core_transport_unavailable',
+            'growth_oauth_curl_unavailable'=>'growth_vault_core_transport_unavailable',
+            'growth_oauth_invalid_response'=>'growth_vault_core_response_invalid',
+            'growth_oauth_missing_instance_url'=>'growth_vault_core_response_invalid',
+            'growth_oauth_invalid_instance_url'=>'growth_vault_core_response_invalid',
+        ];
+        return is_string($reason) && isset($codes[$reason])
+            ?$codes[$reason]:'growth_vault_core_auth_failed';
     }
 
     private static function read($shop)
