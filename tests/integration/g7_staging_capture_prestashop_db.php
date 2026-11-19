@@ -695,10 +695,16 @@ g7DbCheck($withOptout['status']==='batch_review_only_no_sends'
     && !$withOptout['marketing_sends_authorized'],
     'g7_dry_run_cross_customer_csc_leak');
 
-// A negative native customer is a hold even if CSC reads opt-in.
+// One native customer (#901) is negative, including both orders whose
+// id_customer points to 901. The second customer (#904) stays reviewable.
+$oneNativeNegative=function($id)use($sourceLoader) {
+    $c=$sourceLoader($id);
+    if ($id===901)$c->newsletter=0;
+    return $c;
+};
 $withNativeNegative=DryRun::reviewWindow(
     $db,_PS_VERSION_,'ABH',$ns,_DB_PREFIX_,1,0,2,3,
-    $nativeNegativeLoader,$nativeOrder,$nativeCurrency,$localRows,
+    $oneNativeNegative,$nativeOrder,$nativeCurrency,$localRows,
     $subscription,$now,$readCsc,$origin,$sourceName
 );
 g7DbCheck($withNativeNegative['status']==='batch_review_only_no_sends'
