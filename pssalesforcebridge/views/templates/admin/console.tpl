@@ -87,18 +87,83 @@
         <div class="sfmc-stat">
             <span class="sfmc-stat-label">{l s='Credenciales de Salesforce' mod='pssalesforcebridge'}</span>
             {if $sfmc_credentials_ready}
-                <strong><span class="sfmc-dot good" aria-hidden="true"></span>{l s='Detectadas en el servidor' mod='pssalesforcebridge'}</strong>
-                <p class="sfmc-hint">{l s='La recepción de datos todavía debe comprobarse.' mod='pssalesforcebridge'}</p>
+                <strong><span class="sfmc-dot good" aria-hidden="true"></span>{l s='Guardadas de forma cifrada' mod='pssalesforcebridge'}</strong>
+                <p class="sfmc-hint">{l s='Prueba OAuth para comprobar la conexión. No se han enviado registros.' mod='pssalesforcebridge'}</p>
+            {elseif $sfmc_credentials_locked}
+                <strong><span class="sfmc-dot" aria-hidden="true"></span>{l s='Necesitan revisión' mod='pssalesforcebridge'}</strong>
+                <p class="sfmc-hint">{l s='Los datos cifrados no se pueden leer en este servidor.' mod='pssalesforcebridge'}</p>
             {else}
-                <strong><span class="sfmc-dot" aria-hidden="true"></span>{l s='No disponibles en este servidor' mod='pssalesforcebridge'}</strong>
-                <p class="sfmc-hint">{l s='No introduzcas claves aquí; configúralas en el servidor PHP.' mod='pssalesforcebridge'}</p>
+                <strong><span class="sfmc-dot" aria-hidden="true"></span>{l s='Sin configurar' mod='pssalesforcebridge'}</strong>
+                <p class="sfmc-hint">{l s='Configura OAuth en este mismo módulo.' mod='pssalesforcebridge'}</p>
             {/if}
         </div>
     </section>
 
-    <section class="sfmc-panel" aria-labelledby="sfmc-uat-title">
+    <section class="sfmc-panel" aria-labelledby="sfmc-oauth-title">
         <div class="sfmc-panel-title">
             <div class="sfmc-step" aria-hidden="true">1</div>
+            <div>
+                <h3 id="sfmc-oauth-title">{l s='Conexión con Salesforce' mod='pssalesforcebridge'}</h3>
+                <p>{l s='Configura de forma segura la Connected App de Salesforce Growth. Las claves quedan cifradas para esta tienda y nunca se muestran después de guardarlas.' mod='pssalesforcebridge'}</p>
+            </div>
+        </div>
+        {if $sfmc_credentials_admin_allowed}
+            <details {if !$sfmc_credentials_ready}open{/if}>
+                <summary>{if $sfmc_credentials_ready}{l s='Gestionar credenciales guardadas' mod='pssalesforcebridge'}{else}{l s='Configurar las credenciales' mod='pssalesforcebridge'}{/if}</summary>
+                <div class="sfmc-details-inner">
+                    <form method="post" action="{$sfmc_action|escape:'html':'UTF-8'}" autocomplete="off">
+                        <input type="hidden" name="PS_GROWTH_OAUTH_CSRF" value="{$sfmc_credentials_csrf|escape:'html':'UTF-8'}" />
+                        <div class="sfmc-fields">
+                            <div>
+                                <label for="sfmc-oauth-org">{l s='Salesforce Org URL' mod='pssalesforcebridge'} *</label>
+                                <input type="url" id="sfmc-oauth-org" name="PS_GROWTH_OAUTH_ORG" placeholder="https://organizacion.my.salesforce.com" maxlength="253" required autocomplete="off" />
+                                <p class="sfmc-hint">{l s='La URL de My Domain de Salesforce Core (HTTPS).' mod='pssalesforcebridge'}</p>
+                            </div>
+                            <div>
+                                <label for="sfmc-oauth-id">{l s='Client ID' mod='pssalesforcebridge'} *</label>
+                                <input type="text" id="sfmc-oauth-id" name="PS_GROWTH_OAUTH_CLIENT_ID" placeholder="{l s='Consumer Key' mod='pssalesforcebridge'}" maxlength="512" required autocomplete="off" spellcheck="false" />
+                            </div>
+                        </div>
+                        <label for="sfmc-oauth-secret">{l s='Client Secret' mod='pssalesforcebridge'} *</label>
+                        <input type="password" id="sfmc-oauth-secret" name="PS_GROWTH_OAUTH_CLIENT_SECRET" maxlength="4096" required autocomplete="new-password" spellcheck="false" />
+                        <p class="sfmc-hint">{l s='El secreto se cifrará con una clave privada del servidor distinta de la base de datos. Los campos se vacían tras guardar. Para modificar la conexión, introduce los tres valores de nuevo.' mod='pssalesforcebridge'}</p>
+                        <div class="sfmc-buttons">
+                            <button type="submit" name="submitPsGrowthOauthSave" value="1" class="sfmc-btn sfmc-btn-primary">{l s='Guardar conexión cifrada' mod='pssalesforcebridge'}</button>
+                        </div>
+                    </form>
+                </div>
+            </details>
+            <div class="sfmc-buttons">
+                <form method="post" action="{$sfmc_action|escape:'html':'UTF-8'}">
+                    <input type="hidden" name="PS_GROWTH_OAUTH_CSRF" value="{$sfmc_credentials_csrf|escape:'html':'UTF-8'}" />
+                    <button type="submit" name="submitPsGrowthOauthTest" value="1" class="sfmc-btn sfmc-btn-secondary" {if !$sfmc_credentials_ready}disabled{/if}>{l s='Probar conexión OAuth + Data Cloud' mod='pssalesforcebridge'}</button>
+                </form>
+            </div>
+            <p class="sfmc-hint">{l s='La prueba solicita únicamente tokens OAuth. No consulta ni envía datos de clientes, pedidos o campañas.' mod='pssalesforcebridge'}</p>
+            {if $sfmc_credentials_ready}
+                <details>
+                    <summary>{l s='Revocar conexión de esta tienda' mod='pssalesforcebridge'}</summary>
+                    <div class="sfmc-details-inner">
+                        <div class="sfmc-note">{l s='Revocar desactiva esta conexión sin afectar otras tiendas ni borrar datos históricos. No se puede deshacer sin introducir otra vez las credenciales.' mod='pssalesforcebridge'}</div>
+                        <form method="post" action="{$sfmc_action|escape:'html':'UTF-8'}" autocomplete="off">
+                            <input type="hidden" name="PS_GROWTH_OAUTH_CSRF" value="{$sfmc_credentials_csrf|escape:'html':'UTF-8'}" />
+                            <label for="sfmc-oauth-delete">{l s='Escribe ELIMINAR_CONEXION_SALESFORCE' mod='pssalesforcebridge'}</label>
+                            <input id="sfmc-oauth-delete" type="text" name="PS_GROWTH_OAUTH_DELETE_CONFIRM" autocomplete="off" spellcheck="false" />
+                            <div class="sfmc-buttons">
+                                <button type="submit" name="submitPsGrowthOauthRemove" value="1" class="sfmc-btn sfmc-btn-secondary">{l s='Revocar esta conexión' mod='pssalesforcebridge'}</button>
+                            </div>
+                        </form>
+                    </div>
+                </details>
+            {/if}
+        {else}
+            <div class="sfmc-note info" role="status">{l s='Solo el administrador principal de una tienda concreta puede gestionar las credenciales OAuth. Selecciona la tienda y accede con el perfil autorizado.' mod='pssalesforcebridge'}</div>
+        {/if}
+    </section>
+
+    <section class="sfmc-panel" aria-labelledby="sfmc-uat-title">
+        <div class="sfmc-panel-title">
+            <div class="sfmc-step" aria-hidden="true">2</div>
             <div>
                 <h3 id="sfmc-uat-title">{l s='Comprobar cliente y pedido' mod='pssalesforcebridge'}</h3>
                 <p>{l s='Selecciona un cliente y un pedido suyo de esta misma tienda. Primero valida los datos; después, si está autorizado, realiza una sola prueba de envío.' mod='pssalesforcebridge'}</p>
@@ -137,7 +202,7 @@
                         <p>{l s='Requiere autorización para tratar el registro seleccionado. Solo hay un intento por objeto y tienda: una respuesta HTTP 202 no confirma que aparezca en Data Cloud. No se permite repetir automáticamente.' mod='pssalesforcebridge'}</p>
                     </div>
                     {if !$sfmc_can_send}
-                        <div class="sfmc-note info" role="status">{l s='Antes de enviar: configura la identidad ABH, las credenciales en el servidor y mantén Test con captura local desactivada.' mod='pssalesforcebridge'}</div>
+                        <div class="sfmc-note info" role="status">{l s='Antes de enviar: configura la identidad ABH y las credenciales cifradas en este módulo y mantén Test con captura local desactivada.' mod='pssalesforcebridge'}</div>
                     {/if}
 
                     <label for="sfmc-approval">{l s='Autorización expresa para el envío individual' mod='pssalesforcebridge'}</label>
@@ -167,7 +232,7 @@
 
     <section class="sfmc-panel" aria-label="{l s='Configuración de la tienda' mod='pssalesforcebridge'}">
         <div class="sfmc-panel-title">
-            <div class="sfmc-step" aria-hidden="true">2</div>
+            <div class="sfmc-step" aria-hidden="true">3</div>
             <div>
                 <h3>{l s='Configuración de la tienda' mod='pssalesforcebridge'}</h3>
                 <p>{l s='La identidad queda vinculada a esta instalación; no se cambia sin una migración controlada.' mod='pssalesforcebridge'}</p>
