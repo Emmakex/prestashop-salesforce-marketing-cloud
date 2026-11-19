@@ -105,6 +105,7 @@ jobs:
           php tests/g7-staging-delivery-migration-contract.php
           php tests/g7-native-prestashop-lease-contract.php
           php tests/g7-native-preflight-contract.php
+          php tests/g7-native-csc-presend-review-contract.php
           php tests/g7-streaming-ingestion-plan-contract.php
           php tests/g7-staging-hook-capture-contract.php
           php tests/g5-synthetic-actions-test-contract.php
