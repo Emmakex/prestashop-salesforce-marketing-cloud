@@ -65,7 +65,7 @@ adminUxAssert(strpos($template,'<details>')!==false
 foreach([
     'submitPsG7SchemaPrepare',
     'submitPsG7SchemaRollback',
-    'submitPsGrowthStagingCapture',
+    'name="submitPsGrowthStagingCapture"',
     'submitPsGrowthReadback',
     'G7 - Same outbox',
     'Data Cloud - installation preflight'
