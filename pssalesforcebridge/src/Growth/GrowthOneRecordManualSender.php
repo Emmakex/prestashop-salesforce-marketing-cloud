@@ -32,13 +32,17 @@ final class GrowthOneRecordManualSender
             || !preg_match('/^[a-z][a-z0-9_]{5,31}$/D',$namespace)
             || !is_string($merchant)
             || !preg_match('/^[A-Z][A-Z0-9_]{1,31}$/D',$merchant)
-            || !in_array($merchant,['ABH','BCABH'],true) // BC aliases share the approved existing ABH PST connector; other merchants blocked.
             || !is_int($shop) || $shop<1
             || !in_array($object,['PSCustomer','PSOrder'],true)
             || $approval!==self::APPROVAL) {
             throw new RuntimeException('g7_one_send_scope_or_approval_denied');
         }
         self::assertConfigured($merchant,$namespace);
+        // Strict source-to-shop binding: DOABH must use its OWN approved
+        // Salesforce ingestion source, never BC's legacy source.
+        $sourceName=GrowthShopSourceBinding::sourceForSend(
+            $shop,$merchant,$namespace
+        );
         $key=self::key($namespace,$shop,$object);
         $customerKey=self::key($namespace,$shop,'PSCustomer');
         if ($object==='PSOrder'
@@ -68,6 +72,10 @@ final class GrowthOneRecordManualSender
         }
         try {
             self::assertConfigured($merchant,$namespace);
+            if (GrowthShopSourceBinding::sourceForSend(
+                $shop,$merchant,$namespace)!==$sourceName) {
+                throw new RuntimeException('g7_one_send_source_changed');
+            }
             if (\Configuration::get($key)!==false
                 && (string)\Configuration::get($key)!=='') {
                 throw new RuntimeException('g7_one_send_already_attempted');
@@ -114,12 +122,14 @@ final class GrowthOneRecordManualSender
                 throw new RuntimeException('g7_one_send_reservation_failed');
             }
             $report=GrowthDataCloudUpsertTransport::sendIfAuthorized(
-                $token['instance_url'],'ABH_PrestaShop_Data_Cloud',
+                $token['instance_url'],$sourceName,
                 $object,[$record],$namespace,$shop,$token['access_token'],
                 function($checkNamespace,$checkShop,$checkObject)
-                    use($namespace,$shop,$object,$key,$merchant) {
+                    use($namespace,$shop,$object,$key,$merchant,$sourceName) {
                     self::assertConfigured($merchant,$namespace);
-                    return $checkNamespace===$namespace
+                    return GrowthShopSourceBinding::sourceForSend(
+                            $shop,$merchant,$namespace)===$sourceName
+                        && $checkNamespace===$namespace
                         && $checkShop===$shop
                         && $checkObject===$object
                         && (string)\Configuration::get($key)==='attempt_reserved';

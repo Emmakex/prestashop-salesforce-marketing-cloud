@@ -38,7 +38,7 @@ adminUxAssert(strpos($get,'renderClientConsole()')!==false
     'required_client_or_safe_stop_routing_missing');
 adminUxAssert(strpos($module,
     "'views/templates/admin/console.tpl'")!==false
-    && strpos($module,"$"."this->version = '0.9.2'")!==false
+    && strpos($module,"$"."this->version = '0.9.3'")!==false
     && strpos($module,"$"."this->author = 'ALFABH'")!==false,
     'wrong_module_version_or_template');
 
@@ -115,8 +115,12 @@ adminUxAssert(strpos($routes,'http')===false
     && strpos($routes,'curl_')===false
     && strpos($routes,'Db::')===false,
     'network_or_db_write_on_dashboard_route');
-adminUxAssert(strpos($module,"$"."identity=in_array(")!==false
-    && strpos($module,"['ABH','BCABH']")!==false
-    && strpos($module,"const SCHEMA_SOURCE = 'ABH_PrestaShop_Data_Cloud'")!==false,
-    'bcabh_must_share_existing_abh_source_without_new_connector');
+adminUxAssert(strpos($module,'GrowthShopSourceBinding::isMerchant($merchant)')!==false
+    && strpos($module,'GrowthShopSourceBinding::inspect($shop,$merchant,$namespace)')!==false
+    && strpos($module,'GrowthShopSourceBinding::bind(')!==false
+    && strpos($sender,'GrowthShopSourceBinding::sourceForSend(')!==false
+    && strpos($template,'name="PS_GROWTH_SOURCE_API"')!==false
+    && strpos($template,'name="PS_GROWTH_SOURCE_ATTEST"')!==false
+    && strpos($template,'{$sfmc_source_name|escape:')!==false,
+    'merchant_source_became_bespoke_again');
 echo "Pre-beta BO UX PASS: 1 client + 1 order, scoped forms, accessible layout, no legacy diagnostics or new sender.\n";
