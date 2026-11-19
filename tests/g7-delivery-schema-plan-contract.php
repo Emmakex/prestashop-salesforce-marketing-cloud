@@ -73,8 +73,19 @@ $cron=file_get_contents(dirname(__DIR__)
     .'/pssalesforcebridge/controllers/front/cron.php');
 $planCode=file_get_contents(dirname(__DIR__)
     .'/pssalesforcebridge/src/Growth/GrowthG7DeliverySchemaPlan.php');
-g7SchemaAssert(strpos($module,'GrowthG7DeliverySchemaPlan')===false
-    && strpos($cron,'GrowthG7DeliverySchemaPlan')===false,
+// The review-only plan can now be loaded by the explicit BO diagnostic,
+// but must still be absent from automatic install, upgrade and cron.
+$installStart=strpos($module,'public function install()');
+$uninstallStart=strpos($module,'public function uninstall()');
+$upgrade=file_get_contents(dirname(__DIR__)
+    .'/pssalesforcebridge/upgrade/upgrade-0.8.8.php');
+g7SchemaAssert($installStart!==false && $uninstallStart>$installStart
+    && strpos(substr($module,$installStart,$uninstallStart-$installStart),
+        'GrowthG7StagingDeliveryMigration')===false
+    && strpos($cron,'GrowthG7DeliverySchemaPlan')===false
+    && strpos($cron,'GrowthG7StagingDeliveryMigration')===false
+    && strpos($upgrade,'ALTER TABLE')===false
+    && strpos($upgrade,'GrowthG7DeliverySchemaPlan')===false,
     'unexpected_live_migration');
 foreach(['Db::','->execute(', '->exec(', 'curl_', 'file_get_contents(',
     'Configuration::updateValue('] as $forbidden) {

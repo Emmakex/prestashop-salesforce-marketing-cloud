@@ -52,6 +52,8 @@ foreach([
     'Compatibility/OrderHookAdapter.php',
     'Growth/GrowthBlockedHookAdapter.php',
     'Growth/GrowthOutboxSchemaPlan.php',
+    'Growth/GrowthG7DeliverySchemaPlan.php',
+    'Growth/GrowthG7StagingDeliveryMigration.php',
     'Growth/GrowthSqlEngineGate.php',
     'Growth/GrowthStagingSchemaBootstrap.php',
     'Growth/GrowthStagingOutboxStore.php',
@@ -67,6 +69,7 @@ use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthStagingHookCapture a
 use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthStagingSchemaBootstrap as Setup;
 use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthSandboxMigrationExecutor as SandMigration;
 use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthStagingNativeReadback as Readback;
+use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthG7StagingDeliveryMigration as G7Migration;
 
 function g7DbCheck($ok,$code){
     if(!$ok)throw new RuntimeException('g7_real_staging_ci_'.$code);
@@ -230,6 +233,85 @@ g7DbCheck((int)$db->getValue(
     "SELECT COUNT(*) FROM information_schema.TABLES "
     . "WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='ci_sfmc_queue'"
 )===0,'legacy_queue_touched');
+
+// 0.8.8 G7: actual PrestaShop Db staging-only additive migration
+// after all original local events are captured. Never in merchant DB CI.
+$original=G7Migration::inspect($db,_PS_VERSION_,'ABH',$ns,_DB_PREFIX_);
+g7DbCheck($original['status']==='original_g3_verified'
+    && !$original['schema_write_authorized'],'original_inventory_failed');
+$rejected=false;
+try {
+    G7Migration::apply($db,_PS_VERSION_,'ABH',$ns,_DB_PREFIX_,
+        'wrong_phrase',true);
+} catch(RuntimeException $e) {
+    $rejected=$e->getMessage()==='g7_delivery_owner_approval_required';
+}
+g7DbCheck($rejected,'ddl_without_owner_accepted');
+$rejected=false;
+try {
+    G7Migration::apply($db,_PS_VERSION_,'ABH',$ns,_DB_PREFIX_,
+        G7Migration::APPROVE,false);
+} catch(RuntimeException $e) {
+    $rejected=$e->getMessage()==='g7_delivery_owner_approval_required';
+}
+g7DbCheck($rejected,'ddl_without_backup_accepted');
+$applied=G7Migration::apply($db,_PS_VERSION_,'ABH',$ns,_DB_PREFIX_,
+    G7Migration::APPROVE,true);
+$again=G7Migration::apply($db,_PS_VERSION_,'ABH',$ns,_DB_PREFIX_,
+    G7Migration::APPROVE,true);
+$state=G7Migration::inspect($db,_PS_VERSION_,'ABH',$ns,_DB_PREFIX_);
+g7DbCheck($applied['status']==='extended_blocked_no_sends'
+    && $again['status']==='already_extended_verified'
+    && $state['status']==='extended_g7_verified'
+    && !$applied['salesforce_requests_performed']
+    && !$state['outbound_worker_authorized']
+    && (int)$db->getValue("SELECT COUNT(*) FROM $tab")===5
+    && (int)$db->getValue(
+        "SELECT COUNT(*) FROM $tab WHERE delivery_state='blocked'"
+        . " AND delivery_attempts=0"
+    )===5,'migration_changed_local_events');
+
+$rearmed=Setup::install(
+    $db,_PS_VERSION_,'ABH',$ns,_DB_PREFIX_,Setup::CONFIRM
+);
+g7DbCheck($rearmed['schema_present'] && !$rearmed['outbound_authorized'],
+    'g3_rearm_rejected_g7_additive_columns');
+Configuration::updateValue('PS_GROWTH_LOCAL_CAPTURE','staging_armed');
+$denied=false;
+try {
+    G7Migration::rollback($db,_PS_VERSION_,'ABH',$ns,_DB_PREFIX_,
+        G7Migration::UNDO,true);
+} catch(RuntimeException $e) {
+    $denied=$e->getMessage()==='g7_delivery_test_gate_denied';
+}
+g7DbCheck($denied,'rollback_during_capture_accepted');
+Configuration::updateValue('PS_GROWTH_LOCAL_CAPTURE','off');
+
+$db->execute("UPDATE $tab SET delivery_attempts=1 WHERE accepted_sequence=("
+    . "SELECT current_seq FROM (SELECT MAX(accepted_sequence) AS current_seq"
+    . " FROM $tab) q)");
+$denied=false;
+try {
+    G7Migration::rollback($db,_PS_VERSION_,'ABH',$ns,_DB_PREFIX_,
+        G7Migration::UNDO,true);
+} catch(RuntimeException $e) {
+    $denied=$e->getMessage()==='g7_delivery_history_prevents_rollback';
+}
+g7DbCheck($denied,'rollback_dropped_attempt_history');
+$db->execute("UPDATE $tab SET delivery_attempts=0");
+$rolled=G7Migration::rollback(
+    $db,_PS_VERSION_,'ABH',$ns,_DB_PREFIX_,G7Migration::UNDO,true
+);
+g7DbCheck($rolled['status']==='rolled_back_no_sends'
+    && (int)$db->getValue("SELECT COUNT(*) FROM $tab")===5
+    && G7Migration::inspect($db,_PS_VERSION_,'ABH',$ns,_DB_PREFIX_)
+        ['status']==='original_g3_verified',
+    'rollback_did_not_restore_g3');
+$diagnostic=json_encode([$original,$applied,$again,$state,$rolled]);
+g7DbCheck(strpos($diagnostic,'ci-synthetic@example.invalid')===false
+    && strpos($diagnostic,$ns)===false
+    && strpos($diagnostic,'901')===false,
+    'g7_migration_report_leaked_identity');
 
 $pdo->exec("DELETE FROM `$ledger` WHERE source_namespace='$ns'");
 $pdo->exec("DELETE FROM `$tab` WHERE source_namespace='$ns'");

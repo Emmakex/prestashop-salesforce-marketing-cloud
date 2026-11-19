@@ -50,6 +50,7 @@ require_once dirname(__DIR__) . '/pssalesforcebridge/upgrade/upgrade-0.8.4.php';
 require_once dirname(__DIR__) . '/pssalesforcebridge/upgrade/upgrade-0.8.5.php';
 require_once dirname(__DIR__) . '/pssalesforcebridge/upgrade/upgrade-0.8.6.php';
 require_once dirname(__DIR__) . '/pssalesforcebridge/upgrade/upgrade-0.8.7.php';
+require_once dirname(__DIR__) . '/pssalesforcebridge/upgrade/upgrade-0.8.8.php';
 
 use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthOnlyHookPreflight as Hook;
 
@@ -76,7 +77,9 @@ growthAssert(upgrade_module_0_8_0(null) === true
     && upgrade_module_0_8_3(null) === true
     && upgrade_module_0_8_4(null) === true
     && upgrade_module_0_8_5(null) === true
-    && upgrade_module_0_8_6(null) === true, 'upgrade_failed');
+    && upgrade_module_0_8_6(null) === true
+    && upgrade_module_0_8_7(null) === true
+    && upgrade_module_0_8_8(null) === true, 'upgrade_failed');
 growthAssert(Configuration::get('PS_SFMC_MODE') === 'test', 'upgrade_not_fail_closed');
 foreach ($old as $key => $value) {
     if ($key !== 'PS_SFMC_MODE') {
@@ -144,7 +147,17 @@ $escapeMethod=new ReflectionMethod('PsSalesforceBridge', 'escape');
 $escapeMethod->setAccessible(true);
 growthAssert($escapeMethod->invoke($module, '<script>&"') ===
     '&lt;script&gt;&amp;&quot;', 'g7_bo_escape_missing_or_unsafe');
-growthAssert($module->version === '0.8.7'
+// G7 lease migration is never invoked by install, upgrade, hooks or cron.
+$schemaReflection=new ReflectionMethod('PsSalesforceBridge','reviewG7DeliverySchema');
+$schemaReflection->setAccessible(true);
+Configuration::updateValue('PS_SFMC_MODE','test');
+Configuration::updateValue('PS_GROWTH_LOCAL_CAPTURE','staging_armed');
+$stagingGate=$schemaReflection->invoke($module,'apply');
+growthAssert(strpos($stagingGate,'G7 schema action blocked')!==false,
+    'g7_schema_action_ignored_fail_closed');
+Configuration::updateValue('PS_GROWTH_LOCAL_CAPTURE','off');
+Configuration::$writes=[];
+growthAssert($module->version === '0.8.8'
     && $module->author === 'ALFABH'
     && PsSalesforceBridge::PROVIDER === 'marketing_cloud_growth'
     && PsSalesforceBridge::DATA_PLATFORM === 'data_cloud',
