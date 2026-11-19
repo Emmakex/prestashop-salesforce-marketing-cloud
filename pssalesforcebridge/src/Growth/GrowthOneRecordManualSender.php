@@ -32,7 +32,7 @@ final class GrowthOneRecordManualSender
             || !preg_match('/^[a-z][a-z0-9_]{5,31}$/D',$namespace)
             || !is_string($merchant)
             || !preg_match('/^[A-Z][A-Z0-9_]{1,31}$/D',$merchant)
-            || $merchant!=='ABH' // Fixed PST source is BC-only until multi-merchant config.
+            || !in_array($merchant,['ABH','BCABH'],true) // BC aliases share the approved existing ABH PST connector; other merchants blocked.
             || !is_int($shop) || $shop<1
             || !in_array($object,['PSCustomer','PSOrder'],true)
             || $approval!==self::APPROVAL) {

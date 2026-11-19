@@ -1,5 +1,5 @@
 <?php
-/** G7 0.9.1: single native customer+order, explicit UAT, no network. */
+/** G7 0.9.2: single native customer+order, explicit UAT, no network. */
 require_once dirname(__DIR__)
     .'/pssalesforcebridge/src/DataCloud/IngestionPayloadBuilder.php';
 require_once dirname(__DIR__)
@@ -194,6 +194,33 @@ g7OnceAssert(count($calls)===3
     && $success['status']==='one_record_accepted_unconfirmed_manual_dlo_check',
     'auth_failed_reserved_attempt');
 
+// BC production merchant code is BCABH; existing ABH is legacy-compatible.
+// Both use the existing ABH PST connector, without creating a new source.
+$ns='abh_bc_prod_20261119';
+Configuration::updateValue('PS_GROWTH_NAMESPACE',$ns);
+Configuration::updateValue('PS_GROWTH_MERCHANT','BCABH');
+g7OnceReject(function()use($db,$ns,$preview,$token,$mockHttp){
+    SendOne::dispatch($db,$ns,'SHOP_OTHER',2,'PSCustomer',SendOne::APPROVAL,'',
+        $preview,$token,$mockHttp);
+},'g7_one_send_scope_or_approval_denied');
+g7OnceReject(function()use($db,$ns,$preview,$token,$mockHttp){
+    SendOne::dispatch($db,$ns,'ABH',2,'PSCustomer',SendOne::APPROVAL,'',
+        $preview,$token,$mockHttp);
+},'g7_one_send_test_mode_gate_denied');
+$bcBefore=count($calls);
+$bc=SendOne::dispatch($db,$ns,'BCABH',2,'PSCustomer',SendOne::APPROVAL,'',
+    $preview,$token,$mockHttp);
+g7OnceAssert(count($calls)===$bcBefore+1
+    && $bc['status']==='one_record_accepted_unconfirmed_manual_dlo_check'
+    && !$bc['marketing_sends_authorized']
+    && !$bc['dlo_dmo_verified'],'bcabh_same_source_customer');
+$bcOrder=SendOne::dispatch($db,$ns,'BCABH',2,'PSOrder',
+    SendOne::APPROVAL,SendOne::CUSTOMER_DLO_ATTESTATION,
+    $preview,$token,$mockHttp);
+g7OnceAssert(count($calls)===$bcBefore+2
+    && $bcOrder['status']==='one_record_accepted_unconfirmed_manual_dlo_check',
+    'bcabh_same_source_order');
+
 Configuration::updateValue('PS_SFMC_MODE','production');
 g7OnceReject(function()use($db,$ns,$preview,$token,$mockHttp){
     SendOne::dispatch($db,$ns,'ABH',2,'PSOrder',SendOne::APPROVAL,
@@ -207,7 +234,7 @@ $hooks=substr($module,strpos($module,'public function hookActionCustomerAccountA
     -strpos($module,'public function hookActionCustomerAccountAdd'));
 g7OnceAssert(strpos($module,'renderManualOneRecordForms')!==false
     && strpos($module,'runManualOneRecord')!==false
-    && strpos($module,"$"."this->version = '0.9.1'")!==false
+    && strpos($module,"$"."this->version = '0.9.2'")!==false
     && strpos($hooks,'GrowthOneRecordManualSender')===false
     && strpos($cron,'GrowthOneRecordManualSender')===false,
     'unapproved_auto_wiring');
