@@ -28,7 +28,7 @@ foreach([
     'GrowthLocalCustomerHoldReader::inspect',
     "executeS($sql,true,false)",
     'hash_equals(',
-    "'delivery_state'!=='blocked'",
+    "delivery_state']!=='blocked'",
     'source_unverified_hold',
     "'marketing_sends_authorized'=>false",
     "'data_cloud_ingestion_authorized'=>false",
