@@ -3,6 +3,7 @@
 /**
  * PrestaShop -> Salesforce Marketing Cloud Growth + Data Cloud.
  *
+ * v0.9.0: simplified accessible Back Office pre-beta with one guided smoke.
  * v0.8.9: one-customer/one-order manual Test smoke, individual guarded
  * Data Cloud upsert only on explicit BO authorization. No auto sends.
  * v0.8.8: owner-gated additive staging G7 lease columns (no outbound).
@@ -83,7 +84,7 @@ class PsSalesforceBridge extends Module
     {
         $this->name = 'pssalesforcebridge';
         $this->tab = 'advertising_marketing';
-        $this->version = '0.8.9';
+        $this->version = '0.9.0';
         $this->author = 'ALFABH';
         $this->need_instance = 0;
         $this->bootstrap = true;
@@ -94,7 +95,7 @@ class PsSalesforceBridge extends Module
 
         parent::__construct();
         $this->displayName = $this->l('Salesforce Marketing Cloud Growth + Data Cloud');
-        $this->description = $this->l('Growth-only PrestaShop bridge. Data ingestion and campaign sends remain blocked pending approval.');
+        $this->description = $this->l('PrestaShop connector for Salesforce Growth + Data Cloud. Controlled one-record testing; automatic synchronization and campaigns remain disabled.');
         $this->confirmUninstall = $this->l('Uninstall the module? Existing historical tables and data will remain untouched.');
     }
 
@@ -184,41 +185,65 @@ class PsSalesforceBridge extends Module
             $message = $this->runManualOneRecord('customer');
         } elseif (Tools::isSubmit('submitPsGrowthOneOrderSend')) {
             $message = $this->runManualOneRecord('order');
-        } elseif (Tools::isSubmit('submitPsG7SchemaInspect')) {
-            $message = $this->reviewG7DeliverySchema('inspect');
-        } elseif (Tools::isSubmit('submitPsG7SchemaPrepare')) {
-            $message = $this->reviewG7DeliverySchema('apply');
-        } elseif (Tools::isSubmit('submitPsG7SchemaRollback')) {
-            $message = $this->reviewG7DeliverySchema('rollback');
-        } elseif (Tools::isSubmit('submitPsGrowthReadback')) {
-            $message = $this->verifyStagingNativeReadback();
         } elseif (Tools::isSubmit('submitPsGrowthBridge')) {
             $message = $this->saveGrowthSettings();
         } elseif (Tools::isSubmit('submitPsGrowthStagingCaptureStop')) {
+            // Keep only the safe OFF switch for an already armed old staging shop.
             $message = $this->disableStagingCapture();
-        } elseif (Tools::isSubmit('submitPsGrowthStagingCapture')) {
-            $message = $this->armStagingCapture();
         }
+        // Previous G7 development buttons are no longer callable from BO:
+        // no schema DDL, capture arming or stale readback UI in the pre-beta.
+        return $message . $this->renderClientConsole();
+    }
 
-        $html = $message;
-        $html .= $this->displayInformation(
-            $this->l('Provider: Marketing Cloud Growth + Data Cloud only. Mode: Test. The existing Salesforce Core OAuth and Data Cloud token exchange have already been certified; this panel does not repeat them.')
-        );
-        $html .= $this->displayInformation(
-            $this->l('No Data Cloud ingestion, schema upload, Data Streams, identity matching, historic backfill, campaign sends or cart recovery is enabled.')
-        );
-        try {
-            $shops = ShopResolver::activeShopIds(isset($this->context) ? $this->context : null);
-            $review = PrestaShopReadinessProbe::inspect($shops);
-            $html .= (new InstallationReadinessDashboard())->render($review);
-        } catch (\Throwable $e) {
-            $html .= $this->displayError(
-                $this->l('The read-only Data Cloud installation checks are unavailable; exports remain blocked.')
-            );
-        }
-        return $html . $this->renderGrowthForm() . $this->renderCaptureForm()
-            . $this->renderReadbackForm() . $this->renderG7DeliverySchemaForms()
-            . $this->renderManualOneRecordForms();
+    /**
+     * Compact client-facing PrestaShop Back Office. Smarty receives only
+     * sanitized state and two numeric form values; never credentials, payload,
+     * email, source keys or HTTP responses.
+     */
+    private function renderClientConsole()
+    {
+        $merchant=(string)Configuration::get(self::CONFIG_MERCHANT);
+        $namespace=(string)Configuration::get(self::CONFIG_NAMESPACE);
+        $mode=(string)Configuration::get(self::CONFIG_MODE);
+        $capture=(string)Configuration::get(self::CONFIG_LOCAL_CAPTURE);
+        $shop=class_exists('Shop') ? (int)\Shop::getContextShopID() : 0;
+        $identity=$merchant==='ABH'
+            && preg_match('/^[a-z][a-z0-9_]{5,31}$/D',$namespace)===1
+            && $shop>0;
+        $credentials=(string)getenv('SF_GROWTH_ORG_URL')!==''
+            && (string)getenv('SF_GROWTH_CLIENT_ID')!==''
+            && (string)getenv('SF_GROWTH_CLIENT_SECRET')!=='';
+        $customerInput=Tools::getValue('PS_GROWTH_ONE_CUSTOMER_ID');
+        $orderInput=Tools::getValue('PS_GROWTH_ONE_ORDER_ID');
+        // Render only normalized numeric IDs from the current request, not
+        // arbitrary POST strings or source customer/order properties.
+        $customerInput=is_scalar($customerInput)
+            && preg_match('/^[1-9][0-9]{0,14}$/D',(string)$customerInput)
+            ?(string)$customerInput:'';
+        $orderInput=is_scalar($orderInput)
+            && preg_match('/^[1-9][0-9]{0,14}$/D',(string)$orderInput)
+            ?(string)$orderInput:'';
+        $action=AdminController::$currentIndex.'&configure='.$this->name
+            .'&token='.Tools::getAdminTokenLite('AdminModules');
+        $this->context->smarty->assign([
+            'sfmc_action'=>$action,
+            'sfmc_version'=>$this->version,
+            'sfmc_merchant'=>$merchant,
+            'sfmc_namespace'=>$namespace,
+            'sfmc_identity_ready'=>$identity,
+            'sfmc_credentials_ready'=>$credentials,
+            'sfmc_capture_armed'=>$capture==='staging_armed',
+            'sfmc_can_send'=>$identity && $credentials && $mode==='test'
+                && $capture==='off',
+            'sfmc_customer_input'=>$customerInput,
+            'sfmc_order_input'=>$orderInput,
+            'sfmc_customer_status'=>GrowthOneRecordManualSender::statusForShop(
+                $namespace,$shop,'PSCustomer'),
+            'sfmc_order_status'=>GrowthOneRecordManualSender::statusForShop(
+                $namespace,$shop,'PSOrder')
+        ]);
+        return $this->display(__FILE__,'views/templates/admin/console.tpl');
     }
 
     /**
@@ -469,7 +494,7 @@ class PsSalesforceBridge extends Module
             || (string)Configuration::get(self::CONFIG_MODE)!=='test'
             || (string)Configuration::get(self::CONFIG_LOCAL_CAPTURE)!=='off') {
             return $this->displayError(
-                $this->l('Manual single-record Test requires Test mode and local capture OFF. No record sent.')
+                $this->l('La prueba individual requiere modo Test y captura local desactivada. No se ha enviado ningún registro.')
             );
         }
         $rawCustomer=Tools::getValue('PS_GROWTH_ONE_CUSTOMER_ID');
@@ -478,7 +503,7 @@ class PsSalesforceBridge extends Module
             || !preg_match('/^[1-9][0-9]{0,14}$/D',(string)$rawCustomer)
             || !preg_match('/^[1-9][0-9]{0,14}$/D',(string)$rawOrder)) {
             return $this->displayError(
-                $this->l('Select one valid customer ID and its existing order ID. No record sent.')
+                $this->l('Selecciona un cliente y un pedido válido del mismo cliente. No se ha enviado ningún registro.')
             );
         }
         try {
@@ -504,7 +529,7 @@ class PsSalesforceBridge extends Module
                 $report=GrowthOneRecordSelection::summarize($private);
                 unset($private);
                 return $this->displayConfirmation(
-                    $this->l('Selected customer and linked order: local PST v0.4 shape verified. No Salesforce POST and no campaign sent.')
+                    $this->l('Cliente y pedido validados. Los datos y su vinculación son correctos para la prueba. No se ha enviado nada a Salesforce.')
                 );
             }
             $orgUrl=(string)getenv('SF_GROWTH_ORG_URL');
@@ -512,7 +537,7 @@ class PsSalesforceBridge extends Module
             $clientSecret=(string)getenv('SF_GROWTH_CLIENT_SECRET');
             if ($orgUrl==='' || $clientId==='' || $clientSecret==='') {
                 return $this->displayError(
-                    $this->l('Server-side Salesforce OAuth credentials unavailable. Never enter secrets in this form. No record sent.')
+                    $this->l('Las credenciales de Salesforce no están disponibles en el servidor PHP. No las introduzcas en este formulario. No se ha enviado nada.')
                 );
             }
             $getToken=function()use($orgUrl,$clientId,$clientSecret) {
@@ -539,14 +564,14 @@ class PsSalesforceBridge extends Module
                 throw new \RuntimeException('g7_one_send_result_unverified');
             }
             return $this->displayInformation(
-                $this->l('Data Cloud individual test: ')
+                $this->l('Resultado del envío individual: ')
                 .$this->escape($status)
-                .$this->l('. Check this exact record in Salesforce DLO/DMO. No automatic retry or marketing sends.')
+                .$this->l('. Comprueba el registro en Salesforce Data Cloud antes de continuar. No se realizará otro intento ni se enviarán campañas.')
             );
         } catch (\Throwable $e) {
             // No exception SQL, ID, email, token, payload or URL in BO.
             return $this->displayError(
-                $this->l('Single-record test blocked or already attempted. No automatic retry. Verify the selected customer/order, the shop, authorization, and Salesforce ingestion receipts before proceeding.')
+                $this->l('Prueba bloqueada o ya intentada. Comprueba cliente, pedido, tienda, permisos y recepción en Data Cloud. No se permite repetir automáticamente.')
             );
         }
     }
@@ -621,7 +646,7 @@ class PsSalesforceBridge extends Module
             !is_string($namespace) ||
             !preg_match('/^[a-z][a-z0-9_]{5,31}$/D', $namespace)) {
             return $this->displayError(
-                $this->l('Merchant and installation namespace are required. Use uppercase merchant and lowercase namespace identifiers.')
+                $this->l('Introduce el código del comercio en mayúsculas y un identificador de instalación válido en minúsculas.')
             );
         }
         // These are CANDIDATES. Saving them does not certify global uniqueness
@@ -631,16 +656,16 @@ class PsSalesforceBridge extends Module
         if ((is_string($oldMerchant) && $oldMerchant !== '' && $oldMerchant !== $merchant)
             || (is_string($oldNamespace) && $oldNamespace !== '' && $oldNamespace !== $namespace)) {
             return $this->displayError(
-                $this->l('Installation identity cannot be changed in place. Review namespace ownership before migration.')
+                $this->l('La identidad de esta instalación ya está fijada. No puede modificarse sin migración controlada.')
             );
         }
         if (!Configuration::updateValue(self::CONFIG_MODE, 'test')
             || !Configuration::updateValue(self::CONFIG_MERCHANT, $merchant)
             || !Configuration::updateValue(self::CONFIG_NAMESPACE, $namespace)) {
-            return $this->displayError($this->l('Unable to save Growth configuration.'));
+            return $this->displayError($this->l('No se ha podido guardar la configuración.'));
         }
         return $this->displayConfirmation(
-            $this->l('Growth identity candidate saved in Test. No external requests were made.')
+            $this->l('Identidad guardada en modo Test. No se han enviado datos a Salesforce.')
         );
     }
 
@@ -697,7 +722,7 @@ class PsSalesforceBridge extends Module
             return $this->displayError($this->l('Local capture could not be disabled.'));
         }
         return $this->displayConfirmation(
-            $this->l('Local capture stopped. Existing G3 evidence and historical data are preserved.')
+            $this->l('Captura local detenida. Se conservan los datos históricos y las pruebas anteriores.')
         );
     }
 

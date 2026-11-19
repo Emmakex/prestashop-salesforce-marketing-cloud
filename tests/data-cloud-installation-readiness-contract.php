@@ -73,9 +73,10 @@ probe_check(strpos($probeSource, 'SELECT *') === false && strpos($probeSource, '
     && strpos($probeSource, 'curl_') === false,
     'Preflight must not access customer rows, write or call HTTP.');
 $moduleSrc = file_get_contents(dirname(__DIR__) . '/pssalesforcebridge/pssalesforcebridge.php');
-probe_check(strpos($moduleSrc, 'PrestaShopReadinessProbe::inspect($shops)') !== false
-    && strpos($moduleSrc, '(new InstallationReadinessDashboard())->render($review)') !== false,
-    'Growth-only Back Office must display the real read-only Data Cloud readiness panel.');
+probe_check(strpos($moduleSrc, 'PrestaShopReadinessProbe::inspect($shops)') === false
+    && strpos($moduleSrc, '(new InstallationReadinessDashboard())->render($review)') === false
+    && strpos($moduleSrc, 'renderClientConsole()') !== false,
+    'Historic SQL preflight must not clutter the pre-beta client Back Office.');
 $ci = file_get_contents(dirname(__DIR__) . '/.github/workflows/ci.yml');
 probe_check(strpos($ci, 'php tests/data-cloud-installation-readiness-contract.php') !== false,
     'Readiness contract must be gated on CI.');

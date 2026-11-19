@@ -1,0 +1,213 @@
+{*
+  Salesforce Growth + Data Cloud — client-facing pre-beta BO.
+  The module supplies only sanitized status flags and explicit form values.
+  Customer/order records, OAuth tokens and ingestion payloads never enter Smarty.
+*}
+<style>
+{literal}
+.sfmc-console{--sfmc-ink:#172c44;--sfmc-muted:#54657a;--sfmc-blue:#205eb8;--sfmc-border:#dce5f0;--sfmc-bg:#f6f8fc;color:var(--sfmc-ink);max-width:1140px;margin:18px auto 36px;font-family:inherit;font-size:14px;line-height:1.55}
+.sfmc-console *{box-sizing:border-box}
+.sfmc-console h2,.sfmc-console h3,.sfmc-console p{margin:0}
+.sfmc-console .sfmc-hero{background:#152e50;color:#fff;border-radius:15px;padding:27px 30px;display:flex;justify-content:space-between;align-items:center;gap:18px;flex-wrap:wrap}
+.sfmc-console .sfmc-eyebrow{font-size:12px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#accbeb;margin-bottom:6px}
+.sfmc-console .sfmc-hero h2{font-size:25px;line-height:1.2;color:#fff;font-weight:750;margin-bottom:8px}
+.sfmc-console .sfmc-hero p{color:#d9e7f5;max-width:660px}
+.sfmc-console .sfmc-version{display:inline-flex;align-items:center;padding:7px 12px;border:1px solid #7294bb;border-radius:99px;white-space:nowrap;color:#fff}
+.sfmc-console .sfmc-cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:16px 0 24px}
+.sfmc-console .sfmc-stat{padding:17px 18px;background:#fff;border:1px solid var(--sfmc-border);border-radius:12px;min-height:102px}
+.sfmc-console .sfmc-stat-label{font-size:12px;color:var(--sfmc-muted);display:block;margin-bottom:9px}
+.sfmc-console .sfmc-stat strong{display:flex;align-items:center;gap:8px;font-size:14px}
+.sfmc-console .sfmc-dot{width:8px;height:8px;border-radius:50%;display:inline-block;flex:none;background:#b68c26}
+.sfmc-console .sfmc-dot.good{background:#1d9868}
+.sfmc-console .sfmc-dot.neutral{background:#6c819a}
+.sfmc-console .sfmc-panel{border-radius:14px;background:#fff;border:1px solid var(--sfmc-border);box-shadow:0 4px 18px rgba(18,48,77,.04);padding:24px 28px;margin-bottom:16px}
+.sfmc-console .sfmc-panel-title{display:flex;align-items:flex-start;gap:13px;margin-bottom:20px}
+.sfmc-console .sfmc-step{background:#e7f0fd;color:#1457aa;border-radius:10px;min-width:36px;height:36px;display:grid;place-items:center;font-weight:800}
+.sfmc-console .sfmc-panel-title h3{font-size:19px;font-weight:750;color:var(--sfmc-ink);line-height:1.28}
+.sfmc-console .sfmc-panel-title p{color:var(--sfmc-muted);margin-top:5px}
+.sfmc-console .sfmc-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin:18px 0}
+.sfmc-console label{display:block;font-size:13px;font-weight:700;color:#2d4057;margin-bottom:6px}
+.sfmc-console input[type=text],.sfmc-console input[type=number]{display:block;width:100%;min-height:43px;border:1px solid #aebdd0;border-radius:8px;background:#fff;padding:9px 12px;color:#132d46;font:inherit;box-shadow:none}
+.sfmc-console input:focus-visible,.sfmc-console button:focus-visible,.sfmc-console summary:focus-visible{outline:3px solid #86baff;outline-offset:3px}
+.sfmc-console input[readonly]{background:var(--sfmc-bg);color:var(--sfmc-muted)}
+.sfmc-console .sfmc-hint{font-size:12px;color:var(--sfmc-muted);margin:6px 0}
+.sfmc-console .sfmc-btn{appearance:none;display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:42px;padding:10px 17px;font:inherit;font-weight:750;border-radius:8px;cursor:pointer;transition:background .15s ease;white-space:normal;text-align:center}
+.sfmc-console .sfmc-btn-primary{background:#185bb8;border:1px solid #185bb8;color:#fff}
+.sfmc-console .sfmc-btn-primary:hover{background:#10498f;color:#fff}
+.sfmc-console .sfmc-btn-secondary{background:#fff;border:1px solid #2d639f;color:#174c88}
+.sfmc-console .sfmc-btn-secondary:hover{background:#edf5ff}
+.sfmc-console .sfmc-btn[disabled]{background:#eef2f7;border-color:#ccd6e2;color:#63758d;cursor:not-allowed}
+.sfmc-console .sfmc-steps{display:flex;flex-wrap:wrap;gap:9px;margin-top:15px}
+.sfmc-console .sfmc-tag{font-size:12px;padding:5px 11px;border-radius:99px;background:#f0f4fa;color:#34516e}
+.sfmc-console .sfmc-note{border-left:3px solid #b77b1c;background:#fff7e8;color:#604711;padding:11px 14px;margin:16px 0;border-radius:0 8px 8px 0;font-size:13px}
+.sfmc-console .sfmc-note.info{border-color:#2866ad;background:#eef5fd;color:#24496c}
+.sfmc-console details{border:1px solid #d5e1ed;border-radius:10px;margin-top:19px;background:#f9fbff}
+.sfmc-console details>summary{list-style:none;cursor:pointer;font-weight:750;padding:15px 17px;display:flex;align-items:center;justify-content:space-between;gap:10px;color:#1b4777}
+.sfmc-console details>summary::-webkit-details-marker{display:none}
+.sfmc-console details>summary::after{content:"+";font-size:20px;font-weight:500;line-height:1}
+.sfmc-console details[open]>summary::after{content:"−"}
+.sfmc-console .sfmc-details-inner{padding:0 18px 20px}
+.sfmc-console .sfmc-buttons{display:flex;flex-wrap:wrap;gap:10px;margin-top:18px}
+.sfmc-console .sfmc-subhead{font-size:14px;font-weight:750;margin:17px 0 6px}
+.sfmc-console .sfmc-divider{border-top:1px solid var(--sfmc-border);margin:18px 0}
+.sfmc-console .sfmc-settings-summary{display:flex;align-items:center;gap:10px}
+.sfmc-console .sfmc-settings-summary small{font-weight:400;color:var(--sfmc-muted)}
+.sfmc-console .sfmc-foot{color:var(--sfmc-muted);font-size:12px;line-height:1.5;margin:16px 0 0}
+@media(max-width:760px){.sfmc-console{margin:10px 0}.sfmc-console .sfmc-hero{padding:22px}.sfmc-console .sfmc-hero h2{font-size:21px}.sfmc-console .sfmc-cards{grid-template-columns:1fr}.sfmc-console .sfmc-stat{min-height:auto}.sfmc-console .sfmc-panel{padding:20px 16px}.sfmc-console .sfmc-fields{grid-template-columns:1fr}.sfmc-console .sfmc-btn{width:100%}}
+@media(prefers-reduced-motion:reduce){.sfmc-console .sfmc-btn{transition:none}}
+{/literal}
+</style>
+
+<div class="sfmc-console" aria-label="{l s='Integración PrestaShop con Salesforce' mod='pssalesforcebridge'}">
+    <header class="sfmc-hero">
+        <div>
+            <div class="sfmc-eyebrow">ALFABH · PrestaShop</div>
+            <h2>Salesforce Growth + Data Cloud</h2>
+            <p>{l s='Gestiona la conexión y comprueba el envío de un cliente y su pedido desde esta tienda, sin activar campañas ni sincronizaciones automáticas.' mod='pssalesforcebridge'}</p>
+        </div>
+        <span class="sfmc-version">v{$sfmc_version|escape:'html':'UTF-8'} · Pre-beta</span>
+    </header>
+
+    <section class="sfmc-cards" aria-label="{l s='Estado de la integración' mod='pssalesforcebridge'}">
+        <div class="sfmc-stat">
+            <span class="sfmc-stat-label">{l s='Modo de funcionamiento' mod='pssalesforcebridge'}</span>
+            <strong><span class="sfmc-dot neutral" aria-hidden="true"></span>{l s='Pruebas controladas' mod='pssalesforcebridge'}</strong>
+            <p class="sfmc-hint">{l s='Los envíos automáticos están desactivados.' mod='pssalesforcebridge'}</p>
+        </div>
+        <div class="sfmc-stat">
+            <span class="sfmc-stat-label">{l s='Identidad de la tienda' mod='pssalesforcebridge'}</span>
+            {if $sfmc_identity_ready}
+                <strong><span class="sfmc-dot good" aria-hidden="true"></span>{l s='Configurada' mod='pssalesforcebridge'}</strong>
+                <p class="sfmc-hint">{l s='Conector del piloto ABH' mod='pssalesforcebridge'}</p>
+            {else}
+                <strong><span class="sfmc-dot" aria-hidden="true"></span>{l s='Pendiente de configurar' mod='pssalesforcebridge'}</strong>
+                <p class="sfmc-hint">{l s='Abre Configuración de tienda.' mod='pssalesforcebridge'}</p>
+            {/if}
+        </div>
+        <div class="sfmc-stat">
+            <span class="sfmc-stat-label">{l s='Credenciales de Salesforce' mod='pssalesforcebridge'}</span>
+            {if $sfmc_credentials_ready}
+                <strong><span class="sfmc-dot good" aria-hidden="true"></span>{l s='Detectadas en el servidor' mod='pssalesforcebridge'}</strong>
+                <p class="sfmc-hint">{l s='La recepción de datos todavía debe comprobarse.' mod='pssalesforcebridge'}</p>
+            {else}
+                <strong><span class="sfmc-dot" aria-hidden="true"></span>{l s='No disponibles en este servidor' mod='pssalesforcebridge'}</strong>
+                <p class="sfmc-hint">{l s='No introduzcas claves aquí; configúralas en el servidor PHP.' mod='pssalesforcebridge'}</p>
+            {/if}
+        </div>
+    </section>
+
+    <section class="sfmc-panel" aria-labelledby="sfmc-uat-title">
+        <div class="sfmc-panel-title">
+            <div class="sfmc-step" aria-hidden="true">1</div>
+            <div>
+                <h3 id="sfmc-uat-title">{l s='Comprobar cliente y pedido' mod='pssalesforcebridge'}</h3>
+                <p>{l s='Selecciona un cliente y un pedido suyo de esta misma tienda. Primero valida los datos; después, si está autorizado, realiza una sola prueba de envío.' mod='pssalesforcebridge'}</p>
+            </div>
+        </div>
+
+        <div class="sfmc-steps" aria-label="{l s='Estado de las dos pruebas individuales' mod='pssalesforcebridge'}">
+            <span class="sfmc-tag">{l s='Cliente:' mod='pssalesforcebridge'} {$sfmc_customer_status|escape:'html':'UTF-8'}</span>
+            <span class="sfmc-tag">{l s='Pedido:' mod='pssalesforcebridge'} {$sfmc_order_status|escape:'html':'UTF-8'}</span>
+        </div>
+
+        <form method="post" action="{$sfmc_action|escape:'html':'UTF-8'}" autocomplete="off">
+            <div class="sfmc-fields">
+                <div>
+                    <label for="sfmc-customer">{l s='ID del cliente' mod='pssalesforcebridge'} <span aria-hidden="true">*</span></label>
+                    <input id="sfmc-customer" type="number" inputmode="numeric" min="1" step="1" name="PS_GROWTH_ONE_CUSTOMER_ID" value="{$sfmc_customer_input|escape:'html':'UTF-8'}" required />
+                    <p class="sfmc-hint">{l s='Identificador del cliente en PrestaShop.' mod='pssalesforcebridge'}</p>
+                </div>
+                <div>
+                    <label for="sfmc-order">{l s='ID del pedido' mod='pssalesforcebridge'} <span aria-hidden="true">*</span></label>
+                    <input id="sfmc-order" type="number" inputmode="numeric" min="1" step="1" name="PS_GROWTH_ONE_ORDER_ID" value="{$sfmc_order_input|escape:'html':'UTF-8'}" required />
+                    <p class="sfmc-hint">{l s='Debe pertenecer al cliente seleccionado.' mod='pssalesforcebridge'}</p>
+                </div>
+            </div>
+
+            <button class="sfmc-btn sfmc-btn-primary" name="submitPsGrowthOnePreview" value="1" type="submit">
+                {l s='1. Validar datos sin enviar' mod='pssalesforcebridge'}
+            </button>
+            <p class="sfmc-hint">{l s='Esta validación consulta únicamente datos locales y no contacta con Salesforce.' mod='pssalesforcebridge'}</p>
+
+            <details>
+                <summary>{l s='2. Enviar prueba individual a Salesforce' mod='pssalesforcebridge'}</summary>
+                <div class="sfmc-details-inner">
+                    <div class="sfmc-note">
+                        <strong>{l s='Atención: envío real de datos' mod='pssalesforcebridge'}</strong>
+                        <p>{l s='Requiere autorización para tratar el registro seleccionado. Solo hay un intento por objeto y tienda: una respuesta HTTP 202 no confirma que aparezca en Data Cloud. No se permite repetir automáticamente.' mod='pssalesforcebridge'}</p>
+                    </div>
+                    {if !$sfmc_can_send}
+                        <div class="sfmc-note info" role="status">{l s='Antes de enviar: configura la identidad ABH, las credenciales en el servidor y mantén Test con captura local desactivada.' mod='pssalesforcebridge'}</div>
+                    {/if}
+
+                    <label for="sfmc-approval">{l s='Autorización expresa para el envío individual' mod='pssalesforcebridge'}</label>
+                    <input type="text" id="sfmc-approval" name="PS_GROWTH_ONE_APPROVAL" autocomplete="off" spellcheck="false" placeholder="I_APPROVE_ONE_REAL_DATA_CLOUD_RECORD" />
+                    <p class="sfmc-hint">{l s='Escribe exactamente el texto indicado. No concede consentimiento para campañas.' mod='pssalesforcebridge'}</p>
+
+                    <div class="sfmc-buttons">
+                        <button type="submit" name="submitPsGrowthOneCustomerSend" value="1" class="sfmc-btn sfmc-btn-secondary" {if !$sfmc_can_send}disabled{/if}>
+                            {l s='2. Enviar un cliente' mod='pssalesforcebridge'}
+                        </button>
+                    </div>
+
+                    <div class="sfmc-divider"></div>
+                    <p class="sfmc-subhead">{l s='Último paso: pedido asociado' mod='pssalesforcebridge'}</p>
+                    <p class="sfmc-hint">{l s='Comprueba primero en Salesforce que el cliente seleccionado está en el DLO. Solo después continúa con el pedido.' mod='pssalesforcebridge'}</p>
+                    <label for="sfmc-dlo-check">{l s='Confirmación de cliente en Data Cloud' mod='pssalesforcebridge'}</label>
+                    <input type="text" id="sfmc-dlo-check" name="PS_GROWTH_DLO_CUSTOMER_CONFIRM" autocomplete="off" spellcheck="false" placeholder="CUSTOMER_DLO_CONFIRMED_IN_SALESFORCE" />
+                    <div class="sfmc-buttons">
+                        <button type="submit" name="submitPsGrowthOneOrderSend" value="1" class="sfmc-btn sfmc-btn-secondary" {if !$sfmc_can_send}disabled{/if}>
+                            {l s='3. Enviar el pedido vinculado' mod='pssalesforcebridge'}
+                        </button>
+                    </div>
+                </div>
+            </details>
+        </form>
+    </section>
+
+    <section class="sfmc-panel" aria-label="{l s='Configuración de la tienda' mod='pssalesforcebridge'}">
+        <div class="sfmc-panel-title">
+            <div class="sfmc-step" aria-hidden="true">2</div>
+            <div>
+                <h3>{l s='Configuración de la tienda' mod='pssalesforcebridge'}</h3>
+                <p>{l s='La identidad queda vinculada a esta instalación; no se cambia sin una migración controlada.' mod='pssalesforcebridge'}</p>
+            </div>
+        </div>
+        <details {if !$sfmc_identity_ready}open{/if}>
+            <summary>
+                <span class="sfmc-settings-summary">{l s='Ver configuración de identidad' mod='pssalesforcebridge'}</span>
+            </summary>
+            <div class="sfmc-details-inner">
+                <form method="post" action="{$sfmc_action|escape:'html':'UTF-8'}" autocomplete="off">
+                    <div class="sfmc-fields">
+                        <div>
+                            <label for="sfmc-merchant">{l s='Código de comercio' mod='pssalesforcebridge'}</label>
+                            <input type="text" id="sfmc-merchant" name="PS_GROWTH_MERCHANT" value="{$sfmc_merchant|escape:'html':'UTF-8'}" required maxlength="32" {if $sfmc_identity_ready}readonly{/if} />
+                        </div>
+                        <div>
+                            <label for="sfmc-namespace">{l s='Identificador único de instalación' mod='pssalesforcebridge'}</label>
+                            <input type="text" id="sfmc-namespace" name="PS_GROWTH_NAMESPACE" value="{$sfmc_namespace|escape:'html':'UTF-8'}" required maxlength="32" {if $sfmc_identity_ready}readonly{/if} />
+                        </div>
+                    </div>
+                    {if !$sfmc_identity_ready}
+                        <button type="submit" name="submitPsGrowthBridge" value="1" class="sfmc-btn sfmc-btn-secondary">{l s='Guardar identidad de la tienda' mod='pssalesforcebridge'}</button>
+                    {else}
+                        <p class="sfmc-hint">{l s='Identidad ya guardada. Para evitar duplicados entre tiendas, no puede modificarse desde aquí.' mod='pssalesforcebridge'}</p>
+                    {/if}
+                </form>
+            </div>
+        </details>
+    </section>
+
+    {if $sfmc_capture_armed}
+        <section class="sfmc-panel" aria-labelledby="sfmc-capture-alert">
+            <h3 id="sfmc-capture-alert">{l s='Captura local anterior activa' mod='pssalesforcebridge'}</h3>
+            <p class="sfmc-note">{l s='Hay un modo de diagnóstico antiguo activo. Detenlo antes de continuar con la prueba individual.' mod='pssalesforcebridge'}</p>
+            <form method="post" action="{$sfmc_action|escape:'html':'UTF-8'}">
+                <button type="submit" name="submitPsGrowthStagingCaptureStop" value="1" class="sfmc-btn sfmc-btn-secondary">{l s='Detener captura local' mod='pssalesforcebridge'}</button>
+            </form>
+        </section>
+    {/if}
+
+    <p class="sfmc-foot">{l s='Este panel no activa campañas de Marketing Cloud Growth, recuperación de carritos, ingesta masiva ni reintentos. Las herramientas de diagnóstico histórico siguen conservadas en el código, pero no forman parte de la interfaz del cliente.' mod='pssalesforcebridge'}</p>
+</div>

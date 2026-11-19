@@ -113,8 +113,14 @@ foreach (['Db::', 'PDO', 'curl_', 'file_get_contents(', '->execute(',
     schemaCheck(strpos($src, $bad) === false, 'planner_performs_io_' . $bad);
 }
 $module = file_get_contents(dirname(__DIR__) . '/pssalesforcebridge/pssalesforcebridge.php');
-schemaCheck(strpos($module, 'GrowthOutboxSchemaPlan') !== false
+$adminStart=strpos($module,'public function getContent()');
+$adminEnd=strpos($module,'private function renderClientConsole()');
+$publicRoute=substr($module,$adminStart,$adminEnd-$adminStart);
+schemaCheck($adminStart!==false && $adminEnd>$adminStart
+    && strpos($module, 'GrowthOutboxSchemaPlan') !== false
     && strpos($module, "GrowthStagingSchemaBootstrap::install(") !== false
-    && strpos($module, "Tools::isSubmit('submitPsGrowthStagingCapture')") !== false,
-    'module_manual_setup_must_be_guarded');
+    && strpos($publicRoute,"Tools::isSubmit('submitPsGrowthStagingCapture')")===false
+    && strpos($publicRoute,"submitPsG7SchemaPrepare")===false
+    && strpos($publicRoute,"submitPsG7SchemaRollback")===false,
+    'historical_schema_controls_reachable_from_client_admin');
 echo "Growth three-table prefixed install/upgrade preview: PHP offline PASS (no SQL executed).\n";
