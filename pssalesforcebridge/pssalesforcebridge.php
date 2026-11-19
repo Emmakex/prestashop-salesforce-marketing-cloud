@@ -3,7 +3,7 @@
 /**
  * PrestaShop -> Salesforce Marketing Cloud Growth + Data Cloud.
  *
- * v0.9.1: secure per-shop Salesforce credentials and OAuth-only BO test.
+ * v0.9.2: secure per-shop Salesforce credentials and OAuth-only BO test.
  * v0.9.0: simplified accessible Back Office pre-beta with one guided smoke.
  * v0.8.9: one-customer/one-order manual Test smoke, individual guarded
  * Data Cloud upsert only on explicit BO authorization. No auto sends.
@@ -87,7 +87,7 @@ class PsSalesforceBridge extends Module
     {
         $this->name = 'pssalesforcebridge';
         $this->tab = 'advertising_marketing';
-        $this->version = '0.9.1';
+        $this->version = '0.9.2';
         $this->author = 'ALFABH';
         $this->need_instance = 0;
         $this->bootstrap = true;
