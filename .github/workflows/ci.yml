@@ -102,6 +102,7 @@ jobs:
           php tests/g7-captured-outbox-pst-preview-contract.php
           php tests/g7-fresh-source-rehearsal-contract.php
           php tests/g7-delivery-schema-plan-contract.php
+          php tests/g7-staging-delivery-migration-contract.php
           php tests/g7-streaming-ingestion-plan-contract.php
           php tests/g7-staging-hook-capture-contract.php
           php tests/g5-synthetic-actions-test-contract.php
