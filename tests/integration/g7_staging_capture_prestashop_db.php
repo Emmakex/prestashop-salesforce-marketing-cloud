@@ -175,7 +175,12 @@ $createdFresh->newsletter=0;
 $createdFresh->optin=0;
 $createdFresh->date_upd='2026-11-18 09:00:00';
 $loadCustomer=function($id)use($createdFresh,$customer) {
-    if ($id===904) return clone $createdFresh;
+    if ($id===904) {
+        $c=clone $createdFresh;
+        $c->newsletter=1;
+        $c->optin=1;
+        return $c;
+    }
     if ($id===901) return clone $customer;
     throw new RuntimeException('fixture_customer_unknown');
 };
@@ -349,6 +354,22 @@ g7DbCheck($negative['reason']==='local_negative_hold'
     && $negative['local_customer_source_state']==='known_negative'
     && !$negative['marketing_sends_authorized'],
     'g7_preflight_local_optout_not_blocked');
+// Native object may go negative while a scoped SQL reader looks positive.
+// Such a mismatch is a HOLD, never a clean local signal.
+$nativeNegativeLoader=function($id)use($sourceLoader) {
+    $c=$sourceLoader($id);
+    $c->newsletter=0;
+    return $c;
+};
+$nativeNegative=Preflight::inspectLatest(
+    $db,_PS_VERSION_,'ABH',$ns,_DB_PREFIX_,1,'customer',
+    $nativeNegativeLoader,$nativeOrder,$nativeCurrency,$localRows,
+    $origin,$sourceName
+);
+g7DbCheck($nativeNegative['reason']==='local_negative_hold'
+    && $nativeNegative['local_customer_source_state']==='known_negative',
+    'g7_preflight_native_negative_overridden_by_sql');
+
 $changingCalls=0;
 $changingLoader=function($id)use($sourceLoader,&$changingCalls) {
     $result=$sourceLoader($id);
