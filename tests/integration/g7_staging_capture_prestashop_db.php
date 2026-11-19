@@ -57,6 +57,8 @@ foreach([
     'Growth/GrowthPrestaShopDeliveryLease.php',
     'Growth/GrowthLocalCustomerHoldReader.php',
     'Growth/GrowthG7NativePreflight.php',
+    'Growth/GrowthCommunicationConsentHoldGate.php',
+    'Growth/GrowthG7CscPreDispatchReview.php',
     'Growth/GrowthSqlEngineGate.php',
     'Growth/GrowthStagingSchemaBootstrap.php',
     'Growth/GrowthStagingOutboxStore.php',
@@ -77,6 +79,7 @@ use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthStagingNativeReadbac
 use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthG7StagingDeliveryMigration as G7Migration;
 use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthPrestaShopDeliveryLease as NativeLease;
 use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthG7NativePreflight as Preflight;
+use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthG7CscPreDispatchReview as CscReview;
 
 function g7DbCheck($ok,$code){
     if(!$ok)throw new RuntimeException('g7_real_staging_ci_'.$code);
@@ -408,6 +411,128 @@ $stateCheck=(int)$db->getValue("SELECT COUNT(*) FROM $tab"
     . " WHERE status='blocked' AND delivery_state='blocked'"
     . " AND delivery_attempts=0");
 g7DbCheck($stateCheck===5,'g7_preflight_mutated_outbox');
+
+// G7 + G6 join, strictly on disposable g3_ci. A well-formed injected
+// CSC opt-in is REVIEW ONLY; never remote adapter certification or sending.
+$cscCalls=0;
+$subscription='marketing_email_test';
+$now='2026-11-19T10:00:00Z';
+$readCsc=function($key,$sub,$channel)use($ns,$subscription,&$cscCalls) {
+    ++$cscCalls;
+    if ($sub!==$subscription || $channel!=='email'
+        || !in_array($key,[
+            $ns.':1:customer:901',
+            $ns.':1:customer:904'
+        ],true))throw new RuntimeException('csc_fixture_scope_invalid');
+    return [[
+        'channel'=>'email','contact_point_source_key'=>$key,
+        'observed_at_utc'=>'2026-11-19T09:59:50Z',
+        'source'=>'salesforce_communication_subscription_consent',
+        'status'=>'opt_in','subscription_id'=>$sub
+    ]];
+};
+$reviewCustomer=CscReview::inspectLatest(
+    $db,_PS_VERSION_,'ABH',$ns,_DB_PREFIX_,1,'customer',
+    $sourceLoader,$nativeOrder,$nativeCurrency,$localRows,
+    $subscription,$now,$readCsc,$origin,$sourceName
+);
+$reviewOrder=CscReview::inspectLatest(
+    $db,_PS_VERSION_,'ABH',$ns,_DB_PREFIX_,1,'order',
+    $sourceLoader,$nativeOrder,$nativeCurrency,$localRows,
+    $subscription,$now,$readCsc,$origin,$sourceName
+);
+g7DbCheck($reviewCustomer['status']==='hold_for_review'
+    && $reviewCustomer['reason']==='csc_candidate_requires_sendtime_fence'
+    && $reviewCustomer['source_and_consent_rechecked']
+    && $reviewCustomer['csc_source_state']
+        ==='recent_opt_in_observed_not_certified'
+    && $reviewOrder['reason']==='csc_candidate_requires_sendtime_fence'
+    && $cscCalls===2
+    && !$reviewOrder['marketing_sends_authorized']
+    && !$reviewOrder['data_cloud_ingestion_authorized'],
+    'g7_csc_recent_optin_incorrectly_authorized_or_not_joined');
+
+// Native negative must skip an externally injected CSC callback entirely.
+$prev=$cscCalls;
+$cscNegative=CscReview::inspectLatest(
+    $db,_PS_VERSION_,'ABH',$ns,_DB_PREFIX_,1,'customer',
+    $nativeNegativeLoader,$nativeOrder,$nativeCurrency,$localRows,
+    $subscription,$now,$readCsc,$origin,$sourceName
+);
+g7DbCheck($cscNegative['reason']==='local_or_source_hold'
+    && $cscCalls===$prev,
+    'g7_csc_local_negative_bypassed');
+
+// Remote opt-out must always override local positive evidence.
+$readOptout=function($key,$sub,$channel)use($readCsc) {
+    $rows=$readCsc($key,$sub,$channel);
+    $rows[0]['status']='opt_out';
+    return $rows;
+};
+$optout=CscReview::inspectLatest(
+    $db,_PS_VERSION_,'ABH',$ns,_DB_PREFIX_,1,'order',
+    $sourceLoader,$nativeOrder,$nativeCurrency,$localRows,
+    $subscription,$now,$readOptout,$origin,$sourceName
+);
+g7DbCheck($optout['reason']==='csc_denied_or_unverified_hold'
+    && $optout['csc_source_state']==='opt_out'
+    && !$optout['marketing_sends_authorized'],
+    'g7_csc_remote_optout_ignored');
+
+// Missing/incorrect CSC and a reader exception are unknown HOLD, not optin.
+foreach (['missing','throw','stale'] as $scenario) {
+    $badCsc=function($key,$sub,$channel)use($readCsc,$scenario) {
+        if ($scenario==='throw')throw new RuntimeException('private-error');
+        if ($scenario==='missing')return [];
+        $rows=$readCsc($key,$sub,$channel);
+        $rows[0]['observed_at_utc']='2026-11-18T00:00:00Z';
+        return $rows;
+    };
+    $bad=CscReview::inspectLatest(
+        $db,_PS_VERSION_,'ABH',$ns,_DB_PREFIX_,1,'customer',
+        $sourceLoader,$nativeOrder,$nativeCurrency,$localRows,
+        $subscription,$now,$badCsc,$origin,$sourceName
+    );
+    g7DbCheck($bad['reason']==='csc_denied_or_unverified_hold'
+        && !$bad['marketing_sends_authorized'],
+        'g7_csc_unverified_admitted');
+}
+
+// Flip one native field during CSC observation; the later source passes
+// are themselves stable, but must not erase the before/after mismatch.
+$flip=false;
+$flippingCustomer=function($id)use($sourceLoader,&$flip) {
+    $c=$sourceLoader($id);
+    if ($flip)$c->date_upd='2026-11-19 10:00:01';
+    return $c;
+};
+$flippingCsc=function($key,$sub,$channel)use($readCsc,&$flip) {
+    $rows=$readCsc($key,$sub,$channel);
+    $flip=true;
+    return $rows;
+};
+$mutated=CscReview::inspectLatest(
+    $db,_PS_VERSION_,'ABH',$ns,_DB_PREFIX_,1,'customer',
+    $flippingCustomer,$nativeOrder,$nativeCurrency,$localRows,
+    $subscription,$now,$flippingCsc,$origin,$sourceName
+);
+g7DbCheck($mutated['reason']==='native_changed_during_consent_hold'
+    && !$mutated['source_and_consent_rechecked'],
+    'g7_csc_mid_review_native_change_admitted');
+
+$private=json_encode([
+    $reviewCustomer,$reviewOrder,$cscNegative,$optout,$bad,$mutated
+]);
+foreach (['ci-synthetic@example.invalid',$ns,'901','904','905',
+    'Fixture','marketing_email_test','private-error','credencial',
+    'ABH_PrestaShop_Data_Cloud'] as $word) {
+    g7DbCheck(strpos($private,$word)===false,
+        'g7_csc_review_leaked_private_data');
+}
+g7DbCheck((int)$db->getValue("SELECT COUNT(*) FROM $tab"
+    . " WHERE status='blocked' AND delivery_state='blocked'"
+    . " AND delivery_attempts=0")===5,
+    'g7_csc_review_modified_same_outbox');
 
 // Native PrestaShop Db CAS adapter on the same extended G3 outbox.
 $native=new NativeLease($db,_PS_VERSION_,'ABH',$ns,_DB_PREFIX_);
