@@ -30,8 +30,14 @@ final class GrowthG8DloMetadataResolver
         $customer=self::findExact($entities['entities'],'pstpscustomer');
         $order=self::findExact($entities['entities'],'pstpsorder');
 
-        $customerMeta=call_user_func($metadataForEntity,$customer);
-        $orderMeta=call_user_func($metadataForEntity,$order);
+        try {
+            $customerMeta=call_user_func($metadataForEntity,$customer);
+            $orderMeta=call_user_func($metadataForEntity,$order);
+        } catch (Throwable $ignored) {
+            // A real metadata request may throw a URL/SQL/tenant-specific
+            // error. Never allow it to escape to BO or workflow artifacts.
+            throw new RuntimeException('g8_dlo_metadata_lookup_failed');
+        }
         $customerKey=self::exactField($customerMeta,$customer,'source_key');
         $orderKey=self::exactField($orderMeta,$order,'source_key');
         $orderParent=self::exactField(
