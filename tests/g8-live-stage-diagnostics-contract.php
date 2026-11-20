@@ -17,6 +17,9 @@ foreach([
     "'metadata_resolve'","'canary_customer'","'canary_order'",
     "'g8_dlo_metadata_field_ambiguous'",
     "'g8_dlo_metadata_entity_ambiguous'",
+    "'g8_metadata_http_status_403'",
+    "'g8_metadata_http_status_404'",
+    "'g8_metadata_http_status_0'",
     "in_array(",
     "'unclassified'"
 ] as $required) {
