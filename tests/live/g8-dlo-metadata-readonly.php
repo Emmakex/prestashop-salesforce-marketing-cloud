@@ -68,7 +68,13 @@ function g8MetadataGet($origin,$token,$path)
         $ok=curl_exec($ch);
         $status=(int)curl_getinfo($ch,CURLINFO_HTTP_CODE);
         if ($ok===false || $status!==200) {
-            throw new RuntimeException('g8_metadata_http_unverified');
+            // A NUMBER (not response body or URL) identifies missing
+            // metadata permissions versus unsupported endpoint.
+            $allowed=[0,400,401,403,404,405,429,500,502,503,504];
+            $safe=$ok===false?0:$status;
+            $code=in_array($safe,$allowed,true)
+                ?(string)$safe:'other';
+            throw new RuntimeException('g8_metadata_http_status_'.$code);
         }
         $answer=json_decode($body,true);
         if (!is_array($answer)) {
@@ -168,6 +174,18 @@ try {
         'g8_metadata_http_invalid_request',
         'g8_metadata_http_unavailable',
         'g8_metadata_http_unverified',
+        'g8_metadata_http_status_0',
+        'g8_metadata_http_status_400',
+        'g8_metadata_http_status_401',
+        'g8_metadata_http_status_403',
+        'g8_metadata_http_status_404',
+        'g8_metadata_http_status_405',
+        'g8_metadata_http_status_429',
+        'g8_metadata_http_status_500',
+        'g8_metadata_http_status_502',
+        'g8_metadata_http_status_503',
+        'g8_metadata_http_status_504',
+        'g8_metadata_http_status_other',
         'g8_metadata_json_unverified',
         'g8_dlo_metadata_catalog_unverified',
         'g8_dlo_metadata_entity_ambiguous',
