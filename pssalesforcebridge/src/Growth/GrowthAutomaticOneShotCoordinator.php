@@ -105,6 +105,16 @@ final class GrowthAutomaticOneShotCoordinator
                 if (!hash_equals(
                         $first['fingerprint'],$fresh['fingerprint']
                     )
+                    || (string)\Configuration::get('PS_GROWTH_MERCHANT')
+                        !==$merchant
+                    || (string)\Configuration::get('PS_GROWTH_NAMESPACE')
+                        !==$namespace
+                    || (string)\Configuration::get('PS_SFMC_MODE')!=='test'
+                    || (string)\Configuration::get('PS_GROWTH_LOCAL_CAPTURE')
+                        !=='off'
+                    || GrowthShopSourceBinding::sourceForSend(
+                        $shop,$merchant,$namespace
+                    )!==$source
                     || call_user_func($locallyEligible,$fresh)!==true
                     || call_user_func($recordDloStatus,$candidate,$fresh)
                         !=='absent_confirmed'
