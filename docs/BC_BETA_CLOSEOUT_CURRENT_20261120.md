@@ -12,7 +12,7 @@ El atributo `paid_flag=false` es conservador: **no demuestra impago**. No aproba
 
 | Puerta | Criterio objetivo de cierre | Estado |
 | --- | --- | --- |
-| **DMO (G4)** | Comprobar en Data Explorer `default` y tipo **Data Model Object** los registros del piloto en **Individual** y el DMO personalizado **PST-PSOrder** (según mapeos UI de 16/11), y la relación de identidad, incluida la relación de identidad; capturas saneadas | **Por verificar** |
+| **DMO (G4)** | Comprobar en Data Explorer `default` y tipo **Data Model Object** los registros del piloto en **Individual** y el DMO personalizado **PST-PSOrder** (según mapeos UI de 16/11), incluida la relación entre pedido y cliente; capturas saneadas | **Por verificar** |
 | **Consentimiento G6** | Confirmar suscripción Growth Marketing/Correo electrónico y Consent Check nativo de envío, ámbito de Business Unit y prueba negativa de una baja; `newsletter/optin` nunca autoriza campañas | **No certificado** |
 | **G7 automatismo mínimo** | Capturar/deduplicar en staging eventos nuevos PSCustomer/PSOrder, cancelar/retener versiones obsoletas, fence final con exclusiones actuales y conciliación de 202/timeout; pruebas sin backfill y sin reintento ciego. Carritos requieren gate 60m, compra/optout recientes, consentimiento y recuperación, por separado | **No activado: código actual solo 1+1 manual** |
 | **G8 beta / despliegue** | CI exact-head 17/17, runtime 1.7/8/9, upgrade reversibilidad, canario y rollback, autorización expresa del propietario para habilitar el flujo acotado | **Pendiente; Test continúa** |
