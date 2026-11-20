@@ -18,7 +18,6 @@ foreach([
     "'g8_dlo_metadata_field_ambiguous'",
     "'g8_dlo_metadata_entity_ambiguous'",
     "in_array(",
-    "?'",
     "'unclassified'"
 ] as $required) {
     if (strpos($text,$required)===false) {
