@@ -19,8 +19,12 @@ $cron=file_get_contents(dirname(__DIR__)
 g7BatchAssert(Batch::MAX_BATCH===50
     && method_exists(Batch::class,'scan')
     && method_exists(Batch::class,'summarize')
-    && strpos($module,'GrowthG7CurrentEventBatch')===false
+    // Module loads the bounded scanner for a read-only staging operation.
+    // No direct scanner invocation in the front controller or BO, no sender.
+    && strpos($module,'GrowthG8CronReadOnly::inspect(')!==false
+    && strpos($module,'GrowthG7CurrentEventBatch::scan(')===false
     && strpos($cron,'GrowthG7CurrentEventBatch')===false
+    && strpos($cron,'->claim(')===false
     && strpos($module,'inspectSelected(')===false
     && strpos($cron,'inspectSelected(')===false,
     'runtime_wiring_or_bound_invalid');
