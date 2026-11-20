@@ -1,8 +1,14 @@
 <?php
 /** G8 synthetic automation contract; never opens network or real shop DB. */
 class Configuration {
+    public static $settings=[
+        'PS_GROWTH_MERCHANT'=>'BCABH',
+        'PS_GROWTH_NAMESPACE'=>'pssfmc_ci_auto_20261120',
+        'PS_SFMC_MODE'=>'test',
+        'PS_GROWTH_LOCAL_CAPTURE'=>'off',
+    ];
     public static function get($key,$lang=null,$group=null,$shop=null) {
-        return false;
+        return isset(self::$settings[$key])?self::$settings[$key]:false;
     }
 }
 require_once dirname(__DIR__)
