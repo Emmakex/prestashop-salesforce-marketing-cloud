@@ -1,5 +1,5 @@
 <?php
-/** G7 0.9.4: single native customer+order, explicit UAT, no network. */
+/** G7 0.9.5: single native customer+order, explicit UAT, no network. */
 require_once dirname(__DIR__)
     .'/pssalesforcebridge/src/DataCloud/IngestionPayloadBuilder.php';
 require_once dirname(__DIR__)
@@ -276,7 +276,7 @@ $hooks=substr($module,strpos($module,'public function hookActionCustomerAccountA
     -strpos($module,'public function hookActionCustomerAccountAdd'));
 g7OnceAssert(strpos($module,'renderManualOneRecordForms')!==false
     && strpos($module,'runManualOneRecord')!==false
-    && strpos($module,"$"."this->version = '0.9.4'")!==false
+    && strpos($module,"$"."this->version = '0.9.5'")!==false
     && strpos($hooks,'GrowthOneRecordManualSender')===false
     && strpos($cron,'GrowthOneRecordManualSender')===false,
     'unapproved_auto_wiring');
