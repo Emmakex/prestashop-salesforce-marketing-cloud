@@ -35,6 +35,10 @@ final class GrowthAutomaticOneShotCoordinator
             || !isset($scope['mode'],$scope['capture'],$scope['owner_gate'])
             || $scope['mode']!=='test' || $scope['capture']!=='off'
             || $scope['owner_gate']!==self::OWNER_GATE
+            || (string)\Configuration::get('PS_GROWTH_MERCHANT')!==$merchant
+            || (string)\Configuration::get('PS_GROWTH_NAMESPACE')!==$namespace
+            || (string)\Configuration::get('PS_SFMC_MODE')!=='test'
+            || (string)\Configuration::get('PS_GROWTH_LOCAL_CAPTURE')!=='off'
             || count($candidates)>self::MAX_TICK
             || !is_callable($loadFresh) || !is_callable($locallyEligible)
             || !is_callable($recordDloStatus)
