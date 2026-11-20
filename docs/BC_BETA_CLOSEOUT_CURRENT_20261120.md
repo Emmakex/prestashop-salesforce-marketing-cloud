@@ -36,7 +36,7 @@ El workflow GET-only [#44561521286](https://github.com/Emmakex/prestashop-salesf
 
 ## Reglas para el cierre rápido
 
-- Continuar exclusivamente **Marketing Cloud Growth + Data Cloud**; NO Marketing Cloud Engagement ni volver a crear credenciales, conectores o estructuras.
+- Continuar exclusivamente **Marketing Cloud Growth + Data Cloud**, sin rutas de proveedor alternativas ni recrear credenciales, conectores o estructuras.
 - No declarar funcionalidad de campañas o recuperación de carritos terminada por un smoke DLO.
 - Preferir una única corrección sobre la causa observada y cerrar el gate con evidencia, sin módulos auxiliares ni nueva cola.
 - Nunca reenviar los dos registros manuales: sus slots de intento ya están consumidos.
