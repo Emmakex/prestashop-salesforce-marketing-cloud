@@ -9,6 +9,7 @@ on:
       - 'pssalesforcebridge/src/DataCloud/GrowthG8DloPresenceReader.php'
       - 'tests/live/g8-dlo-metadata-readonly.php'
       - 'tests/g8-dlo-metadata-resolver-contract.php'
+      - 'tests/g8-live-stage-diagnostics-contract.php'
   workflow_dispatch:
 
 permissions:
@@ -49,6 +50,7 @@ jobs:
           php -l tests/live/g8-dlo-metadata-readonly.php
           php -l pssalesforcebridge/src/DataCloud/GrowthG8DloMetadataResolver.php
           php tests/g8-dlo-metadata-resolver-contract.php
+          php tests/g8-live-stage-diagnostics-contract.php
           php tests/g8-dlo-presence-contract.php
       - name: Inspect existing PST DLO identities and synthetic canaries
         env:
