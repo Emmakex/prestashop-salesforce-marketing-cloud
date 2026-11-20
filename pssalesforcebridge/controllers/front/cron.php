@@ -1,8 +1,9 @@
 <?php
 
 /**
- * Growth-only protected cron. Until G3/G4 and sender certification, the
- * endpoint only reports blocked status. No old queue or campaign is touched.
+ * Growth-only protected cron. Default is blocked status.
+ * Explicit "inspect" reads up to 10 staging-only G3 event references and
+ * returns counts only; no scheduler, HTTP transmission or campaigns.
  */
 class PsSalesforceBridgeCronModuleFrontController extends ModuleFrontController
 {
@@ -17,8 +18,15 @@ class PsSalesforceBridgeCronModuleFrontController extends ModuleFrontController
         if ($provided === '' || $expected === '' || !hash_equals($expected, $provided)) {
             $this->respond(['ok' => false, 'error' => 'unauthorized'], 403);
         }
+        $operation=Tools::getValue('operation','status');
+        if (!is_string($operation)
+            || !in_array($operation,['status','inspect'],true)) {
+            $this->respond(['ok'=>false,'error'=>'invalid_operation'],400);
+        }
         try {
-            $this->respond($this->module->cronReport(), 200);
+            // "inspect" is staging-only, bounded, read-only, PII-free.
+            // The default status operation remains unchanged for BC/DO.
+            $this->respond($this->module->cronReport($operation), 200);
         } catch (\Throwable $e) {
             if (class_exists('PrestaShopLogger')) {
                 PrestaShopLogger::addLog(
