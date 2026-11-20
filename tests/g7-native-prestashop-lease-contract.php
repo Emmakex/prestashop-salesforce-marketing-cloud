@@ -24,9 +24,23 @@ $module=file_get_contents(dirname(__DIR__)
     .'/pssalesforcebridge/pssalesforcebridge.php');
 $cron=file_get_contents(dirname(__DIR__)
     .'/pssalesforcebridge/controllers/front/cron.php');
-g7NativeLeaseAssert(strpos($module,'GrowthPrestaShopDeliveryLease')===false
-    && strpos($cron,'GrowthPrestaShopDeliveryLease')===false,
-    'early_live_wiring');
+// The G8 cron may require the lease class ONLY for its staging-only
+// schema guard inside a read-only event scan. Never call lease mutation,
+// claim, cancellation, transport or reconciliation from module/cron.
+g7NativeLeaseAssert(
+    strpos($module,'GrowthG8CronReadOnly::inspect(')!==false
+    && strpos($cron,'GrowthG8CronReadOnly::inspect(')===false
+    && strpos($cron,'GrowthPrestaShopDeliveryLease')===false
+    && strpos($module,'new GrowthPrestaShopDeliveryLease(')===false
+    && strpos($module,'->claim(')===false
+    && strpos($module,'->markAcceptedUnconfirmed(')===false
+    && strpos($module,'->markUnknownUnconfirmed(')===false
+    && strpos($module,'->quarantineExpired(')===false
+    && strpos($cron,'->claim(')===false
+    && strpos($cron,'->markAcceptedUnconfirmed(')===false
+    && strpos($cron,'->markUnknownUnconfirmed(')===false
+    && strpos($cron,'->quarantineExpired(')===false,
+    'lease_mutation_wired_to_live_module');
 foreach ([
     'GrowthG7StagingDeliveryMigration::inspect',
     "AND o.delivery_state='ready' AND o.delivery_attempts<3",
