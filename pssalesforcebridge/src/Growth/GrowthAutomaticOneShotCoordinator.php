@@ -8,7 +8,8 @@ use Throwable;
  * G7/G8 automatic ingestion coordinator -- bounded, one-attempt semantics.
  *
  * NOT a campaign sender, not cron-connected, not a permission grant.
- * Existing G3 outbox/ledger adapters must supply an atomic CAS reserve and
+ * Existing G3 outbox/ledger adapters must supply an atomic CAS reserve, a
+ * scoped Data Cloud DLO absence check (to avoid replaying BC manual smokes), and
  * durable reconcile/hold receipts before any production invocation.
  *
  * A 202 is "reconcile", never "delivered". No retry of an uncertain outcome.
@@ -21,7 +22,8 @@ final class GrowthAutomaticOneShotCoordinator
 
     public static function tick(
         array $scope, array $candidates,
-        $loadFresh, $locallyEligible, $customerDloVerified,
+        $loadFresh, $locallyEligible, $recordDloStatus,
+        $customerDloVerified,
         $reserveOnce, $postOnce, $persistOutcome
     ) {
         $shop=isset($scope['shop'])?$scope['shop']:null;
@@ -35,6 +37,7 @@ final class GrowthAutomaticOneShotCoordinator
             || $scope['owner_gate']!==self::OWNER_GATE
             || count($candidates)>self::MAX_TICK
             || !is_callable($loadFresh) || !is_callable($locallyEligible)
+            || !is_callable($recordDloStatus)
             || !is_callable($customerDloVerified)
             || !is_callable($reserveOnce) || !is_callable($postOnce)
             || !is_callable($persistOutcome)) {
@@ -48,7 +51,7 @@ final class GrowthAutomaticOneShotCoordinator
         $summary=[
             'status'=>'bounded_tick_completed_unconfirmed',
             'examined'=>0,'reserved'=>0,'accepted_202_unconfirmed'=>0,
-            'held_or_unknown'=>0,'skipped'=>0,
+            'pending_reconciliation'=>0,'held'=>0,'skipped'=>0,
             'records_verified_in_dlo'=>0,
             'marketing_sends_authorized'=>false,
             'automatic_retry_authorized'=>false,
@@ -70,6 +73,8 @@ final class GrowthAutomaticOneShotCoordinator
                 $first=call_user_func($loadFresh,$candidate);
                 self::snapshot($first,$candidate,$namespace,$shop);
                 if (call_user_func($locallyEligible,$first)!==true
+                    || call_user_func($recordDloStatus,$candidate,$first)
+                        !=='absent_confirmed'
                     || !self::parentVerified(
                         $candidate,$first,$shop,$namespace,
                         $customerDloVerified
@@ -97,6 +102,8 @@ final class GrowthAutomaticOneShotCoordinator
                         $first['fingerprint'],$fresh['fingerprint']
                     )
                     || call_user_func($locallyEligible,$fresh)!==true
+                    || call_user_func($recordDloStatus,$candidate,$fresh)
+                        !=='absent_confirmed'
                     || !self::parentVerified(
                         $candidate,$fresh,$shop,$namespace,
                         $customerDloVerified
@@ -139,11 +146,15 @@ final class GrowthAutomaticOneShotCoordinator
                     } catch (Throwable $ignored) {
                         $summary['status']='reconciliation_required';
                     }
-                    $summary['held_or_unknown']++;
+                    if ($state==='reconcile') {
+                        $summary['pending_reconciliation']++;
+                    } else {
+                        $summary['held']++;
+                    }
                 }
             }
         }
-        // Note: held_or_unknown includes 202 awaiting reconciliation; the
+        // Note: accepted 202 is counted as pending reconciliation, never
         // summary NEVER presents accepted HTTP as DLO-verified delivery.
         return $summary;
     }
