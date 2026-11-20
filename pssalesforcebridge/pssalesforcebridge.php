@@ -3,6 +3,7 @@
 /**
  * PrestaShop -> Salesforce Marketing Cloud Growth + Data Cloud.
  *
+ * v0.9.5: staging cron read-only G3 keyset preview; no outbound/cron sending.
  * v0.9.4: safe, distinct local preview vs real send diagnostics; no PII.
  * v0.9.3: merchant-independent source binding for each shop (DOABH etc.).
  * v0.9.2: secure per-shop Salesforce credentials and OAuth-only BO test.
@@ -54,6 +55,9 @@ require_once __DIR__ . '/src/Growth/GrowthOneRecordSafeDiagnosis.php';
 require_once __DIR__ . '/src/Growth/GrowthOneRecordManualSender.php';
 require_once __DIR__ . '/src/Growth/GrowthShopCredentialVault.php';
 require_once __DIR__ . '/src/Growth/GrowthShopSourceBinding.php';
+require_once __DIR__ . '/src/Growth/GrowthPrestaShopDeliveryLease.php';
+require_once __DIR__ . '/src/Growth/GrowthG7CurrentEventBatch.php';
+require_once __DIR__ . '/src/Growth/GrowthG8CronReadOnly.php';
 require_once __DIR__ . '/src/DataCloud/GrowthStreamingIngestionPlan.php';
 require_once __DIR__ . '/src/DataCloud/GrowthDataCloudUpsertTransport.php';
 require_once __DIR__ . '/src/Growth/AuthClient.php';
@@ -73,6 +77,7 @@ use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthOneRecordSafeDiagnos
 use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthOneRecordManualSender;
 use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthShopCredentialVault;
 use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthShopSourceBinding;
+use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthG8CronReadOnly;
 use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\AuthClient;
 use Emmakex\PrestaShopSalesforceMarketingCloud\DataCloud\TokenExchangeClient;
 
@@ -93,7 +98,7 @@ class PsSalesforceBridge extends Module
     {
         $this->name = 'pssalesforcebridge';
         $this->tab = 'advertising_marketing';
-        $this->version = '0.9.4';
+        $this->version = '0.9.5';
         $this->author = 'ALFABH';
         $this->need_instance = 0;
         $this->bootstrap = true;
@@ -1050,8 +1055,32 @@ class PsSalesforceBridge extends Module
         ];
     }
 
-    public function cronReport()
+    public function cronReport($operation='status')
     {
+        // The only extra operation is a bounded READ-ONLY staging inspection.
+        // No egress, lease, ready transition or sending endpoint exists.
+        if ($operation==='inspect') {
+            $shop=isset($this->context,$this->context->shop,
+                $this->context->shop->id)
+                ?(int)$this->context->shop->id:0;
+            if (class_exists('Shop') && Shop::isFeatureActive()
+                && (Shop::getContext()!==Shop::CONTEXT_SHOP
+                    || (int)Shop::getContextShopID()!==$shop)) {
+                $shop=0;
+            }
+            $merchant=(string)Configuration::get(self::CONFIG_MERCHANT);
+            $namespace=(string)Configuration::get(self::CONFIG_NAMESPACE);
+            // Never connect to a shop DB to inspect events when this is
+            // an ordinary production namespace (BC/DO).
+            $staging=$shop>0 && preg_match(
+                '/(?:^|_)(?:stage|staging)(?:_|$)/D',$namespace
+            )===1;
+            $db=$staging ? Db::getInstance():null;
+            return GrowthG8CronReadOnly::inspect(
+                $db,$shop,defined('_PS_VERSION_')?(string)_PS_VERSION_:'',
+                $merchant,$namespace,_DB_PREFIX_
+            );
+        }
         // Pure status endpoint. No legacy queue, retry, backfill, scheduler,
         // retention or retired campaign processor is called.
         return [
