@@ -6,7 +6,7 @@ Piloto: **Barcelona Confort / BCABH**, fuente Salesforce existente `ABH_PrestaSh
 
 **Certificación de código en main SHA 79ef0c9b6d9002cba95fad7e7c2cea8c5b2ed5c9:** [CI 17/17](https://github.com/Emmakex/prestashop-salesforce-marketing-cloud/actions/runs/44561521177) y [PrestaShop runtime 1.7/8/9 3/3](https://github.com/Emmakex/prestashop-salesforce-marketing-cloud/actions/runs/44561521159). **No reinstalar, no repetir PSCustomer/PSOrder ni volver a configurar OAuth.** La UI 0.9.4 corrige el diagnóstico local.
 
-**ACTUALIZACIÓN 20/11/2026 · DMO verificado en Salesforce:** el propietario aportó capturas de `Data Explorer → default → Objeto de modelo de datos`: **Individual** contiene la identidad `pssfmc_50084a0e4069f7ad:1:customer:6031` procedente del DLO de PSCustomer; el DMO personalizado **PST-PSOrder** contiene el pedido **612**, y `customer_source_key` coincide **exactamente** con esa identidad. Se verifica la presencia real y la coherencia de claves **DLO → DMO 1+1** de los dos objetos probados. No se certifican todavía todas las consultas relacionales del modelo ni consentimiento Growth. Evidencia trazable: [issue #12, recibo DMO](https://github.com/Emmakex/prestashop-salesforce-marketing-cloud/issues/12#issuecomment-7035590730).
+**ACTUALIZACIÓN 20/11/2026 · DMO verificado en Salesforce:** el propietario aportó capturas de `Data Explorer → default → Objeto de modelo de datos`: **Individual** contiene la identidad `pssfmc_50084a0e4069f7ad:1:customer:6031` procedente del DLO de PSCustomer; el DMO personalizado **PST-PSOrder** contiene el pedido **612**, y `customer_source_key` coincide **exactamente** con esa identidad. Se verifica la presencia real y la coherencia de claves **DLO → DMO 1+1** de los dos objetos probados. No se certifican todavía todas las consultas relacionales del modelo. La configuración del consentimiento Growth ha sido declarada verificada por el administrador mediante la integración CRM existente; no se repetirá su configuración. Evidencia trazable: [issue #12, recibo DMO](https://github.com/Emmakex/prestashop-salesforce-marketing-cloud/issues/12#issuecomment-7035590730).
 
 El atributo `paid_flag=false` es conservador: **no demuestra impago**. No aprobar semántica de pagos ni campañas por este dato. La prueba cubre **ingesta DLO y DMO individual**, NO una sincronización operativa o masiva.
 
@@ -15,11 +15,11 @@ El atributo `paid_flag=false` es conservador: **no demuestra impago**. No aproba
 | Puerta | Criterio objetivo de cierre | Estado |
 | --- | --- | --- |
 | **DMO (G4)** | Cliente 6031 en **Individual** y pedido 612 en **PST-PSOrder**, con identidad `customer_source_key` coincidente en `default`, confirmados por capturas del propietario; sin certificar consultas relacionales adicionales | **VERIFICADO 1+1 en DMO** |
-| **Consentimiento G6** | Confirmar suscripción Growth Marketing/Correo electrónico y Consent Check nativo de envío, ámbito de Business Unit y prueba negativa de una baja; `newsletter/optin` nunca autoriza campañas | **No certificado** |
+| **Consentimiento G6** | El propietario confirma verificación del administrador en la integración CRM existente: mantener el Consent Check vigente y la supresión por contacto en el runtime sin volver a configurar ni repetir el circuito de aprobación | **Validación administrativa confirmada por propietario; ejecución por contacto sigue protegida** |
 | **G7 automatismo mínimo** | Capturar/deduplicar en staging eventos nuevos PSCustomer/PSOrder, cancelar/retener versiones obsoletas, fence final con exclusiones actuales y conciliación de 202/timeout; pruebas sin backfill y sin reintento ciego. Carritos requieren gate 60m, compra/optout recientes, consentimiento y recuperación, por separado | **No activado: código actual solo 1+1 manual** |
 | **G8 beta / despliegue** | CI exact-head 17/17, runtime 1.7/8/9, upgrade reversibilidad, canario y rollback, autorización expresa del propietario para habilitar el flujo acotado | **Pendiente; Test continúa** |
 
-**No confundir HTTP 202 con persistencia.** Esta prueba 1+1 **sí está confirmada en DLO y DMO mediante capturas**; no autoriza envíos automáticos, consentimiento por finalidad ni campañas.
+**No confundir HTTP 202 con persistencia.** Esta prueba 1+1 **sí está confirmada en DLO y DMO mediante capturas**; no autoriza envíos automáticos ni campañas. La validación administrativa Growth/CRM declarada por el propietario es un hito distinto de la evaluación de consentimiento de cada contacto al enviar.
 
 ## Evidencia histórica del DMO y revisión completada mediante UI
 
