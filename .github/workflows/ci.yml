@@ -115,6 +115,7 @@ jobs:
           php tests/growth-one-record-safe-diagnosis-contract.php
           php tests/g8-automatic-one-shot-coordinator-contract.php
           php tests/g8-cron-readonly-contract.php
+          php tests/g8-dlo-presence-contract.php
           php tests/growth-shop-credential-vault-contract.php
           php tests/growth-prebeta-admin-ui-contract.php
           php tests/g7-live-existing-canary-readonly-contract.php
