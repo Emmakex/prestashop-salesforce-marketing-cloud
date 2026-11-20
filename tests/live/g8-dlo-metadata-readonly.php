@@ -99,6 +99,7 @@ $evidence=[
     'previous_customer_canary_found'=>false,
     'previous_order_canary_found'=>false,
 ];
+$stage='oauth_core';
 try {
     $auth=new AuthClient(
         (string)getenv('SF_GROWTH_ORG_URL'),
@@ -106,15 +107,18 @@ try {
         (string)getenv('SF_GROWTH_CLIENT_SECRET')
     );
     $core=$auth->requestAccessToken();
+    $stage='oauth_exchange';
     $cloud=(new TokenExchangeClient())->exchange(
         $core['instance_url'],$core['access_token']
     );
     unset($auth,$core);
     $origin=$cloud['instance_url'];
     $token=$cloud['access_token'];
+    $stage='catalog_get';
     $entities=g8MetadataGet(
         $origin,$token,'/api/v1/metadataEntities?entityType=DataLakeObject'
     );
+    $stage='metadata_resolve';
     $resolved=Metadata::resolve(
         $entities,
         function($entityName)use($origin,$token) {
@@ -132,10 +136,12 @@ try {
     // SELECT never creates/updates them. No real BC customer is accessed.
     $ns='growth_g5_canary_20261117';
     $id=987654321;
+    $stage='canary_customer';
     $customer=Presence::inspect(
         $origin,$token,$ns,2,'PSCustomer',$id,
         $resolved['PSCustomer']['dlo'],$resolved['PSCustomer']['key']
     );
+    $stage='canary_order';
     $order=Presence::inspect(
         $origin,$token,$ns,2,'PSOrder',$id,
         $resolved['PSOrder']['dlo'],$resolved['PSOrder']['key']
@@ -149,7 +155,31 @@ try {
     }
     unset($origin,$token,$cloud,$entities,$resolved);
 } catch (Throwable $ignored) {
-    // No exception details: even a metadata failure may include tenant URL.
+    // Expose ONLY a constant processing-stage label and allowlisted code;
+    // NEVER raw errors, host, response text, SQL, tokens or entity names.
+    $allowedStages=[
+        'oauth_core','oauth_exchange','catalog_get','metadata_resolve',
+        'canary_customer','canary_order'
+    ];
+    $evidence['failure_stage']=in_array(
+        $stage,$allowedStages,true
+    )?$stage:'unclassified';
+    $allowedCodes=[
+        'g8_metadata_http_invalid_request',
+        'g8_metadata_http_unavailable',
+        'g8_metadata_http_unverified',
+        'g8_metadata_json_unverified',
+        'g8_dlo_metadata_catalog_unverified',
+        'g8_dlo_metadata_entity_ambiguous',
+        'g8_dlo_metadata_lookup_failed',
+        'g8_dlo_metadata_detail_unverified',
+        'g8_dlo_metadata_field_ambiguous',
+        'g8_dlo_metadata_keys_not_independent',
+    ];
+    $message=(string)$ignored->getMessage();
+    $evidence['failure_code']=in_array(
+        $message,$allowedCodes,true
+    )?$message:'unclassified';
     $evidence['status']='metadata_unverified';
 }
 $evidence['completed_utc']=gmdate('c');
