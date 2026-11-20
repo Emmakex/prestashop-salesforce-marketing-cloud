@@ -1,0 +1,68 @@
+name: G8 PST DLO Exact Metadata Read Only
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/g8-dlo-metadata-readonly.yml'
+      - 'pssalesforcebridge/src/DataCloud/GrowthG8DloMetadataResolver.php'
+      - 'pssalesforcebridge/src/DataCloud/GrowthG8DloPresenceReader.php'
+      - 'tests/live/g8-dlo-metadata-readonly.php'
+      - 'tests/g8-dlo-metadata-resolver-contract.php'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: g8-existing-dlo-metadata-readonly
+  cancel-in-progress: false
+
+jobs:
+  read-existing-pst-dlo:
+    if: >-
+      github.repository == 'Emmakex/prestashop-salesforce-marketing-cloud' &&
+      github.ref == 'refs/heads/main' &&
+      (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: salesforce-growth-certification
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Verify exact repository and commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REPOSITORY" = "Emmakex/prestashop-salesforce-marketing-cloud"
+          test "$GITHUB_REF" = "refs/heads/main"
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: curl
+          coverage: none
+      - name: Offline contract and lint
+        run: |
+          php -l tests/live/g8-dlo-metadata-readonly.php
+          php -l pssalesforcebridge/src/DataCloud/GrowthG8DloMetadataResolver.php
+          php tests/g8-dlo-metadata-resolver-contract.php
+          php tests/g8-dlo-presence-contract.php
+      - name: Inspect existing PST DLO identities and synthetic canaries
+        env:
+          G8_DLO_READ_ONLY_MODE: METADATA_AND_EXISTING_CANARY_ONLY
+          G8_DLO_EVIDENCE_FILE: g8-dlo-metadata-sanitized.json
+          SF_GROWTH_ORG_URL: ${{ vars.SF_GROWTH_ORG_URL }}
+          SF_GROWTH_CLIENT_ID: ${{ secrets.SF_GROWTH_CLIENT_ID }}
+          SF_GROWTH_CLIENT_SECRET: ${{ secrets.SF_GROWTH_CLIENT_SECRET }}
+        run: php tests/live/g8-dlo-metadata-readonly.php
+      - name: Store allowlisted boolean evidence only
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: g8-exact-dlo-metadata-${{ github.run_id }}-${{ github.run_attempt }}
+          path: g8-dlo-metadata-sanitized.json
+          if-no-files-found: ignore
+          retention-days: 14
