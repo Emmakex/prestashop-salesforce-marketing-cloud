@@ -133,10 +133,21 @@ $load=function($c)use($ns,&$sourceChange,&$loadCount) {
         'sequence'=>$c['sequence'],
         'fingerprint'=>hash('sha256',$c['type'].$c['id'].
             ($sourceChange && ($loadCount%2===0)?'drift':'stable')),
-        'customer_id'=>44,'payload_private'=>$payload
+        'customer_id'=>$customer?$c['id']:44,'payload_private'=>$payload
     ];
 };
 $local=function($fresh)use(&$eligible){return $eligible;};
+$denyContactAt=null;
+$contactFence=function($candidate,$customerId,$stage)
+    use(&$denyContactAt){
+    receiptAssert($candidate['shop']===1
+        && $customerId===($candidate['type']==='PSCustomer'
+            ?$candidate['id']:44)
+        && in_array(
+            $stage,['before_claim','after_claim','before_transport'],true
+        ),'contact_binding_invalid');
+    return $stage!==$denyContactAt;
+};
 $dlo=function($c,$fresh)use(&$remote){return $remote;};
 $parent=function($shop,$namespace,$id)use($ns) {
     return $shop===1 && $namespace===$ns && $id===44;
@@ -165,10 +176,10 @@ $reserve=function($c,$fp)use($bridge) {
 $persist=function($c,$state,$http,$started)use($bridge) {
     return $bridge->persistOutcome($c,$state,$http,$started);
 };
-$run=function($c)use($scope,$load,$local,$dlo,$parent,$reserve,$post,$persist) {
+$run=function($c)use($scope,$load,$local,$dlo,$parent,$reserve,$post,$persist,$contactFence) {
     return Coordinator::tick(
         $scope,[$c],$load,$local,$dlo,$parent,
-        $reserve,$post,$persist
+        $reserve,$post,$persist,$contactFence
     );
 };
 $c=['shop'=>1,'type'=>'PSCustomer','id'=>44,'sequence'=>11];
@@ -235,6 +246,48 @@ $run($uncertain);
 receiptAssert($lease->claims===$claims
     && $lease->rows['customer:50:17']['state']==='claimed',
     'failed_receipt_double_claim');
+// A withdrawal between CAS and HTTP must cancel the claim without
+// transmitting, and still prevents any automatic retry afterward.
+$denyContactAt='after_claim';
+$withdrawn=['shop'=>1,'type'=>'PSCustomer','id'=>55,'sequence'=>18];
+$lease->add('customer',55,18);
+$postBaseline=$posts;
+$withdrawnOutcome=$run($withdrawn);
+receiptAssert($withdrawnOutcome['held']===1
+    && $lease->rows['customer:55:18']['state']==='cancelled'
+    && $lease->rows['customer:55:18']['attempts']===1
+    && $posts===$postBaseline
+    && $bridge->reserveOnce(
+        $withdrawn,hash('sha256','PSCustomer55stable')
+    )==='previous_attempt','withdrawn_after_claim_replayed');
+$denyContactAt='before_transport';
+$lastSecond=['shop'=>1,'type'=>'PSCustomer','id'=>56,'sequence'=>19];
+$lease->add('customer',56,19);
+$lastSecondOutcome=$run($lastSecond);
+receiptAssert($lastSecondOutcome['held']===1
+    && $lease->rows['customer:56:19']['state']==='cancelled'
+    && $posts===$postBaseline,
+    'last_second_consent_bypass');
+$denyContactAt='before_claim';
+$preClaim=['shop'=>1,'type'=>'PSCustomer','id'=>57,'sequence'=>20];
+$lease->add('customer',57,20);
+$preClaimOutcome=$run($preClaim);
+receiptAssert($preClaimOutcome['reserved']===0
+    && $lease->rows['customer:57:20']['state']==='ready'
+    && $posts===$postBaseline,
+    'preclaim_consent_bypass');
+$denyContactAt=null;
+$missingGateDenied=false;
+try {
+    Coordinator::tick(
+        $scope,[$preClaim],$load,$local,$dlo,$parent,
+        $reserve,$post,$persist
+    );
+} catch (RuntimeException $e) {
+    $missingGateDenied=$e->getMessage()==='g8_auto_tick_not_authorized';
+}
+receiptAssert($missingGateDenied,'optional_contact_fence_bypassed');
+
 $invalid=$scope;$invalid['mode']='production';
 $denied=false;
 try {new Bridge($lease,$invalid);}
