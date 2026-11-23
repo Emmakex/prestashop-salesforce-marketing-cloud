@@ -337,6 +337,11 @@
                         <input type="hidden" name="PS_GROWTH_G8_CSRF" value="{$sfmc_credentials_csrf|escape:'html':'UTF-8'}" />
                         <button type="submit" name="submitPsGrowthG8ReadDlo" value="1" class="sfmc-btn sfmc-btn-secondary">{l s='2. Comprobar cliente en Data Cloud (lectura)' mod='pssalesforcebridge'}</button>
                     </form>
+                    <form method="post" action="{$sfmc_action|escape:'html':'UTF-8'}">
+                        <input type="hidden" name="PS_GROWTH_G8_CSRF" value="{$sfmc_credentials_csrf|escape:'html':'UTF-8'}" />
+                        <button type="submit" name="submitPsGrowthG8DiagnoseLocal" value="1" class="sfmc-btn sfmc-btn-secondary">{l s='3. Diagnosticar preenvío G8 sin enviar' mod='pssalesforcebridge'}</button>
+                    </form>
+                    <p class="sfmc-hint">{l s='Comprueba únicamente el cliente seleccionado, la vigencia G3, el esquema G7 y el borrador local de Data Cloud. Sin OAuth ni consultas remotas, no publica ni reintenta.' mod='pssalesforcebridge'}</p>
                     <p class="sfmc-hint">{l s='HTTP 202 no certifica persistencia, y una ausencia en Data Cloud no prueba que un envío incierto nunca llegue. Estas comprobaciones no permiten reintentar.' mod='pssalesforcebridge'}</p>
                 </section>
             {/if}

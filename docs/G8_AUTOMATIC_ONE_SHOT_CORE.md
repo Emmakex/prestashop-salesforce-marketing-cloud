@@ -125,3 +125,13 @@ Tras autorizar la UAT del cliente de staging 8 y pedido 11, el Back Office mostr
 `GrowthG8UatReceiptReview` consulta exclusivamente la revisión actual del cliente/pedido vinculado en las tablas originales G3 outbox+ledger, sin mutaciones: `blocked_no_attempt`, `ready_no_attempt`, `claimed_unconfirmed`, `accepted_202_unconfirmed`, `reconciliation_required`, `held_requires_review`, `cancelled`, `not_found` o `unverified`, más `attempts` y código HTTP estrictamente saneado. El BO presenta dos botones CSRF/administrador/tienda staging: **Revisar recibos G3 sin enviar**, y **Comprobar cliente en Data Cloud (lectura)**. El segundo hace OAuth Core→Data Cloud, metadata GET y Query V2 SELECT exacto por namespace/shop/cliente para devolver solo `present`, `absent_confirmed` o `unknown`; ninguna llamada al endpoint de ingesta, ningún DDL, ninguna campaña.
 
 **Regla irreversible:** el resultado `202` requiere comprobar DLO, y el resultado `absent_confirmed` en un instante no prueba que un POST incierto no esté pendiente de ingestión. Las lecturas no autorizan reintentos ni cambian consentimientos. Hasta obtener ambas evidencias y diagnóstico del origen de la excepción, suspender UAT y la release final v0.9.6. Staging y producción son entornos separados.
+
+## Recuperación UAT tras G3 blocked_no_attempt y cliente DLO ausente
+
+Cuando el responsable comprueba cliente=blocked_no_attempt y pedido=blocked_no_attempt (G3) y PSCustomer=absent_confirmed (DLO), la información disponible no registra un CAS ni recibo de transporte. No iniciar un segundo POST sin diagnosticar el origen del fallo.
+
+El botón protegido **Diagnosticar preenvío G8 sin enviar** aparece incluso con la autorización de staging revocada y comprueba solo fuentes locales: staging/Test/captura OFF, par seleccionado y origen, estado G3 actual, exclusiones locales del cliente, candidatos G3 exactos, estructura G7/lease por lectura y borrador nativo PSCustomer en memoria.
+
+Responde exclusivamente con códigos PII-free como local_customer_excluded, local_customer_reader_exception, g3_candidate_unverified, g7_schema_or_candidate_unverified, native_customer_payload_unverified o local_pre_dispatch_validated_no_send. No POST, OAuth, cambios SQL ni campañas.
+
+Un resultado local validado no autoriza el reenvío ni sustituye la evidencia de Data Cloud. Reparar solo el punto defectuoso y finalizar UAT antes de publicar versión definitiva.

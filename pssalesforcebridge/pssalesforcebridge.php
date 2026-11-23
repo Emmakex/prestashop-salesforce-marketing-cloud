@@ -63,6 +63,7 @@ require_once __DIR__ . '/src/Growth/GrowthStableBoCsrf.php';
 require_once __DIR__ . '/src/Growth/GrowthG8ExactCaptureInspector.php';
 require_once __DIR__ . '/src/Growth/GrowthG8UatPairScope.php';
 require_once __DIR__ . '/src/Growth/GrowthG8UatReceiptReview.php';
+require_once __DIR__ . '/src/Growth/GrowthG8LocalPreDispatchReview.php';
 require_once __DIR__ . '/src/Growth/GrowthG8CronReadOnly.php';
 require_once __DIR__ . '/src/DataCloud/GrowthG8DloMetadataResolver.php';
 require_once __DIR__ . '/src/DataCloud/GrowthG8DloPresenceReader.php';
@@ -97,6 +98,7 @@ use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthStableBoCsrf;
 use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthG8ExactCaptureInspector;
 use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthG8UatPairScope;
 use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthG8UatReceiptReview;
+use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthG8LocalPreDispatchReview;
 use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthG8CronReadOnly;
 use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthG8StagingWorker;
 use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthG8NativeStagingServices;
@@ -227,6 +229,8 @@ class PsSalesforceBridge extends Module
             $message=$this->handleG8UatTarget('revoke');
         } elseif (Tools::isSubmit('submitPsGrowthG8ReadG3')) {
             $message=$this->handleG8UatReadOnly('g3');
+        } elseif (Tools::isSubmit('submitPsGrowthG8DiagnoseLocal')) {
+            $message=$this->handleG8UatReadOnly('local');
         } elseif (Tools::isSubmit('submitPsGrowthG8ReadDlo')) {
             $message=$this->handleG8UatReadOnly('dlo');
         } elseif (Tools::isSubmit('submitPsGrowthG8Preflight')) {
@@ -370,7 +374,7 @@ class PsSalesforceBridge extends Module
         $csrf=Tools::getValue('PS_GROWTH_G8_CSRF');
         $merchant=(string)Configuration::get(self::CONFIG_MERCHANT);
         $namespace=(string)Configuration::get(self::CONFIG_NAMESPACE);
-        if (!in_array($operation,['g3','dlo'],true)
+        if (!in_array($operation,['g3','dlo','local'],true)
             || !$this->isCredentialAdmin($shop)
             || !is_string($csrf) || $this->credentialCsrf($shop)===''
             || !hash_equals($this->credentialCsrf($shop),$csrf)
@@ -392,6 +396,45 @@ class PsSalesforceBridge extends Module
             return $this->displayError(
                 $this->l('Revisión G8 sin cliente/pedido de UAT seleccionado. No se ha enviado nada.')
             );
+        }
+        if ($operation==='local') {
+            try {
+                $report=GrowthG8LocalPreDispatchReview::inspect(
+                    Db::getInstance(),(string)_PS_VERSION_,
+                    $merchant,$namespace,_DB_PREFIX_,$shop
+                );
+                $status=is_array($report) && isset($report['status'])
+                    ?(string)$report['status']:'stage_scope_invalid';
+                $safe=[
+                    'stage_scope_invalid',
+                    'uat_pair_not_bound',
+                    'source_binding_unverified',
+                    'g3_receipt_unverified',
+                    'g3_not_pristine_no_retry',
+                    'local_customer_read_unverified',
+                    'local_customer_excluded',
+                    'local_customer_reader_exception',
+                    'g3_candidate_unverified',
+                    'g7_lease_unverified',
+                    'g7_schema_or_candidate_unverified',
+                    'prestashop_customer_unavailable',
+                    'native_customer_payload_unverified',
+                    'local_pre_dispatch_validated_no_send'
+                ];
+                if (!in_array($status,$safe,true)) {
+                    $status='stage_scope_invalid';
+                }
+                return $this->displayConfirmation(
+                    sprintf(
+                        $this->l('Diagnóstico local G8 sin enviar: %s. Ningún intento nuevo ni modificación G3. Este resultado no autoriza reintentar ni activar campañas.'),
+                        $status
+                    )
+                );
+            } catch (\Throwable $ignored) {
+                return $this->displayError(
+                    $this->l('Diagnóstico local G8 inconcluso. No se ha realizado ningún envío ni cambio de G3.')
+                );
+            }
         }
         if ($operation==='g3') {
             try {
