@@ -36,7 +36,7 @@ function g8MetadataGet($origin,$token,$path)
         || !in_array($path,[
             '/api/v1/metadataEntities?entityType=DataLakeObject'
         ],true) && !preg_match(
-            '~^/api/v1/metadata/\?entityType=DataLakeObject&entityName=[A-Za-z][A-Za-z0-9_]{2,95}$~D',
+            '~^/api/v1/metadata\?entityType=DataLakeObject&entityName=[A-Za-z][A-Za-z0-9_]{2,95}$~D',
             $path
         )) {
         throw new RuntimeException('g8_metadata_http_invalid_request');
@@ -134,7 +134,7 @@ try {
                 :($metadataLookups===2?'metadata_order_get':'metadata_resolve');
             return g8MetadataGet(
                 $origin,$token,
-                '/api/v1/metadata/?entityType=DataLakeObject&entityName='
+                '/api/v1/metadata?entityType=DataLakeObject&entityName='
                     .$entityName
             );
         }
