@@ -1,6 +1,6 @@
 <?php
 /**
- * G8 0.9.7 protected exact-pair cron acceptance contract.
+ * G8 0.9.8 protected exact-pair cron acceptance contract.
  * No DB access, token exchange, HTTP, merchant rows or sending.
  * CI certifies the path only; a live UAT is NOT implied.
  */
@@ -24,9 +24,9 @@ $coordinator=file_get_contents($root
     .'/pssalesforcebridge/src/Growth/GrowthAutomaticOneShotCoordinator.php');
 $lease=file_get_contents($root
     .'/pssalesforcebridge/src/Growth/GrowthPrestaShopDeliveryLease.php');
-$upgrade=file_get_contents($root.'/pssalesforcebridge/upgrade/upgrade-0.9.7.php');
+$upgrade=file_get_contents($root.'/pssalesforcebridge/upgrade/upgrade-0.9.8.php');
 
-pairCronAssert(strpos($module,"\$this->version = '0.9.7';")!==false
+pairCronAssert(strpos($module,"\$this->version = '0.9.8';")!==false
     && strpos($upgrade,'function upgrade_module_0_9_7(')!==false
     && strpos($upgrade,'return true;')!==false
     && strpos($upgrade,'Configuration::updateValue(')===false
