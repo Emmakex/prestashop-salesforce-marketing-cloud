@@ -62,8 +62,8 @@ stableCsrfAssert(strpos($module,
         "PS_GROWTH_OAUTH_CSRF")!==false,
     'controller_token_or_form_security_removed');
 stableCsrfAssert(substr_count($module,
-    "|| !hash_equals(\$this->credentialCsrf(\$shop),\$csrf)")===5
+    "|| !hash_equals(\$this->credentialCsrf(\$shop),\$csrf)")===6
     && substr_count($module,
-        "\$this->credentialCsrf(\$shop)===''")===5,
+        "\$this->credentialCsrf(\$shop)===''")===6,
     'form_missing_or_empty_csrf_not_blocked');
 echo "Growth BO CSRF PASS: stable across route POST, server-keyed, shop+employee, no fail-open.\n";
