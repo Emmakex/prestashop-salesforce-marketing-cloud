@@ -2,8 +2,10 @@
 
 /**
  * Growth-only protected cron. Default is blocked status.
- * Explicit "inspect" reads up to 10 staging-only G3 event references and
- * returns counts only; no scheduler, HTTP transmission or campaigns.
+ * "inspect" reads up to 10 staging-only G3 event references; "dispatch"
+ * retains the prior explicit customer-only UAT behavior. "dispatch_pair"
+ * opts into bounded customer->order UAT for exactly one approved pair.
+ * Default "status" never initiates transport or marketing campaigns.
  */
 class PsSalesforceBridgeCronModuleFrontController extends ModuleFrontController
 {
@@ -20,7 +22,7 @@ class PsSalesforceBridgeCronModuleFrontController extends ModuleFrontController
         }
         $operation=Tools::getValue('operation','status');
         if (!is_string($operation)
-            || !in_array($operation,['status','inspect','dispatch'],true)) {
+            || !in_array($operation,['status','inspect','dispatch','dispatch_pair'],true)) {
             $this->respond(['ok'=>false,'error'=>'invalid_operation'],400);
         }
         try {

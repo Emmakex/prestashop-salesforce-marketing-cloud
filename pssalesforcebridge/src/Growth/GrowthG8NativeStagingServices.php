@@ -22,7 +22,8 @@ final class GrowthG8NativeStagingServices
         $db,$version,$prefix,$shop,$objectType='PSCustomer'
     )
     {
-        if (!in_array($objectType,['PSCustomer','PSOrder'],true)
+        if (($objectType!==null
+                && !in_array($objectType,['PSCustomer','PSOrder'],true))
             || !is_int($shop) || $shop<1
             || !class_exists('Configuration')
             || !class_exists('Customer')
@@ -55,6 +56,10 @@ final class GrowthG8NativeStagingServices
 
         // No OAuth or metadata requests before a private, exact UAT
         // customer/order selection has been bound by the BO administrator.
+        // A null objectType is legal ONLY for the separately named protected
+        // dispatch_pair cron operation; BO always supplies PSCustomer/PSOrder.
+        // The worker's parentDloVerified callback still prevents any order
+        // before exact remote PSCustomer presence is confirmed.
         if (GrowthG8UatPairScope::inspect(
             $shop,$merchant,$namespace
         )===null) {
