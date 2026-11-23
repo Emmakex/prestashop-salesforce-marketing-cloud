@@ -19,6 +19,7 @@ use Throwable;
 final class GrowthG8DloPresenceReader
 {
     const MAX_RESPONSE_BYTES=65536;
+    const RESULT_ALIAS='g8_exact_source_key';
 
     /**
      * Stable three-state contract for the automatic coordinator.
@@ -61,7 +62,7 @@ final class GrowthG8DloPresenceReader
             }
             $key=$namespace.':'.$shop.':'
                 .($object==='PSCustomer'?'customer':'order').':'.$id;
-            $q='SELECT "'.$sourceKeyField.'" FROM "'.$dloApiName
+            $q='SELECT "'.$sourceKeyField.'" AS "'.self::RESULT_ALIAS.'" FROM "'.$dloApiName
                 .'" WHERE "'.$sourceKeyField.'" = '."'".$key."'"
                 .' LIMIT 2';
             $json=json_encode(['sql'=>$q],JSON_UNESCAPED_SLASHES);
@@ -106,13 +107,13 @@ final class GrowthG8DloPresenceReader
                 if (!is_array($row)) {
                     return self::evidence('unknown','row_not_object');
                 }
-                if (!array_key_exists($sourceKeyField,$row)) {
+                if (!array_key_exists(self::RESULT_ALIAS,$row)) {
                     return self::evidence('unknown','row_field_missing');
                 }
-                if (!is_string($row[$sourceKeyField])) {
+                if (!is_string($row[self::RESULT_ALIAS])) {
                     return self::evidence('unknown','row_value_not_string');
                 }
-                if (!hash_equals($key,$row[$sourceKeyField])) {
+                if (!hash_equals($key,$row[self::RESULT_ALIAS])) {
                     return self::evidence('unknown','row_key_not_exact');
                 }
             }
