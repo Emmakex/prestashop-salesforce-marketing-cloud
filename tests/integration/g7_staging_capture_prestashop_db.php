@@ -1031,6 +1031,15 @@ $runWorker=$workerClass::run(
     $db,_PS_VERSION_,$g8Scope,_DB_PREFIX_,$services
 );
 $workerReceipt=$native->inspect(1,'customer',901,$nativeSeq901);
+fwrite(STDERR,'G8 synthetic CI diagnosis: '.json_encode([
+    'worker_status'=>$runWorker['status'],
+    'counts'=>$runWorker['counts'],
+    'lease_state'=>$workerReceipt['state'],
+    'receipt_http'=>$workerReceipt['last_http'],
+    'attempts'=>$workerReceipt['attempts'],
+    'posts'=>$postsFromWorker,
+    'checks'=>$checksFromWorker
+],JSON_UNESCAPED_SLASHES)."\n");
 g7DbCheck($runWorker['status']==='staging_tick_completed_unconfirmed'
     && $runWorker['counts']['accepted_202_unconfirmed']===1
     && $postsFromWorker===1
