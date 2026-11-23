@@ -121,6 +121,127 @@ final class GrowthG8StagingReadyGate
         }
     }
 
+    /**
+     * Private, bounded READY keyset for the future staging one-shot worker.
+     * Nothing here grants the right to send a record. A second scan can
+     * observe a different set; each candidate MUST still CAS its own row.
+     */
+    public static function scanReady(
+        $db,$version,array $scope,$prefix,$afterSequence=0,$limit=10
+    ) {
+        if (!is_object($db) || !is_callable([$db,'executeS'])
+            || !is_string($version) || $version===''
+            || !is_string($prefix)
+            || preg_match('/^[A-Za-z0-9_]{1,32}$/D',$prefix)!==1
+            || !self::scope($scope)
+            || !is_int($afterSequence) || $afterSequence<0
+            || !is_int($limit) || $limit<1 || $limit>10) {
+            return self::readyScanBlocked();
+        }
+        try {
+            new GrowthPrestaShopDeliveryLease(
+                $db,$version,$scope['merchant'],$scope['namespace'],$prefix
+            );
+            $binding=GrowthShopSourceBinding::inspect(
+                $scope['shop'],$scope['merchant'],$scope['namespace']
+            );
+            if (!isset($binding['ready']) || $binding['ready']!==true) {
+                return self::readyScanBlocked();
+            }
+            $plan=GrowthOutboxSchemaPlan::preview(
+                $version,$scope['merchant'],'marketing_cloud_growth',
+                $scope['namespace'],'test',$prefix
+            );
+            $outbox=self::q($plan['tables']['outbox']);
+            $ledger=self::q($plan['tables']['ledger']);
+            $namespace=$scope['namespace'];
+            $shop=$scope['shop'];
+            $fetchLimit=$limit+1;
+            $sql='SELECT o.accepted_sequence,o.entity_type,o.entity_id'
+                . ' FROM '.$outbox.' o INNER JOIN '.$ledger.' l'
+                . ' ON l.source_namespace=o.source_namespace'
+                . ' AND l.shop_id=o.shop_id'
+                . ' AND l.entity_type=o.entity_type'
+                . ' AND l.entity_id=o.entity_id'
+                . " WHERE o.source_namespace='$namespace'"
+                . " AND o.shop_id=$shop"
+                . " AND o.accepted_sequence>$afterSequence"
+                . " AND o.status='blocked' AND l.status='blocked'"
+                . ' AND l.latest_accepted_sequence=o.accepted_sequence'
+                . " AND o.delivery_state='ready' AND o.delivery_attempts=0"
+                . ' AND o.lease_token_hash IS NULL'
+                . ' AND o.lease_until_epoch IS NULL'
+                . ' AND o.delivery_last_http IS NULL'
+                . " AND ((o.entity_type='customer' AND"
+                . " o.original_event_type IN ('CUSTOMER_CREATED','CUSTOMER_UPDATED'))"
+                . " OR (o.entity_type='order' AND"
+                . " o.original_event_type='ORDER_CREATED'))"
+                . " ORDER BY o.accepted_sequence ASC LIMIT $fetchLimit";
+            $rows=$db->executeS($sql,true,false);
+            if (!is_array($rows) || count($rows)>$fetchLimit) {
+                return self::readyScanBlocked();
+            }
+            $hasMore=count($rows)>$limit;
+            if ($hasMore)array_pop($rows);
+            $candidates=[];$last=$afterSequence;
+            foreach ($rows as $row) {
+                if (!is_array($row) || count($row)!==3
+                    || !isset($row['accepted_sequence'],$row['entity_type'],
+                        $row['entity_id'])) {
+                    return self::readyScanBlocked();
+                }
+                $seq=self::positiveId($row['accepted_sequence']);
+                $id=self::positiveId($row['entity_id']);
+                if ($seq===null || $id===null || $seq<=$last
+                    || !in_array(
+                        $row['entity_type'],['customer','order'],true
+                    )) {
+                    return self::readyScanBlocked();
+                }
+                $last=$seq;
+                $candidates[]=[
+                    'shop'=>$shop,
+                    'type'=>$row['entity_type']==='customer'
+                        ?'PSCustomer':'PSOrder',
+                    'id'=>$id,'sequence'=>$seq
+                ];
+            }
+            return [
+                'status'=>'ready_candidates_private',
+                'candidates_private'=>$candidates,
+                'next_cursor_private'=>$last,
+                'has_more'=>$hasMore,
+                'data_cloud_ingestion_authorized'=>false,
+                'marketing_sends_authorized'=>false
+            ];
+        } catch (Throwable $ignored) {
+            return self::readyScanBlocked();
+        }
+    }
+
+    private static function readyScanBlocked()
+    {
+        return [
+            'status'=>'ready_scan_failed_closed',
+            'candidates_private'=>[],
+            'next_cursor_private'=>null,
+            'has_more'=>false,
+            'data_cloud_ingestion_authorized'=>false,
+            'marketing_sends_authorized'=>false
+        ];
+    }
+
+    private static function positiveId($value)
+    {
+        if (is_int($value))return $value>0?$value:null;
+        if (!is_string($value)
+            || preg_match('/^[1-9][0-9]*$/D',$value)!==1) {
+            return null;
+        }
+        $n=(int)$value;
+        return $n>0 && (string)$n===$value?$n:null;
+    }
+
     private static function scope($s)
     {
         if (!isset($s['shop'],$s['merchant'],$s['namespace'],
