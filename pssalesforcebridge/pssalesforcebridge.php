@@ -284,6 +284,10 @@ class PsSalesforceBridge extends Module
             'sfmc_credentials_csrf'=>$canManage
                 ?$this->credentialCsrf($shop):'',
             'sfmc_capture_armed'=>$capture==='staging_armed',
+            'sfmc_g8_is_stage'=>$shop>0
+                && preg_match(
+                    '/(?:^|_)(?:stage|staging)(?:_|$)/D',$namespace
+                )===1,
             'sfmc_g8_staging_available'=>$canManage
                 && $identity && $source['ready'] && $credentials
                 && $mode==='test' && $capture==='off'
