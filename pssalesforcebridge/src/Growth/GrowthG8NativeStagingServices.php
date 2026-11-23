@@ -52,7 +52,7 @@ final class GrowthG8NativeStagingServices
 
         // No OAuth or metadata requests before a private, exact UAT
         // customer/order selection has been bound by the BO administrator.
-        if (GrowthG8UatExactTarget::inspect(
+        if (GrowthG8UatPairScope::inspect(
             $shop,$merchant,$namespace
         )===null) {
             return self::report('staging_target_not_bound');
