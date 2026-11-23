@@ -198,6 +198,14 @@
             </button>
             <p class="sfmc-hint">{l s='Esta validación consulta únicamente datos locales y no contacta con Salesforce.' mod='pssalesforcebridge'}</p>
 
+            {if $sfmc_g8_is_stage && !$sfmc_capture_armed && $sfmc_credentials_admin_allowed}
+                <input type="hidden" name="PS_GROWTH_G8_CSRF" value="{$sfmc_credentials_csrf|escape:'html':'UTF-8'}" />
+                <button class="sfmc-btn sfmc-btn-secondary" name="submitPsGrowthG8CaptureInspect" value="1" type="submit">
+                    {l s='Comprobar captura G3 sin enviar' mod='pssalesforcebridge'}
+                </button>
+                <p class="sfmc-hint">{l s='Comprueba que este cliente y este pedido aparecen en G3 como eventos vigentes bloqueados y sin intentos. No consulta ni envía nada a Salesforce.' mod='pssalesforcebridge'}</p>
+            {/if}
+
             <details>
                 <summary>{l s='2. Enviar prueba individual a Salesforce' mod='pssalesforcebridge'}</summary>
                 <div class="sfmc-details-inner">
