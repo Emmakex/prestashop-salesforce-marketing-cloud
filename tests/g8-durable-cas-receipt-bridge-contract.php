@@ -301,9 +301,11 @@ $module=file_get_contents(dirname(__DIR__)
     .'/pssalesforcebridge/pssalesforcebridge.php');
 $cron=file_get_contents(dirname(__DIR__)
     .'/pssalesforcebridge/controllers/front/cron.php');
-receiptAssert(strpos($module,'GrowthG8DurableReceiptBridge')===false
-    && strpos($cron,'GrowthG8DurableReceiptBridge')===false,
-    'premature_live_wiring');
+receiptAssert(strpos($module,'GrowthG8DurableReceiptBridge.php')!==false
+    && strpos($module,'GrowthG8NativeStagingServices::run(')!==false
+    && strpos($cron,'GrowthG8DurableReceiptBridge')===false
+    && strpos($module,"PS_GROWTH_G8_STAGING_APPROVAL")!==false,
+    'stage_gate_wiring_missing');
 foreach (['curl_','Mail::send(', '->post(',
     "delivery_state='ready'",'GrowthDataCloudUpsertTransport'] as $bad) {
     receiptAssert(strpos($source,$bad)===false,'unexpected_egress');

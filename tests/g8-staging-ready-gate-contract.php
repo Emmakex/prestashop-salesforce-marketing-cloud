@@ -81,9 +81,11 @@ $module=file_get_contents(dirname(__DIR__)
     .'/pssalesforcebridge/pssalesforcebridge.php');
 $cron=file_get_contents(dirname(__DIR__)
     .'/pssalesforcebridge/controllers/front/cron.php');
-readyAssert(strpos($module,'GrowthG8StagingReadyGate')===false
-    && strpos($cron,'GrowthG8StagingReadyGate')===false,
-    'premature_production_wiring');
+readyAssert(strpos($module,'GrowthG8StagingReadyGate.php')!==false
+    && strpos($module,'GrowthG8NativeStagingServices::run(')!==false
+    && strpos($cron,'GrowthG8StagingReadyGate')===false
+    && strpos($module,"PS_GROWTH_G8_STAGING_APPROVAL")!==false,
+    'stage_ready_gate_wiring_missing');
 foreach ([
     'GrowthPrestaShopDeliveryLease',
     'l.latest_accepted_sequence=o.accepted_sequence',

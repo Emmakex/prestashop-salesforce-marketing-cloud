@@ -174,7 +174,8 @@ $module=file_get_contents(dirname(__DIR__)
     .'/pssalesforcebridge/pssalesforcebridge.php');
 $cron=file_get_contents(dirname(__DIR__)
     .'/pssalesforcebridge/controllers/front/cron.php');
-dloAssert(strpos($module,'GrowthG8DloPresenceReader')===false
+dloAssert(strpos($module,'GrowthG8DloPresenceReader.php')!==false
+    && strpos($module,'GrowthG8NativeStagingServices::run(')!==false
     && strpos($cron,'GrowthG8DloPresenceReader')===false
     && strpos($source,"'/api/v2/query'")!==false
     && strpos($source,"LIMIT 2")!==false

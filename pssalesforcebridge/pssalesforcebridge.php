@@ -3,7 +3,8 @@
 /**
  * PrestaShop -> Salesforce Marketing Cloud Growth + Data Cloud.
  *
- * v0.9.5: staging cron read-only G3 keyset preview; no outbound/cron sending.
+ * v0.9.5: staging G8 controlled UAT dispatcher (OFF until owner approval).
+ * Existing public version remains frozen until end-to-end certification.
  * v0.9.4: safe, distinct local preview vs real send diagnostics; no PII.
  * v0.9.3: merchant-independent source binding for each shop (DOABH etc.).
  * v0.9.2: secure per-shop Salesforce credentials and OAuth-only BO test.
@@ -59,6 +60,16 @@ require_once __DIR__ . '/src/Growth/GrowthPrestaShopDeliveryLease.php';
 require_once __DIR__ . '/src/Growth/GrowthG7CurrentEventBatch.php';
 require_once __DIR__ . '/src/Growth/GrowthG8StagingCandidateAdapter.php';
 require_once __DIR__ . '/src/Growth/GrowthG8CronReadOnly.php';
+require_once __DIR__ . '/src/DataCloud/GrowthG8DloMetadataResolver.php';
+require_once __DIR__ . '/src/DataCloud/GrowthG8DloPresenceReader.php';
+require_once __DIR__ . '/src/DataCloud/GrowthG8CloudMetadataClient.php';
+require_once __DIR__ . '/src/Growth/GrowthG8ScopedDloRead.php';
+require_once __DIR__ . '/src/Growth/GrowthLocalCustomerHoldReader.php';
+require_once __DIR__ . '/src/Growth/GrowthAutomaticOneShotCoordinator.php';
+require_once __DIR__ . '/src/Growth/GrowthG8DurableReceiptBridge.php';
+require_once __DIR__ . '/src/Growth/GrowthG8StagingReadyGate.php';
+require_once __DIR__ . '/src/Growth/GrowthG8StagingWorker.php';
+require_once __DIR__ . '/src/Growth/GrowthG8NativeStagingServices.php';
 require_once __DIR__ . '/src/DataCloud/GrowthStreamingIngestionPlan.php';
 require_once __DIR__ . '/src/DataCloud/GrowthDataCloudUpsertTransport.php';
 require_once __DIR__ . '/src/Growth/AuthClient.php';
@@ -79,6 +90,8 @@ use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthOneRecordManualSende
 use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthShopCredentialVault;
 use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthShopSourceBinding;
 use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthG8CronReadOnly;
+use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthG8StagingWorker;
+use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthG8NativeStagingServices;
 use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\AuthClient;
 use Emmakex\PrestaShopSalesforceMarketingCloud\DataCloud\TokenExchangeClient;
 
@@ -208,6 +221,10 @@ class PsSalesforceBridge extends Module
             $message = $this->runManualOneRecord('order');
         } elseif (Tools::isSubmit('submitPsGrowthBridge')) {
             $message = $this->saveGrowthSettings();
+        } elseif (Tools::isSubmit('submitPsGrowthG8UatApprove')) {
+            $message=$this->handleG8StagingUat('approve');
+        } elseif (Tools::isSubmit('submitPsGrowthG8UatRevoke')) {
+            $message=$this->handleG8StagingUat('revoke');
         } elseif (Tools::isSubmit('submitPsGrowthStagingCaptureStop')) {
             // Keep only the safe OFF switch for an already armed old staging shop.
             $message = $this->disableStagingCapture();
@@ -267,6 +284,23 @@ class PsSalesforceBridge extends Module
             'sfmc_credentials_csrf'=>$canManage
                 ?$this->credentialCsrf($shop):'',
             'sfmc_capture_armed'=>$capture==='staging_armed',
+            'sfmc_g8_is_stage'=>$shop>0
+                && preg_match(
+                    '/(?:^|_)(?:stage|staging)(?:_|$)/D',$namespace
+                )===1,
+            'sfmc_g8_staging_available'=>$canManage
+                && $identity && $source['ready'] && $credentials
+                && $mode==='test' && $capture==='off'
+                && preg_match(
+                    '/(?:^|_)(?:stage|staging)(?:_|$)/D',$namespace
+                )===1
+                && (string)Configuration::get(
+                    'PS_SFMC_CART_CONSENT_MODE'
+                )==='marketing_optin',
+            'sfmc_g8_staging_approved'=>(string)Configuration::get(
+                'PS_GROWTH_G8_STAGING_APPROVAL'
+            )===GrowthG8StagingWorker::APPROVAL,
+            'sfmc_g8_staging_confirmation'=>GrowthG8StagingWorker::APPROVAL,
             'sfmc_can_send'=>$canManage && $identity && $source['ready']
                 && $credentials && $mode==='test'
                 && $capture==='off',
@@ -278,6 +312,60 @@ class PsSalesforceBridge extends Module
                 $namespace,$shop,'PSOrder')
         ]);
         return $this->display(__FILE__,'views/templates/admin/console.tpl');
+    }
+
+    /**
+     * Explicit opt-in for a SINGLE staging shop, revocable at any time.
+     * Never an approval for production ingestion or Growth campaigns.
+     */
+    private function handleG8StagingUat($operation)
+    {
+        $shop=$this->credentialContextShopId();
+        $csrf=Tools::getValue('PS_GROWTH_G8_CSRF');
+        if (!in_array($operation,['approve','revoke'],true)
+            || !$this->isCredentialAdmin($shop)
+            || !is_string($csrf)
+            || !hash_equals($this->credentialCsrf($shop),$csrf)) {
+            return $this->displayError(
+                $this->l('Autorización de staging no válida. No se ha cambiado nada.')
+            );
+        }
+        $namespace=(string)Configuration::get(self::CONFIG_NAMESPACE);
+        $merchant=(string)Configuration::get(self::CONFIG_MERCHANT);
+        if ($operation==='approve') {
+            if (!GrowthShopSourceBinding::isNamespace($namespace)
+                || preg_match(
+                    '/(?:^|_)(?:stage|staging)(?:_|$)/D',$namespace
+                )!==1
+                || (string)Configuration::get(self::CONFIG_MODE)!=='test'
+                || (string)Configuration::get(self::CONFIG_LOCAL_CAPTURE)!=='off'
+                || (string)Configuration::get(
+                    'PS_SFMC_CART_CONSENT_MODE'
+                )!=='marketing_optin'
+                || GrowthShopSourceBinding::inspect(
+                    $shop,$merchant,$namespace
+                )['ready']!==true
+                || GrowthShopCredentialVault::inspect($shop)['ready']!==true
+                || Tools::getValue('PS_GROWTH_G8_CONFIRM')
+                    !==GrowthG8StagingWorker::APPROVAL) {
+                return $this->displayError(
+                    $this->l('La autorización G8 requiere una tienda de staging, modo Test, conexión válida y confirmación exacta. No se han activado envíos.')
+                );
+            }
+        }
+        $value=$operation==='approve'
+            ?GrowthG8StagingWorker::APPROVAL:'off';
+        if (!Configuration::updateValue(
+            'PS_GROWTH_G8_STAGING_APPROVAL',
+            $value,false,null,$shop
+        )) {
+            return $this->displayError(
+                $this->l('No se ha podido guardar la autorización G8.')
+            );
+        }
+        return $this->displayConfirmation($operation==='approve'
+            ?$this->l('UAT G8 de esta tienda de staging autorizada. Solo se ejecuta bajo cron protegido; no se han enviado registros al guardar.')
+            :$this->l('Autorización G8 de staging retirada. No se iniciarán nuevos envíos.'));
     }
 
     /**
@@ -1058,8 +1146,8 @@ class PsSalesforceBridge extends Module
 
     public function cronReport($operation='status')
     {
-        // The only extra operation is a bounded READ-ONLY staging inspection.
-        // No egress, lease, ready transition or sending endpoint exists.
+        // "status" remains inert; "inspect" stays read-only. The new
+        // "dispatch" path is stage-only, explicitly approved, and bounded.
         if ($operation==='inspect') {
             $shop=isset($this->context,$this->context->shop,
                 $this->context->shop->id)
@@ -1080,6 +1168,31 @@ class PsSalesforceBridge extends Module
             return GrowthG8CronReadOnly::inspect(
                 $db,$shop,defined('_PS_VERSION_')?(string)_PS_VERSION_:'',
                 $merchant,$namespace,_DB_PREFIX_
+            );
+        }
+        if ($operation==='dispatch') {
+            $shop=$this->credentialContextShopId();
+            $namespace=(string)Configuration::get(self::CONFIG_NAMESPACE);
+            if ($shop<1
+                || preg_match(
+                    '/(?:^|_)(?:stage|staging)(?:_|$)/D',$namespace
+                )!==1
+                || (string)Configuration::get('PS_SFMC_MODE')!=='test'
+                || (string)Configuration::get('PS_GROWTH_LOCAL_CAPTURE')
+                    !=='off'
+                || (string)Configuration::get(
+                    'PS_GROWTH_G8_STAGING_APPROVAL'
+                )!==GrowthG8StagingWorker::APPROVAL) {
+                return [
+                    'ok'=>false,'status'=>'staging_dispatch_not_approved',
+                    'marketing_sends_authorized'=>false,
+                    'automatic_retry_authorized'=>false
+                ];
+            }
+            return GrowthG8NativeStagingServices::run(
+                Db::getInstance(),
+                defined('_PS_VERSION_')?(string)_PS_VERSION_:'',
+                _DB_PREFIX_,$shop
             );
         }
         // Pure status endpoint. No legacy queue, retry, backfill, scheduler,

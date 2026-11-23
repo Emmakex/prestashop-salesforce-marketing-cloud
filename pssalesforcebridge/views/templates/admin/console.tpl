@@ -286,6 +286,34 @@
         </details>
     </section>
 
+    {if $sfmc_g8_is_stage}
+        <section class="sfmc-panel" aria-labelledby="sfmc-g8-uat-title">
+            <h3 id="sfmc-g8-uat-title">{l s='Sincronización automática G8 · Staging' mod='pssalesforcebridge'}</h3>
+            <p class="sfmc-hint">{l s='Operación de pruebas para esta tienda: utiliza la misma outbox G3, valida cada contacto y consulta Data Cloud antes de realizar un único envío. No activa campañas, reintentos ni producción.' mod='pssalesforcebridge'}</p>
+            {if $sfmc_g8_staging_approved}
+                <div class="sfmc-note info" role="status">{l s='UAT G8 autorizada en esta tienda. Solo se ejecuta mediante operación dispatch y token cron. Desactívala después de verificar la recepción en Data Cloud.' mod='pssalesforcebridge'}</div>
+                {if $sfmc_credentials_admin_allowed}
+                    <form method="post" action="{$sfmc_action|escape:'html':'UTF-8'}">
+                        <input type="hidden" name="PS_GROWTH_G8_CSRF" value="{$sfmc_credentials_csrf|escape:'html':'UTF-8'}" />
+                        <button class="sfmc-btn sfmc-btn-secondary" type="submit" name="submitPsGrowthG8UatRevoke" value="1">{l s='Desactivar autorización G8 de staging' mod='pssalesforcebridge'}</button>
+                    </form>
+                {/if}
+            {else}
+                {if $sfmc_g8_staging_available}
+                    <form method="post" action="{$sfmc_action|escape:'html':'UTF-8'}" autocomplete="off">
+                        <label for="sfmc-g8-confirm">{l s='Confirmación explícita del responsable' mod='pssalesforcebridge'}</label>
+                        <p class="sfmc-hint">{l s='Esta autorización permite únicamente la prueba de ingesta Data Cloud en staging. No activa ningún cron por sí sola.' mod='pssalesforcebridge'}</p>
+                        <input type="text" id="sfmc-g8-confirm" name="PS_GROWTH_G8_CONFIRM" placeholder="{$sfmc_g8_staging_confirmation|escape:'html':'UTF-8'}" required autocomplete="off" />
+                        <input type="hidden" name="PS_GROWTH_G8_CSRF" value="{$sfmc_credentials_csrf|escape:'html':'UTF-8'}" />
+                        <button type="submit" class="sfmc-btn sfmc-btn-secondary" name="submitPsGrowthG8UatApprove" value="1">{l s='Autorizar únicamente la UAT G8' mod='pssalesforcebridge'}</button>
+                    </form>
+                {else}
+                    <div class="sfmc-note info" role="status">{l s='Para preparar la UAT, selecciona una tienda concreta, configura su origen y OAuth, mantén Test y captura OFF y utiliza la política marketing_optin.' mod='pssalesforcebridge'}</div>
+                {/if}
+            {/if}
+        </section>
+    {/if}
+
     {if $sfmc_capture_armed}
         <section class="sfmc-panel" aria-labelledby="sfmc-capture-alert">
             <h3 id="sfmc-capture-alert">{l s='Captura local anterior activa' mod='pssalesforcebridge'}</h3>

@@ -57,6 +57,8 @@ g7TransportAssert($result['status']==='ingestion_transport_result_requires_recon
     && $result['automatic_retry_authorized']===false
     && $result['marketing_sends_authorized']===false,
     '202_misclassified');
+g7TransportAssert($result['http_status']===202,
+    '202_status_not_retained_for_receipt');
 g7TransportAssert(strpos(json_encode($result),$token)===false
     && strpos(json_encode($result),'synthetic.c360a')===false
     && strpos(json_encode($result),'source_key')===false
@@ -107,6 +109,9 @@ foreach ([
 }
 $broken=Client::sendIfAuthorized($host,$source,'PSCustomer',$rows,
     $namespace,2,$token,$permit,function(){throw new RuntimeException('pii');});
+g7TransportAssert(array_key_exists('http_status',$result)
+    && is_int($result['http_status']),
+    'safe_http_status_contract_missing');
 g7TransportAssert($broken['outcome_state']==='unknown_after_transport'
     && strpos(json_encode($broken),'pii')===false,'transport_error_leak');
 
