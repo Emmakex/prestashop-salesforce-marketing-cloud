@@ -60,6 +60,7 @@ require_once __DIR__ . '/src/Growth/GrowthPrestaShopDeliveryLease.php';
 require_once __DIR__ . '/src/Growth/GrowthG7CurrentEventBatch.php';
 require_once __DIR__ . '/src/Growth/GrowthG8StagingCandidateAdapter.php';
 require_once __DIR__ . '/src/Growth/GrowthStableBoCsrf.php';
+require_once __DIR__ . '/src/Growth/GrowthG8ExactCaptureInspector.php';
 require_once __DIR__ . '/src/Growth/GrowthG8CronReadOnly.php';
 require_once __DIR__ . '/src/DataCloud/GrowthG8DloMetadataResolver.php';
 require_once __DIR__ . '/src/DataCloud/GrowthG8DloPresenceReader.php';
@@ -91,6 +92,7 @@ use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthOneRecordManualSende
 use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthShopCredentialVault;
 use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthShopSourceBinding;
 use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthStableBoCsrf;
+use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthG8ExactCaptureInspector;
 use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthG8CronReadOnly;
 use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthG8StagingWorker;
 use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthG8NativeStagingServices;
@@ -215,6 +217,8 @@ class PsSalesforceBridge extends Module
             $message = $this->handleSalesforceCredentials('test');
         } elseif (Tools::isSubmit('submitPsGrowthOauthRemove')) {
             $message = $this->handleSalesforceCredentials('remove');
+        } elseif (Tools::isSubmit('submitPsGrowthG8CaptureInspect')) {
+            $message = $this->handleG8ExactCaptureInspect();
         } elseif (Tools::isSubmit('submitPsGrowthOnePreview')) {
             $message = $this->runManualOneRecord('preview');
         } elseif (Tools::isSubmit('submitPsGrowthOneCustomerSend')) {
@@ -324,6 +328,74 @@ class PsSalesforceBridge extends Module
                 $namespace,$shop,'PSOrder')
         ]);
         return $this->display(__FILE__,'views/templates/admin/console.tpl');
+    }
+
+    /**
+     * Admin-only exact G3 verification for the selected UAT customer/order.
+     * Works without phpMyAdmin or cron secrets. Does not send or promote.
+     */
+    private function handleG8ExactCaptureInspect()
+    {
+        $shop=$this->credentialContextShopId();
+        $csrf=Tools::getValue('PS_GROWTH_G8_CSRF');
+        $customerRaw=Tools::getValue('PS_GROWTH_ONE_CUSTOMER_ID');
+        $orderRaw=Tools::getValue('PS_GROWTH_ONE_ORDER_ID');
+        $namespace=(string)Configuration::get(self::CONFIG_NAMESPACE);
+        $merchant=(string)Configuration::get(self::CONFIG_MERCHANT);
+        if (!$this->isCredentialAdmin($shop)
+            || !is_string($csrf) || $this->credentialCsrf($shop)===''
+            || !hash_equals($this->credentialCsrf($shop),$csrf)
+            || !is_scalar($customerRaw) || !is_scalar($orderRaw)
+            || !preg_match('/^[1-9][0-9]{0,14}$/D',(string)$customerRaw)
+            || !preg_match('/^[1-9][0-9]{0,14}$/D',(string)$orderRaw)
+            || !GrowthShopSourceBinding::isMerchant($merchant)
+            || !GrowthShopSourceBinding::isNamespace($namespace)
+            || preg_match(
+                '/(?:^|_)(?:stage|staging)(?:_|$)/D',$namespace
+            )!==1
+            || (string)Configuration::get(self::CONFIG_MODE)!=='test'
+            || (string)Configuration::get(self::CONFIG_LOCAL_CAPTURE)!=='off') {
+            return $this->displayError(
+                $this->l('Comprobación G3 bloqueada: autorización o tienda de staging no válidas. No se ha enviado nada.')
+            );
+        }
+        $customerId=(int)$customerRaw;
+        $orderId=(int)$orderRaw;
+        try {
+            $order=new Order($orderId);
+            $customer=new Customer($customerId);
+            if ((int)$order->id_customer!==$customerId
+                || (int)$order->id_shop!==$shop
+                || (int)$customer->id_shop!==$shop
+                || (int)$customer->id!==$customerId
+                || (int)$order->id!==$orderId) {
+                return $this->displayError(
+                    $this->l('El cliente y el pedido no pertenecen a esta tienda o no coinciden. No se ha enviado nada.')
+                );
+            }
+            $result=GrowthG8ExactCaptureInspector::inspect(
+                Db::getInstance(),
+                (string)_PS_VERSION_,$merchant,$namespace,
+                _DB_PREFIX_,$shop,$customerId,$orderId
+            );
+            if ($result['status']==='both_events_captured') {
+                return $this->displayConfirmation(
+                    $this->l('Captura G3 confirmada: cliente y pedido presentes como eventos vigentes y bloqueados, sin intentos. No se ha enviado nada a Salesforce.')
+                );
+            }
+            if ($result['status']==='capture_not_confirmed') {
+                return $this->displayError(
+                    $this->l('Captura G3 todavía no confirmada para ambos registros. No autorices dispatch ni repitas la compra. Revisaremos cuál de los dos eventos falta.')
+                );
+            }
+            return $this->displayError(
+                $this->l('No ha sido posible verificar G3. Captura detenida; ningún registro enviado.')
+            );
+        } catch (\Throwable $ignored) {
+            return $this->displayError(
+                $this->l('No ha sido posible leer los eventos G3. No se ha enviado nada a Salesforce.')
+            );
+        }
     }
 
     /**
