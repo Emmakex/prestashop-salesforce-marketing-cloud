@@ -81,6 +81,9 @@ stageWorkerAssert($run($scope,$noPresence)['status']==='staging_worker_blocked',
 $bad=$scope;$bad['capture']='staging_armed';
 stageWorkerAssert($run($bad,$callbacks)['status']==='staging_worker_blocked',
     'capture_armed_allowed');
+stageWorkerAssert(Worker::run(
+    $db,'9.1.5',$scope,'ci_',$callbacks,'PSCart'
+)['status']==='staging_worker_blocked','invalid_object_type_allowed');
 stageWorkerAssert($db->calls===0 && $called===0,
     'unexpected_action_on_denial');
 Configuration::$data['PS_GROWTH_G8_STAGING_APPROVAL']=Worker::APPROVAL;
