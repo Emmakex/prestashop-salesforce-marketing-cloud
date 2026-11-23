@@ -61,6 +61,7 @@ require_once __DIR__ . '/src/Growth/GrowthG7CurrentEventBatch.php';
 require_once __DIR__ . '/src/Growth/GrowthG8StagingCandidateAdapter.php';
 require_once __DIR__ . '/src/Growth/GrowthStableBoCsrf.php';
 require_once __DIR__ . '/src/Growth/GrowthG8ExactCaptureInspector.php';
+require_once __DIR__ . '/src/Growth/GrowthG8UatPairScope.php';
 require_once __DIR__ . '/src/Growth/GrowthG8CronReadOnly.php';
 require_once __DIR__ . '/src/DataCloud/GrowthG8DloMetadataResolver.php';
 require_once __DIR__ . '/src/DataCloud/GrowthG8DloPresenceReader.php';
@@ -93,6 +94,7 @@ use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthShopCredentialVault;
 use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthShopSourceBinding;
 use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthStableBoCsrf;
 use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthG8ExactCaptureInspector;
+use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthG8UatPairScope;
 use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthG8CronReadOnly;
 use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthG8StagingWorker;
 use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthG8NativeStagingServices;
@@ -217,6 +219,10 @@ class PsSalesforceBridge extends Module
             $message = $this->handleSalesforceCredentials('test');
         } elseif (Tools::isSubmit('submitPsGrowthOauthRemove')) {
             $message = $this->handleSalesforceCredentials('remove');
+        } elseif (Tools::isSubmit('submitPsGrowthG8TargetBind')) {
+            $message=$this->handleG8UatTarget('bind');
+        } elseif (Tools::isSubmit('submitPsGrowthG8TargetRevoke')) {
+            $message=$this->handleG8UatTarget('revoke');
         } elseif (Tools::isSubmit('submitPsGrowthG8CaptureInspect')) {
             $message = $this->handleG8ExactCaptureInspect();
         } elseif (Tools::isSubmit('submitPsGrowthOnePreview')) {
@@ -265,6 +271,9 @@ class PsSalesforceBridge extends Module
         $credentialStatus=GrowthShopCredentialVault::inspect($shop);
         $credentials=$credentialStatus['ready'];
         $canManage=$this->isCredentialAdmin($shop);
+        $g8Target=GrowthG8UatPairScope::inspect(
+            $shop,$merchant,$namespace
+        );
         $customerInput=Tools::getValue('PS_GROWTH_ONE_CUSTOMER_ID');
         $orderInput=Tools::getValue('PS_GROWTH_ONE_ORDER_ID');
         // Render only normalized numeric IDs from the current request, not
@@ -296,6 +305,13 @@ class PsSalesforceBridge extends Module
                 && preg_match(
                     '/(?:^|_)(?:stage|staging)(?:_|$)/D',$namespace
                 )===1,
+            'sfmc_g8_target_bound'=>$g8Target!==null,
+            'sfmc_g8_target_can_bind'=>$canManage
+                && $g8Target===null && $mode==='test'
+                && $capture==='off'
+                && preg_match(
+                    '/(?:^|_)(?:stage|staging)(?:_|$)/D',$namespace
+                )===1,
             'sfmc_g8_capture_prepare_available'=>$canManage
                 && $identity && $source['ready'] && $credentials
                 && $mode==='test' && $capture==='off'
@@ -305,6 +321,7 @@ class PsSalesforceBridge extends Module
             'sfmc_g8_capture_prepare_phrase'=>GrowthStagingSchemaBootstrap::CONFIRM,
             'sfmc_g8_backup_phrase'=>'I_HAVE_A_VERIFIED_STAGING_BACKUP',
             'sfmc_g8_staging_available'=>$canManage
+                && $g8Target!==null
                 && $identity && $source['ready'] && $credentials
                 && $mode==='test' && $capture==='off'
                 && preg_match(
@@ -328,6 +345,98 @@ class PsSalesforceBridge extends Module
                 $namespace,$shop,'PSOrder')
         ]);
         return $this->display(__FILE__,'views/templates/admin/console.tpl');
+    }
+
+    /**
+     * Bind only the two exact, current, never-attempted UAT events to the
+     * staging worker. No Salesforce request and no G3 mutation here.
+     */
+    private function handleG8UatTarget($operation)
+    {
+        $shop=$this->credentialContextShopId();
+        $csrf=Tools::getValue('PS_GROWTH_G8_CSRF');
+        $merchant=(string)Configuration::get(self::CONFIG_MERCHANT);
+        $namespace=(string)Configuration::get(self::CONFIG_NAMESPACE);
+        if (!in_array($operation,['bind','revoke'],true)
+            || !$this->isCredentialAdmin($shop)
+            || !is_string($csrf)
+            || $this->credentialCsrf($shop)===''
+            || !hash_equals($this->credentialCsrf($shop),$csrf)
+            || (string)Configuration::get(self::CONFIG_MODE)!=='test'
+            || (string)Configuration::get(self::CONFIG_LOCAL_CAPTURE)!=='off'
+            || !GrowthShopSourceBinding::isMerchant($merchant)
+            || !GrowthShopSourceBinding::isNamespace($namespace)
+            || preg_match(
+                '/(?:^|_)(?:stage|staging)(?:_|$)/D',$namespace
+            )!==1) {
+            return $this->displayError(
+                $this->l('UAT exacta no autorizada para esta tienda. No se han enviado registros.')
+            );
+        }
+        if ($operation==='revoke') {
+            if (!GrowthG8UatPairScope::clear(
+                $shop,$merchant,$namespace
+            ) || !Configuration::updateValue(
+                'PS_GROWTH_G8_STAGING_APPROVAL',
+                'off',false,null,$shop
+            )) {
+                return $this->displayError(
+                    $this->l('No se ha podido retirar la selección G8. Comprueba la autorización y desactiva la UAT.')
+                );
+            }
+            return $this->displayConfirmation(
+                $this->l('Selección G8 retirada y autorización de staging desactivada. No se han enviado registros.')
+            );
+        }
+        if ((string)Configuration::get(
+                'PS_GROWTH_G8_STAGING_APPROVAL'
+            )===GrowthG8StagingWorker::APPROVAL) {
+            return $this->displayError(
+                $this->l('Desactiva G8 antes de cambiar la selección de UAT.')
+            );
+        }
+        $rawCustomer=Tools::getValue('PS_GROWTH_ONE_CUSTOMER_ID');
+        $rawOrder=Tools::getValue('PS_GROWTH_ONE_ORDER_ID');
+        if (!is_scalar($rawCustomer) || !is_scalar($rawOrder)
+            || !preg_match('/^[1-9][0-9]{0,14}$/D',(string)$rawCustomer)
+            || !preg_match('/^[1-9][0-9]{0,14}$/D',(string)$rawOrder)) {
+            return $this->displayError(
+                $this->l('Introduce los IDs numéricos del cliente y pedido de pruebas.')
+            );
+        }
+        $customerId=(int)$rawCustomer;
+        $orderId=(int)$rawOrder;
+        try {
+            $customer=new Customer($customerId);
+            $order=new Order($orderId);
+            if ((int)$customer->id!==$customerId
+                || (int)$customer->id_shop!==$shop
+                || (int)$order->id!==$orderId
+                || (int)$order->id_shop!==$shop
+                || (int)$order->id_customer!==$customerId) {
+                throw new \RuntimeException('g8_target_link_invalid');
+            }
+            $proof=GrowthG8ExactCaptureInspector::inspect(
+                Db::getInstance(),(string)_PS_VERSION_,
+                $merchant,$namespace,_DB_PREFIX_,$shop,
+                $customerId,$orderId
+            );
+            if ($proof['status']!=='both_events_captured'
+                || !GrowthG8UatPairScope::bind(
+                    $shop,$merchant,$namespace,$customerId,$orderId
+                )) {
+                return $this->displayError(
+                    $this->l('No se puede fijar G8: verifica la captura exacta de ambos eventos, sin intentos ni selecciones anteriores. No se ha enviado nada.')
+                );
+            }
+            return $this->displayConfirmation(
+                $this->l('UAT G8 vinculada únicamente a este cliente y pedido de pruebas. Ningún evento histórico podrá entrar en dispatch. No se ha enviado nada.')
+            );
+        } catch (\Throwable $ignored) {
+            return $this->displayError(
+                $this->l('Selección G8 no verificada. No se ha enviado nada a Salesforce.')
+            );
+        }
     }
 
     /**
@@ -497,6 +606,9 @@ class PsSalesforceBridge extends Module
                 )!==1
                 || (string)Configuration::get(self::CONFIG_MODE)!=='test'
                 || (string)Configuration::get(self::CONFIG_LOCAL_CAPTURE)!=='off'
+                || GrowthG8UatPairScope::inspect(
+                    $shop,$merchant,$namespace
+                )===null
                 || (string)Configuration::get(
                     'PS_SFMC_CART_CONSENT_MODE'
                 )!=='marketing_optin'

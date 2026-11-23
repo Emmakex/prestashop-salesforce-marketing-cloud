@@ -60,6 +60,7 @@ foreach([
     'Growth/GrowthG8DurableReceiptBridge.php',
     'Growth/GrowthG8StagingReadyGate.php',
     'Growth/GrowthG8StagingWorker.php',
+    'Growth/GrowthG8UatPairScope.php',
     'Growth/GrowthLocalCustomerHoldReader.php',
     'Growth/GrowthG7NativePreflight.php',
     'Growth/GrowthG7CurrentEventBatch.php',
@@ -1002,6 +1003,15 @@ $db->execute("UPDATE $tab SET delivery_state='blocked',"
     . " AND entity_type='customer' AND entity_id=901");
 g7DbCheck($native->inspect(1,'customer',901,$nativeSeq901)['state']
     ==='blocked','g8_worker_fixture_not_blocked');
+$uatTarget=\Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthG8UatPairScope::class;
+g7DbCheck($uatTarget::bind(1,'ABH',$ns,901,902),
+    'g8_exact_uat_target_not_bound');
+$targetRead=$uatTarget::inspect(1,'ABH',$ns);
+g7DbCheck(is_array($targetRead)
+    && $targetRead['customer_id']===901
+    && $targetRead['order_id']===902
+    && !$uatTarget::bind(1,'ABH',$ns,904,905),
+    'g8_exact_uat_target_switch_allowed');
 Configuration::updateValue(
     'PS_GROWTH_G8_STAGING_APPROVAL',$workerClass::APPROVAL
 );
@@ -1053,6 +1063,9 @@ $runWorker=$workerClass::run(
     $db,_PS_VERSION_,$g8Scope,_DB_PREFIX_,$services
 );
 $workerReceipt=$native->inspect(1,'customer',901,$nativeSeq901);
+// Exact customer/order isolation: the worker may not touch other G3 events.
+g7DbCheck($native->inspect(1,'customer',904,$g8Sequence)['attempts']===1,
+    'g8_other_customer_modified');
 fwrite(STDERR,'G8 synthetic CI diagnosis: '.json_encode([
     'worker_status'=>$runWorker['status'],
     'counts'=>$runWorker['counts'],

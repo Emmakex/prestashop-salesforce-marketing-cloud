@@ -50,6 +50,13 @@ final class GrowthG8NativeStagingServices
             'owner_gate'=>GrowthAutomaticOneShotCoordinator::OWNER_GATE
         ];
 
+        // No OAuth or metadata requests before a private, exact UAT
+        // customer/order selection has been bound by the BO administrator.
+        if (GrowthG8UatPairScope::inspect(
+            $shop,$merchant,$namespace
+        )===null) {
+            return self::report('staging_target_not_bound');
+        }
         try {
             $credential=GrowthShopCredentialVault::inspect($shop);
             if (!is_array($credential) || !isset($credential['ready'])
