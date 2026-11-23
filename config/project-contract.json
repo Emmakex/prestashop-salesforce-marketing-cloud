@@ -28,7 +28,7 @@
     "live_campaign_sends_authorized": false,
     "historical_backfill_authorized": false,
     "external_sender_provider": "not_implemented_for_pilot",
-    "target_module_version": "0.9.6"
+    "target_module_version": "0.9.7"
   },
   "provider_registry": {
     "marketing_cloud_growth": {

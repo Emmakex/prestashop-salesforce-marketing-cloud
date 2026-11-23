@@ -68,7 +68,7 @@ $module=file_get_contents(
 assertDiagnosis(strpos($module,
     "GrowthOneRecordSafeDiagnosis::classify(")!==false
     && strpos($module,"safeOneRecordFailureMessage(")!==false
-    && strpos($module,"$"."this->version = '0.9.6';")!==false
+    && strpos($module,"$"."this->version = '0.9.7';")!==false
     && strpos($module,"Prueba bloqueada o ya intentada.")===false,
     'module_old_generic_error_still_reachable');
 assertDiagnosis(strpos($module,
