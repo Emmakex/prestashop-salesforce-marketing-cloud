@@ -63,7 +63,30 @@ final class GrowthG8LocalPreDispatchReview
                 return self::report('local_customer_read_unverified');
             }
             if ($local['local_customer_source_state']==='known_negative') {
-                return self::report('local_customer_excluded');
+                // Return only allowlisted source-state codes already computed
+                // by the local reader. Never expose customer fields or raw data.
+                $allowed=[
+                    'local_customer_deleted',
+                    'local_customer_inactive',
+                    'local_customer_guest',
+                    'local_newsletter_negative',
+                    'local_optin_negative'
+                ];
+                if (!isset($local['reasons']) || !is_array($local['reasons'])
+                    || count($local['reasons'])<1
+                    || count($local['reasons'])>count($allowed)) {
+                    return self::report('local_customer_read_unverified');
+                }
+                $reasons=[];
+                foreach ($local['reasons'] as $reason) {
+                    if (!is_string($reason)
+                        || !in_array($reason,$allowed,true)
+                        || in_array($reason,$reasons,true)) {
+                        return self::report('local_customer_read_unverified');
+                    }
+                    $reasons[]=$reason;
+                }
+                return self::report('local_customer_excluded',$reasons);
             }
             if ($local['local_customer_source_state']
                 !=='no_local_negative_observed') {
@@ -137,10 +160,11 @@ final class GrowthG8LocalPreDispatchReview
             return self::report('native_customer_payload_unverified');
         }
     }
-    private static function report($status)
+    private static function report($status,array $reasons=[])
     {
         return [
-            'status'=>$status,'read_only'=>true,
+            'status'=>$status,'local_exclusion_reasons'=>$reasons,
+            'read_only'=>true,
             'customer_data_exposed'=>false,
             'http_request_performed'=>false,
             'database_write_performed'=>false,
