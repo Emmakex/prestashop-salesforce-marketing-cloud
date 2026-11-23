@@ -59,7 +59,12 @@ foreach ([
     [$fixture([],false),'unknown','batch_unverified'],
     [$fixture([],true,1),'unknown','batch_unverified'],
     [$fixture(['not_a_row_object']),'unknown','row_not_object'],
-    [$fixture([['other_column'=>'value']]),'unknown','row_field_missing'],
+    [$fixture([[]]),'unknown','row_projection_unverified'],
+    [$fixture([['g8_exact_source_key'=>$expected,
+        'unexpected_extra'=>$expected]]),'unknown','row_projection_unverified'],
+    [$fixture([['source_key__c'=>$expected]]),'present','exact_match'],
+    [$fixture([0=>$expected]),'present','exact_match'],
+    [$fixture([['other_column'=>'value']]),'unknown','row_key_not_exact'],
     [$fixture([['g8_exact_source_key'=>123]]),'unknown','row_value_not_string'],
     [$fixture([['g8_exact_source_key'=>'wrong']]),'unknown','row_key_not_exact'],
     [$fixture([],true,0,400),'unknown','http_status_400'],
@@ -74,11 +79,18 @@ foreach ([
     dloAssert($diag===['result'=>$case[1],'reason'=>$case[2]],
         'restricted_result_reason');
 }
-// A row whose returned field name ignores the explicit SQL alias cannot
-// certify an exact source key even if its value happens to look correct.
+// Query V2 may relabel its output. Projection is a single field: the
+// exact string value is sufficient; multiple values are never accepted.
 dloAssert($diagnose($fixture([['source_key__c'=>$expected]]))===[
-    'result'=>'unknown','reason'=>'row_field_missing'
-],'unexpected_unaliased_column_accepted');
+    'result'=>'present','reason'=>'exact_match'
+],'single_projection_relabelled_column_rejected');
+dloAssert($diagnose($fixture([['source_key__c'=>$expected,
+    'unexpected_extra'=>$expected]]))===[
+    'result'=>'unknown','reason'=>'row_projection_unverified'
+],'multiple_projection_values_accepted');
+dloAssert($diagnose($fixture([['source_key__c'=>'wrong']]))===[
+    'result'=>'unknown','reason'=>'row_key_not_exact'
+],'unaliased_but_wrong_value_accepted');
 dloAssert($diagnose(function() {
     return ['status'=>200,'body'=>'not-json'];
 })===['result'=>'unknown','reason'=>'json_unverified'],
