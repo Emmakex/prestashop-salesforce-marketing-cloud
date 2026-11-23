@@ -1,0 +1,107 @@
+name: G8 Staging Cron Read-only Check
+
+on:
+  workflow_dispatch:
+    inputs:
+      operation:
+        description: "Protected cron verification (never ingestion)"
+        required: true
+        default: status
+        type: choice
+        options:
+          - status
+          - inspect
+
+permissions:
+  contents: read
+
+concurrency:
+  group: g8-staging-cron-readonly
+  cancel-in-progress: false
+
+jobs:
+  readonly:
+    name: Staging cron token and G3 read-only validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      CRON_OPERATION: ${{ inputs.operation }}
+      STAGING_CRON_ENDPOINT: ${{ secrets.G8_STAGING_CRON_ENDPOINT }}
+      STAGING_CRON_TOKEN: ${{ secrets.G8_STAGING_CRON_TOKEN }}
+    steps:
+      - name: Validate request and query protected cron safely
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import os
+          from urllib.parse import urlsplit
+          operation = os.environ.get("CRON_OPERATION", "")
+          endpoint = os.environ.get("STAGING_CRON_ENDPOINT", "")
+          token = os.environ.get("STAGING_CRON_TOKEN", "")
+          if operation not in ("status", "inspect"):
+              raise SystemExit("Blocked: unknown read-only cron operation.")
+          if not endpoint or not token:
+              raise SystemExit("Blocked: configure G8_STAGING_CRON_ENDPOINT and G8_STAGING_CRON_TOKEN in GitHub Actions secrets.")
+          parsed = urlsplit(endpoint)
+          if (parsed.scheme != "https" or not parsed.hostname
+                  or parsed.username or parsed.password or parsed.query
+                  or parsed.fragment
+                  or parsed.path.rstrip("/") != "/module/pssalesforcebridge/cron"):
+              raise SystemExit("Blocked: expected a clean HTTPS PrestaShop cron endpoint without query or fragments.")
+          PY
+          response="$(mktemp)"
+          trap 'rm -f "$response"' EXIT
+          # URL and token are never printed. GET is read-only.
+          code="$(curl --silent --show-error --proto '=https' --max-time 20 \
+            --max-redirs 0 --output "$response" --write-out '%{http_code}' \
+            --get --data-urlencode "operation=${CRON_OPERATION}" \
+            --data-urlencode "token=${STAGING_CRON_TOKEN}" \
+            "${STAGING_CRON_ENDPOINT}")"
+          if [ "$code" != "200" ]; then
+            echo "Protected read-only cron unavailable (HTTP $code). No ingestion request was made." >&2
+            exit 1
+          fi
+          python3 - "$response" <<'PY'
+          import json
+          import os
+          import sys
+          from pathlib import Path
+          try:
+              data = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+          except (OSError, ValueError, UnicodeError):
+              raise SystemExit("Blocked: cron response is not valid JSON.")
+          if not isinstance(data, dict) or data.get("ok") is not True:
+              raise SystemExit("Blocked: cron returned an unavailable status.")
+          op = os.environ["CRON_OPERATION"]
+          if op == "status":
+              if data.get("status") != "blocked_test":
+                  raise SystemExit("Blocked: default cron is no longer inert.")
+              print("G8 status: blocked_test. No data ingestion authorized.")
+              sys.exit(0)
+          states = {
+              "staging_events_review_only", "blocked_by_configuration",
+              "blocked_non_staging", "blocked_source_binding",
+              "staging_schema_unavailable"
+          }
+          if data.get("status") not in states:
+              raise SystemExit("Blocked: unexpected G8 read-only state.")
+          for key, value in (
+              ("read_only", True),
+              ("database_write_performed", False),
+              ("http_request_performed", False),
+              ("data_cloud_ingestion_authorized", False),
+              ("marketing_sends_authorized", False),
+              ("automatic_retry_authorized", False),
+              ("scheduler_activated", False),
+              ("identifiers_exposed", False),
+              ("cursor_exposed", False),
+          ):
+              if data.get(key) is not value:
+                  raise SystemExit("Blocked: read-only response safety contract changed.")
+          count = data.get("reviewed_candidates")
+          if type(count) is not int or not 0 <= count <= 10:
+              raise SystemExit("Blocked: unexpected bounded candidate count.")
+          print("G8 inspect:", data["status"], "| candidate count:", count,
+                "| no outbound ingestion, no changes.")
+          PY

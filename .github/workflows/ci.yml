@@ -24,6 +24,7 @@ jobs:
         run: |
           python3 scripts/ci/verify-project-focus.py
           python3 -m unittest discover -s tests -p 'test_project_focus.py'
+          python3 -m unittest discover -s tests -p 'test_g8_cron_readonly_workflow.py'
 
   growth-product-boundary:
     name: Growth + Data Cloud source boundary
