@@ -582,6 +582,9 @@ class PsSalesforceBridge extends Module
                 $this->l('No hay cliente y pedido fijados para esta UAT G8.')
             );
         }
+        // An exception during preflight cannot have reached the transport.
+        // For customer/order, distinguish preparation from a started worker.
+        $phase='local_customer';
         try {
             $local=GrowthLocalCustomerHoldReader::inspectPrestaShop(
                 $shop,$target['customer_id']
@@ -598,10 +601,12 @@ class PsSalesforceBridge extends Module
                 );
             }
             if ($operation==='preflight') {
+                $phase='preflight_render';
                 return $this->displayConfirmation(
                     $this->l('Preflight local G8 correcto: cliente registrado, activo y sin exclusiones locales. No certifica consentimiento de campañas ni comprueba DLO. No se ha enviado nada.')
                 );
             }
+            $phase='confirmation';
             $confirm=Tools::getValue('PS_GROWTH_G8_RUN_CONFIRM');
             $expected=$operation==='customer'
                 ?'EXECUTE_G8_CUSTOMER_ONCE':'EXECUTE_G8_ORDER_ONCE';
@@ -612,10 +617,14 @@ class PsSalesforceBridge extends Module
             }
             // Do not reuse the one-record manual send path. Ingest only
             // the selected object via the protected native G8 worker.
+            // Once this call is entered, a POST might have started. From
+            // here onward no exception may be called a pre-send failure.
+            $phase='worker_invoked';
             $outcome=GrowthG8NativeStagingServices::run(
                 Db::getInstance(),(string)_PS_VERSION_,_DB_PREFIX_,
                 $shop,$operation==='customer'?'PSCustomer':'PSOrder'
             );
+            $phase='receipt_reporting';
             $count=is_array($outcome) && isset($outcome['counts'])
                 && is_array($outcome['counts'])?$outcome['counts']:null;
             if ($count!==null
@@ -639,8 +648,21 @@ class PsSalesforceBridge extends Module
                 $this->l('G8: resultado sin confirmación de recepción. Puede existir un intento en G3; no repitas la operación. Comprueba el recibo y Data Cloud.')
             );
         } catch (\Throwable $ignored) {
+            // The preflight UI is local-only; it never reaches worker/POST.
+            if ($operation==='preflight') {
+                return $this->displayError(
+                    $this->l('G8: preflight local inconcluso antes de cualquier envío. No se ha ejecutado ningún POST desde este preflight. Utiliza el diagnóstico G8 sin enviar; no ejecutes cliente ni pedido.')
+                );
+            }
+            if ($phase==='local_customer' || $phase==='confirmation') {
+                return $this->displayError(
+                    $this->l('G8: la preparación local falló antes de invocar el transporte. No se ha iniciado POST desde esta operación. Conserva G3 y revisa el diagnóstico local.')
+                );
+            }
+            // The worker may have reached the transport even if this UI
+            // failed to render. Never infer non-delivery from this error.
             return $this->displayError(
-                $this->l('G8: no se pudo confirmar el resultado. Antes de cualquier otro intento comprueba G3 y Data Cloud.')
+                $this->l('G8: resultado de la ejecución no confirmado. Puede haber existido un POST. No reintentes; revisa recibos G3 y presencia exacta en Data Cloud.')
             );
         }
     }

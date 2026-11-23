@@ -36,7 +36,14 @@ foreach ([
     "$operation==='customer'?'PSCustomer':'PSOrder'",
     "accepted_202_unconfirmed",
     "pending_reconciliation",
-    "No repitas la ejecución"
+    "No repitas la ejecución",
+    "\$phase='local_customer'",
+    "\$phase='preflight_render'",
+    "\$phase='confirmation'",
+    "\$phase='worker_invoked'",
+    "\$phase='receipt_reporting'",
+    "No se ha ejecutado ningún POST desde este preflight",
+    "Puede haber existido un POST"
 ] as $required) {
     g8OperatorAssert(strpos($handler,$required)!==false,
         'missing_security_or_no_retry_guard');
@@ -48,6 +55,9 @@ g8OperatorAssert($localFirst!==false && $localFirst<$explicit
     && $explicit<$firstNetwork,'local_or_confirmation_after_network');
 g8OperatorAssert(strpos($handler,"if (\$operation==='preflight')")!==false
     && strpos($handler,'return $this->displayConfirmation(')!==false
+    && strpos($handler,"if (\$operation==='preflight') {\n                return \$this->displayError(")!==false
+    && strpos($handler,"\$phase='worker_invoked'")<strpos($handler,'GrowthG8NativeStagingServices::run(')
+    && strpos($handler,"\$phase='receipt_reporting'")>strpos($handler,'GrowthG8NativeStagingServices::run(')
     && strpos($handler,'curl_')===false
     && strpos($handler,'Mail::send(')===false,
     'read_only_preflight_sends');
