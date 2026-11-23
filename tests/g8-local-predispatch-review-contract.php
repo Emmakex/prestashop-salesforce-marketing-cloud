@@ -62,11 +62,13 @@ namespace Emmakex\PrestaShopSalesforceMarketingCloud\Growth {
     }
     final class GrowthLocalCustomerHoldReader {
         public static $source='no_local_negative_observed';
+        public static $reasons=['local_newsletter_negative'];
         public static $throw=false;
         public static function inspectPrestaShop($shop,$customer) {
             if (self::$throw)throw new \RuntimeException('private exception');
             return ['status'=>'hold_for_review',
-                'local_customer_source_state'=>self::$source];
+                'local_customer_source_state'=>self::$source,
+                'reasons'=>self::$reasons];
         }
     }
     final class GrowthPrestaShopDeliveryLease {
@@ -126,8 +128,35 @@ namespace {
     localG8Assert($run('pssfmc_prod')['status']==='stage_scope_invalid',
         'production_preflight_blocked');
     $local::$source='known_negative';
-    localG8Assert($run()['status']==='local_customer_excluded',
-        'optout_not_held');
+    $excluded=$run();
+    localG8Assert($excluded['status']==='local_customer_excluded'
+        && $excluded['local_exclusion_reasons']===['local_newsletter_negative']
+        && !$excluded['retry_authorized']
+        && !$excluded['http_request_performed'],'optout_not_held');
+    foreach ([
+        'local_customer_deleted','local_customer_inactive',
+        'local_customer_guest','local_newsletter_negative',
+        'local_optin_negative'
+    ] as $reason) {
+        $local::$reasons=[$reason];
+        $excluded=$run();
+        localG8Assert($excluded['status']==='local_customer_excluded'
+            && $excluded['local_exclusion_reasons']===[$reason]
+            && !$excluded['dispatch_authorized'],
+            'excluded_reason_'.$reason);
+    }
+    $local::$reasons=['local_optin_negative','local_newsletter_negative'];
+    localG8Assert($run()['local_exclusion_reasons']===$local::$reasons,
+        'multiple_exclusion_reasons');
+    $local::$reasons=['local_optin_negative','private.email@example.org'];
+    $rejected=$run();
+    localG8Assert($rejected['status']==='local_customer_read_unverified'
+        && $rejected['local_exclusion_reasons']===[],
+        'forbidden_reason_leaked');
+    $local::$reasons=[];
+    localG8Assert($run()['status']==='local_customer_read_unverified',
+        'missing_reasons_accepted');
+    $local::$reasons=['local_newsletter_negative'];
     $local::$source='unknown';
     localG8Assert($run()['status']==='local_customer_read_unverified',
         'unknown_local_read_accepted');
@@ -174,7 +203,10 @@ namespace {
         && strpos($handler,"if (\$operation==='local')")!==false
         && strpos($handler,'GrowthG8LocalPreDispatchReview::inspect(')!==false
         && strpos($handler,'isCredentialAdmin($shop)')!==false
-        && strpos($handler,'hash_equals($this->credentialCsrf($shop),$csrf)')!==false,
+        && strpos($handler,'hash_equals($this->credentialCsrf($shop),$csrf)')!==false
+        && strpos($handler,"'local_customer_excluded'")!==false
+        && strpos($handler,'local_exclusion_reasons')!==false
+        && strpos($handler,'local_customer_reason_unverified')!==false,
         'bo_review_not_protected');
     foreach ([
         'curl_','GrowthDataCloudUpsertTransport','Mail::send(',
