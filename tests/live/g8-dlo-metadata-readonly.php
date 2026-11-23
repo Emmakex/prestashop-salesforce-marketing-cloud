@@ -125,9 +125,13 @@ try {
         $origin,$token,'/api/v1/metadataEntities?entityType=DataLakeObject'
     );
     $stage='metadata_resolve';
+    $metadataLookups=0;
     $resolved=Metadata::resolve(
         $entities,
-        function($entityName)use($origin,$token) {
+        function($entityName)use($origin,$token,&$stage,&$metadataLookups) {
+            $metadataLookups++;
+            $stage=$metadataLookups===1?'metadata_customer_get'
+                :($metadataLookups===2?'metadata_order_get':'metadata_resolve');
             return g8MetadataGet(
                 $origin,$token,
                 '/api/v1/metadata/?entityType=DataLakeObject&entityName='
@@ -165,6 +169,7 @@ try {
     // NEVER raw errors, host, response text, SQL, tokens or entity names.
     $allowedStages=[
         'oauth_core','oauth_exchange','catalog_get','metadata_resolve',
+        'metadata_customer_get','metadata_order_get',
         'canary_customer','canary_order'
     ];
     $evidence['failure_stage']=in_array(
