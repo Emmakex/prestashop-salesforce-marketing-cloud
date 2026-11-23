@@ -135,3 +135,10 @@ El botón protegido **Diagnosticar preenvío G8 sin enviar** aparece incluso con
 Responde exclusivamente con códigos PII-free como local_customer_excluded, local_customer_reader_exception, g3_candidate_unverified, g7_schema_or_candidate_unverified, native_customer_payload_unverified o local_pre_dispatch_validated_no_send. No POST, OAuth, cambios SQL ni campañas.
 
 Un resultado local validado no autoriza el reenvío ni sustituye la evidencia de Data Cloud. Reparar solo el punto defectuoso y finalizar UAT antes de publicar versión definitiva.
+
+
+## Diagnóstico de elegibilidad local del cliente (lectura segura)
+
+Si el preenvío G8 devuelve `local_customer_excluded`, ahora informa **solo** los códigos locales permitidos y sin datos personales: `local_customer_deleted`, `local_customer_inactive`, `local_customer_guest`, `local_newsletter_negative`, `local_optin_negative`. Puede devolver varios motivos. El BO descarta cualquier motivo fuera de esa lista; no muestra el contenido de filas ni consulta Salesforce.
+
+Los indicadores `newsletter` y `optin` proceden del cliente PrestaShop y se utilizan en el filtro técnico local actual; **no sustituyen ni modifican** el consentimiento comercial ya verificado en Growth/CRM. El diagnóstico por sí solo no autoriza cambiar las preferencias de un cliente, reenviar ni pasar el ledger G3 a READY. Si las preferencias son legítimamente negativas, no se deben modificar para forzar la UAT; se necesita un cliente sintético nuevo y elegible, con una autorización de prueba independiente y sin reutilizar el primer envío incierto.
