@@ -37,7 +37,8 @@ foreach ([
     "accepted_202_unconfirmed",
     "pending_reconciliation",
     "No repitas la ejecución",
-    "\$phase='local_customer'",
+    "\$phase='customer_local_review'",
+    "\$phase='order_local_reader'",
     "'local_pre_dispatch_validated_no_send'",
     'GrowthG8LocalPreDispatchReview::inspect(',
     "\$preflightPhase='render'",
@@ -45,6 +46,7 @@ foreach ([
     "\$phase='worker_invoked'",
     "\$phase='receipt_reporting'",
     "No se ha ejecutado POST desde esta acción",
+    "Sin POST en esta operación",
     "Puede haber existido un POST"
 ] as $required) {
     g8OperatorAssert(strpos($handler,$required)!==false,
@@ -56,7 +58,7 @@ $explicit=strpos($handler,'EXECUTE_G8_CUSTOMER_ONCE');
 g8OperatorAssert($localFirst!==false && $localFirst<$explicit
     && $explicit<$firstNetwork,'local_or_confirmation_after_network');
 $preflightStart=strpos($handler,"if (\$operation==='preflight') {");
-$customerGateStart=strpos($handler,"\$phase='local_customer'");
+$customerGateStart=strpos($handler,"\$phase='customer_local_review'");
 g8OperatorAssert($preflightStart!==false
     && $customerGateStart!==false
     && $preflightStart<$customerGateStart
@@ -76,10 +78,27 @@ g8OperatorAssert(strpos($preflight,'GrowthG8LocalPreDispatchReview::inspect(')!=
     && strpos($preflight,'curl_')===false
     && strpos($preflight,'Mail::send(')===false,
     'read_only_preflight_sends');
+$customerSection=substr($handler,$customerGateStart,
+    $firstNetwork-$customerGateStart);
+g8OperatorAssert(strpos($customerSection,"if (\$operation==='customer')")!==false
+    && strpos($customerSection,'GrowthG8LocalPreDispatchReview::inspect(')!==false
+    && strpos($customerSection,"'local_pre_dispatch_validated_no_send'")!==false
+    && strpos($customerSection,"\$review['read_only']===true")!==false
+    && strpos($customerSection,"\$review['http_request_performed']===false")!==false
+    && strpos($customerSection,"\$review['database_write_performed']===false")!==false
+    && strpos($customerSection,"\$review['dispatch_authorized']===false")!==false
+    && strpos($customerSection,"\$review['retry_authorized']===false")!==false
+    && strpos($customerSection,"\$phase='order_local_reader'")!==false
+    && strpos($customerSection,'GrowthLocalCustomerHoldReader::inspectPrestaShop(')!==false
+    && strpos($customerSection,'GrowthG8NativeStagingServices::run(')===false,
+    'customer_and_order_local_gates_not_isolated');
 g8OperatorAssert(strpos($handler,"\$phase='worker_invoked'")
         <strpos($handler,'GrowthG8NativeStagingServices::run(')
     && strpos($handler,"\$phase='receipt_reporting'")
-        >strpos($handler,'GrowthG8NativeStagingServices::run('),
+        >strpos($handler,'GrowthG8NativeStagingServices::run(')
+    && strpos($handler,"if (\$phase==='customer_local_review')")!==false
+    && strpos($handler,"if (\$phase==='order_local_reader')")!==false
+    && strpos($handler,"if (\$phase==='confirmation')")!==false,
     'uncertain_send_guard_missing');
 foreach ([
     'submitPsGrowthG8Preflight',
