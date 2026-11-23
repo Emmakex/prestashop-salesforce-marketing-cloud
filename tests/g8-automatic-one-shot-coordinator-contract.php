@@ -63,11 +63,25 @@ $fakeLoad=function($c)use(&$sourceFlip,$ns) {
         'fingerprint'=>hash('sha256',($sourceFlip?'changed':'original')
             .$c['type'].$c['id']),
         'payload_private'=>$payload,
-        'customer_id'=>44
+        'customer_id'=>$isCustomer?$c['id']:44
     ];
 };
 $eligible=function($fresh)use(&$localAllowed){
     return $localAllowed;
+};
+$consentAllowed=true;
+$denyConsentStage=null;
+$consentSeen=[];
+$contactFence=function($candidate,$customerId,$stage)
+    use(&$consentAllowed,&$denyConsentStage,&$consentSeen){
+    autoAssert(
+        $candidate['shop']===1 && is_int($customerId)
+        && $customerId===($candidate['type']==='PSCustomer'
+            ?$candidate['id']:44),
+        'contact_identity_mismatch'
+    );
+    $consentSeen[]=$stage;
+    return $consentAllowed===true && $denyConsentStage!==$stage;
 };
 $presence=function($candidate,$fresh)use(&$remote) {
     return $remote;
@@ -90,10 +104,10 @@ $save=function($candidate,$outcome)use(&$persisted) {
     $persisted[$candidate['type']]=$outcome;
     return true;
 };
-$run=function($events)use($scope,$fakeLoad,$eligible,$presence,$parent,$reserve,$post,$save) {
+$run=function($events)use($scope,$fakeLoad,$eligible,$presence,$parent,$reserve,$post,$save,$contactFence) {
     return Auto::tick(
         $scope,$events,$fakeLoad,$eligible,$presence,$parent,
-        $reserve,$post,$save
+        $reserve,$post,$save,$contactFence
     );
 };
 
@@ -149,7 +163,7 @@ $changedLoad=function($c)use($fakeLoad,&$freshReadCount,&$sourceFlip) {
 $changed=['shop'=>1,'type'=>'PSCustomer','id'=>47,'sequence'=>15];
 $changedResult=Auto::tick(
     $scope,[$changed],$changedLoad,$eligible,$presence,$parent,
-    $reserve,$post,$save
+    $reserve,$post,$save,$contactFence
 );
 autoAssert(count($calls)===2 && $changedResult['held']===1
     && $persisted['PSCustomer']==='held',
@@ -161,7 +175,7 @@ $uncertain=['shop'=>1,'type'=>'PSCustomer','id'=>48,'sequence'=>16];
 $throwingPost=function(){throw new RuntimeException('simulated_http_timeout');};
 $unknown=Auto::tick(
     $scope,[$uncertain],$fakeLoad,$eligible,$presence,$parent,
-    $reserve,$throwingPost,$save
+    $reserve,$throwingPost,$save,$contactFence
 );
 autoAssert($unknown['pending_reconciliation']===1
     && $unknown['accepted_202_unconfirmed']===0
@@ -170,10 +184,43 @@ $bad=['shop'=>1,'type'=>'PSCustomer','id'=>49,'sequence'=>17];
 $failedPost=function(){return ['http_status'=>503,'outcome'=>'rejected'];};
 $held=Auto::tick(
     $scope,[$bad],$fakeLoad,$eligible,$presence,$parent,
-    $reserve,$failedPost,$save
+    $reserve,$failedPost,$save,$contactFence
 );
 autoAssert($held['held']===1 && $persisted['PSCustomer']==='held',
     '503_not_held');
+
+// The coordinator MUST reject missing contact authorization even when
+// caller has all other fake callbacks and owner approval.
+autoBlocked(function()use($scope,$customer,$fakeLoad,$eligible,
+    $presence,$parent,$reserve,$post,$save) {
+    Auto::tick($scope,[$customer],$fakeLoad,$eligible,$presence,
+        $parent,$reserve,$post,$save);
+},'missing_contact_gate');
+$baseline=count($calls);
+$denyConsentStage='before_claim';
+$beforeDenied=$run([['shop'=>1,'type'=>'PSCustomer','id'=>51,'sequence'=>21]]);
+autoAssert($beforeDenied['reserved']===0 && count($calls)===$baseline,
+    'contact_before_claim_not_blocked');
+$denyConsentStage='after_claim';
+$afterDenied=$run([['shop'=>1,'type'=>'PSCustomer','id'=>52,'sequence'=>22]]);
+autoAssert($afterDenied['reserved']===1 && $afterDenied['held']===1
+    && count($calls)===$baseline && $persisted['PSCustomer']==='held',
+    'contact_after_claim_not_cancelled');
+$denyConsentStage='before_transport';
+$finalDenied=$run([['shop'=>1,'type'=>'PSCustomer','id'=>53,'sequence'=>23]]);
+autoAssert($finalDenied['reserved']===1 && $finalDenied['held']===1
+    && count($calls)===$baseline,
+    'contact_final_fence_not_cancelled');
+$denyConsentStage=null;
+$consentAllowed=1; // truthy but not exact boolean
+$nonBoolean=$run([['shop'=>1,'type'=>'PSCustomer','id'=>54,'sequence'=>24]]);
+autoAssert($nonBoolean['reserved']===0 && count($calls)===$baseline,
+    'contact_truthy_return_accepted');
+$consentAllowed=true;
+autoAssert(in_array('before_claim',$consentSeen,true)
+    && in_array('after_claim',$consentSeen,true)
+    && in_array('before_transport',$consentSeen,true),
+    'contact_fence_not_checked_three_times');
 
 // No settings, source or cross-shop cannot trigger callback.
 $notApproved=$scope;$notApproved['owner_gate']='';
