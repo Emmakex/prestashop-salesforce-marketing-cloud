@@ -129,4 +129,68 @@ foreach (['->claim(', '->execute(', 'Mail::send(', '->post(',
     'GrowthDataCloudUpsertTransport'] as $forbidden) {
     sdAssert(strpos($source,$forbidden)===false,'unexpected_sender');
 }
+
+/* Integrated rehearsal using the actual read-only scoped DLO adapter,
+ * native-lease interface, and G7 positive-but-HOLD CSC review contract. */
+require_once dirname(__DIR__)
+    .'/pssalesforcebridge/src/Growth/GrowthG8StagingSafetyReview.php';
+use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthG8StagingSafetyReview as Gate;
+
+$lease=new class {
+    public function inspect($shop,$type,$id,$sequence) {
+        sdAssert($shop===1 && $sequence>=10,'integration_lease_scope');
+        return [
+            'status'=>'staging_local_lease_only','state'=>'blocked',
+            'attempts'=>0,'last_http'=>null,'ledger_current'=>true,
+            'lease_active'=>false,'data_cloud_ingestion_authorized'=>false,
+            'outbound_worker_authorized'=>false,
+            'marketing_sends_authorized'=>false
+        ];
+    }
+};
+$csc=function($candidate) {
+    sdAssert($candidate['shop']===1,'integration_csc_shop');
+    return [
+        'status'=>'hold_for_review',
+        'reason'=>'csc_candidate_requires_sendtime_fence',
+        'csc_source_state'=>'recent_opt_in_observed_not_certified',
+        'source_and_consent_rechecked'=>true,
+        'send_time_consent_certified'=>false,
+        'final_dispatch_fence_certified'=>false,
+        'data_cloud_ingestion_authorized'=>false,
+        'marketing_sends_authorized'=>false
+    ];
+};
+$lookup=function($shop,$namespace,$object,$id)
+    use($descriptor,$read) {
+    return $read($descriptor,$shop,$namespace,$object,$id);
+};
+$selected=[
+    ['shop'=>1,'type'=>'PSCustomer','id'=>99111,'sequence'=>10],
+    ['shop'=>1,'type'=>'PSOrder','id'=>99222,'sequence'=>11],
+];
+$reviewScope=[
+    'shop'=>1,'merchant'=>'BCABH','namespace'=>$ns,
+    'mode'=>'test','capture'=>'off'
+];
+$remote='present';
+$combined=Gate::inspect(
+    $reviewScope,$selected,$lease,$csc,$lookup,
+    function($candidate) {return 99111;}
+);
+sdAssert($combined['status']==='staging_review_only_no_sends'
+    && $combined['counts']['remote_already_present']===2
+    && $combined['counts']['remote_absent_review_only']===0
+    && $combined['data_cloud_ingestion_authorized']===false,
+    'composed_present_dlo_sends_blocked');
+$remote='absent';
+$combined=Gate::inspect(
+    $reviewScope,$selected,$lease,$csc,$lookup,
+    function($candidate) {return 99111;}
+);
+sdAssert($combined['counts']['remote_absent_review_only']===1
+    && $combined['counts']['parent_not_verified']===1
+    && $combined['marketing_sends_authorized']===false,
+    'composed_missing_parent_dlo_sends_blocked');
+
 echo "G8 scoped DLO PASS: exact tenant/shop/source, tri-state, synthetic no egress.\n";
