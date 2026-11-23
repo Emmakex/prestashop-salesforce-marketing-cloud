@@ -34,8 +34,15 @@ final class GrowthG8DloMetadataResolver
             $customerMeta=call_user_func($metadataForEntity,$customer);
             $orderMeta=call_user_func($metadataForEntity,$order);
         } catch (Throwable $ignored) {
-            // A real metadata request may throw a URL/SQL/tenant-specific
-            // error. Never allow it to escape to BO or workflow artifacts.
+            // Keep only an explicitly allowlisted HTTP status from the
+            // metadata detail GET. Reject all host, URL, SQL and body text.
+            $code=(string)$ignored->getMessage();
+            if (preg_match(
+                '/^g8_metadata_http_status_(?:0|400|401|403|404|405|429|500|502|503|504|other)$/D',
+                $code
+            )===1 || $code==='g8_metadata_json_unverified') {
+                throw new RuntimeException($code);
+            }
             throw new RuntimeException('g8_dlo_metadata_lookup_failed');
         }
         $customerKey=self::exactField($customerMeta,$customer,'source_key');
