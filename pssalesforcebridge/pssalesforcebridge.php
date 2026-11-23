@@ -3,6 +3,7 @@
 /**
  * PrestaShop -> Salesforce Marketing Cloud Growth + Data Cloud.
  *
+ * v0.9.6 beta: protected staging pair cron, customer before order (OFF by default).
  * v0.9.5: staging G8 controlled UAT dispatcher (OFF until owner approval).
  * Existing public version remains frozen until end-to-end certification.
  * v0.9.4: safe, distinct local preview vs real send diagnostics; no PII.
@@ -122,7 +123,7 @@ class PsSalesforceBridge extends Module
     {
         $this->name = 'pssalesforcebridge';
         $this->tab = 'advertising_marketing';
-        $this->version = '0.9.5';
+        $this->version = '0.9.6';
         $this->author = 'ALFABH';
         $this->need_instance = 0;
         $this->bootstrap = true;
@@ -1837,8 +1838,11 @@ class PsSalesforceBridge extends Module
 
     public function cronReport($operation='status')
     {
-        // "status" remains inert; "inspect" stays read-only. The new
-        // "dispatch" path is stage-only, explicitly approved, and bounded.
+        // "status" remains inert, "inspect" is read-only. Existing
+        // "dispatch" remains a customer-only staging UAT. "dispatch_pair"
+        // requires an explicit protected cron operation and the same
+        // owner/target gates, and processes at most the selected customer
+        // followed by its order, with strict DLO parent confirmation.
         if ($operation==='inspect') {
             $shop=isset($this->context,$this->context->shop,
                 $this->context->shop->id)
@@ -1861,7 +1865,7 @@ class PsSalesforceBridge extends Module
                 $merchant,$namespace,_DB_PREFIX_
             );
         }
-        if ($operation==='dispatch') {
+        if ($operation==='dispatch' || $operation==='dispatch_pair') {
             $shop=$this->credentialContextShopId();
             $namespace=(string)Configuration::get(self::CONFIG_NAMESPACE);
             if ($shop<1
@@ -1880,10 +1884,16 @@ class PsSalesforceBridge extends Module
                     'automatic_retry_authorized'=>false
                 ];
             }
+            // The operation is deliberately opt-in by name. A configured
+            // "dispatch" cron NEVER silently changes to sending orders.
+            // Passing null selects both exact UAT rows. The worker itself
+            // rechecks PSCustomer DLO before PSOrder, CAS once per event,
+            // and quarantines every uncertain HTTP outcome.
+            $type=$operation==='dispatch_pair'?null:'PSCustomer';
             return GrowthG8NativeStagingServices::run(
                 Db::getInstance(),
                 defined('_PS_VERSION_')?(string)_PS_VERSION_:'',
-                _DB_PREFIX_,$shop
+                _DB_PREFIX_,$shop,$type
             );
         }
         // Pure status endpoint. No legacy queue, retry, backfill, scheduler,
