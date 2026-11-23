@@ -87,7 +87,7 @@ function g8MetadataGet($origin,$token,$path)
 }
 
 $evidence=[
-    'version'=>1,
+    'version'=>2,
     'status'=>'metadata_unverified',
     'run_id'=>(string)(getenv('GITHUB_RUN_ID')?:''),
     'commit_sha'=>(string)(getenv('GITHUB_SHA')?:''),
@@ -104,6 +104,10 @@ $evidence=[
     'exact_order_metadata_verified'=>false,
     'previous_customer_canary_found'=>false,
     'previous_order_canary_found'=>false,
+    'previous_customer_canary_status'=>'not_checked',
+    'previous_order_canary_status'=>'not_checked',
+    'previous_customer_canary_reason'=>'not_checked',
+    'previous_order_canary_reason'=>'not_checked',
 ];
 $stage='oauth_core';
 try {
@@ -147,18 +151,22 @@ try {
     $ns='growth_g5_canary_20261117';
     $id=987654321;
     $stage='canary_customer';
-    $customer=Presence::inspect(
+    $customer=Presence::inspectWithEvidence(
         $origin,$token,$ns,2,'PSCustomer',$id,
         $resolved['PSCustomer']['dlo'],$resolved['PSCustomer']['key']
     );
+    $evidence['previous_customer_canary_status']=$customer['result'];
+    $evidence['previous_customer_canary_reason']=$customer['reason'];
     $stage='canary_order';
-    $order=Presence::inspect(
+    $order=Presence::inspectWithEvidence(
         $origin,$token,$ns,2,'PSOrder',$id,
         $resolved['PSOrder']['dlo'],$resolved['PSOrder']['key']
     );
-    $evidence['previous_customer_canary_found']=$customer==='present';
-    $evidence['previous_order_canary_found']=$order==='present';
-    if ($customer==='present' && $order==='present') {
+    $evidence['previous_order_canary_status']=$order['result'];
+    $evidence['previous_order_canary_reason']=$order['reason'];
+    $evidence['previous_customer_canary_found']=$customer['result']==='present';
+    $evidence['previous_order_canary_found']=$order['result']==='present';
+    if ($customer['result']==='present' && $order['result']==='present') {
         $evidence['status']='exact_metadata_and_existing_canaries_verified';
     } else {
         $evidence['status']='exact_metadata_canaries_unverified';
