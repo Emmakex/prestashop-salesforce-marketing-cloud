@@ -514,11 +514,13 @@ class PsSalesforceBridge extends Module
                 'namespace'=>$namespace,'source'=>$source,
                 'origin'=>$origin,'resolved'=>$metadata
             ];
-            $presence=\Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthG8ScopedDloRead::inspect(
+            $evidence=\Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthG8ScopedDloRead::inspectWithEvidence(
                 $descriptor,$origin,$token,$shop,$namespace,
                 'PSCustomer',$target['customer_id']
             );
             unset($cloud,$origin,$token,$metadata,$descriptor);
+            $presence=is_array($evidence)
+                && isset($evidence['result'])?$evidence['result']:'unknown';
             if ($presence==='present') {
                 return $this->displayConfirmation(
                     $this->l('Data Cloud (lectura): cliente de UAT presente en el DLO de Salesforce. No se ha enviado nada nuevo. El resultado G3 debe revisarse antes del pedido.')
@@ -529,8 +531,30 @@ class PsSalesforceBridge extends Module
                     $this->l('Data Cloud (lectura): cliente todavía no localizado en el DLO. Una respuesta ausente no descarta un envío en tránsito. No reintentes.')
                 );
             }
+            $reason=is_array($evidence)
+                && isset($evidence['reason']) && is_string($evidence['reason'])
+                ?$evidence['reason']:'query_evidence_unverified';
+            $safe=[
+                'scope_unverified','scope_exception',
+                'query_evidence_unverified','request_invalid',
+                'transport_unverified','response_unverified',
+                'json_unverified','batch_unverified',
+                'row_not_object','row_projection_unverified',
+                'row_value_not_string','row_key_not_exact',
+                'transport_exception',
+                'http_status_0','http_status_400',
+                'http_status_401','http_status_403',
+                'http_status_404','http_status_405',
+                'http_status_408','http_status_422',
+                'http_status_429','http_status_500',
+                'http_status_502','http_status_503',
+                'http_status_504','http_status_other'
+            ];
+            if (!in_array($reason,$safe,true)) {
+                $reason='query_evidence_unverified';
+            }
             return $this->displayError(
-                $this->l('Data Cloud: consulta de presencia inconclusa. No reintentes el envío.')
+                sprintf($this->l('Data Cloud: consulta de presencia inconclusa (%s). No se ha ejecutado ningún POST de ingesta. No reintentes el envío.'),$reason)
             );
         } catch (\Throwable $ignored) {
             return $this->displayError(
