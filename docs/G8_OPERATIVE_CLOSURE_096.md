@@ -44,3 +44,11 @@ En GitHub → Settings → Secrets and variables → Actions → New repository 
 Después ejecutar manualmente el workflow `G8 Staging Cron Read-only Check` con operación `status`, no `dispatch` ni `dispatch_pair`. La acción no transmite registros y solo valida el endpoint protegido. El secreto no se muestra más al recargar el Back Office.
 
 **No reutilizar** el par UAT ambiguo ni habilitar envíos. Para entornos multitienda, este revelado está expresamente bloqueado por el token global heredado y requiere un diseño distinto por tienda.
+
+## 23/11/2026 — Corrección de visualización y generación explícita 0.9.8
+
+En **PrestaShop 9.1.5**, las alertas del Back Office pueden escapar HTML: la acción 0.9.7 enviaba el campo con token mediante `displayInformation($html)`, de modo que la entrada de copia no aparecía correctamente. La **0.9.8** devuelve un pequeño fragmento HTML directamente al resultado del módulo (solo en el POST autenticado del administrador). La respuesta aplica no-store, no-cache, no-referrer; **no se guarda el token en Smarty, logs ni URL**.
+
+La misma acción comprueba el secreto de cron **ya existente**: admite token hexadecimal heredado de 40 a 128 caracteres, sin reemplazarlo, regenerarlo ni invalidar otros usos. Si la clave está realmente ausente, el superadministrador puede inicializar un token de 48 caracteres **solo al pulsar el botón** con CSRF y bajo modo Test, captura OFF, UAT G8 desactivada, staging, tienda individual y sin multitienda. Un secreto existente de formato no reconocido no se sobrescribe; se informa del fallo con mensaje seguro. La actualización por sí misma no crea ni revela ningún token.
+
+**Prueba de aceptación:** actualizar el módulo en staging sin desinstalar, pulsar **Mostrar token protegido para copiar**, seleccionar el campo de contraseña y copiar con Cmd/Ctrl+A → Cmd/Ctrl+C. Pegar directamente en el secreto de Actions `G8_STAGING_CRON_TOKEN`, sin compartir capturas ni valor. Mantener UAT desactivada, no enviar datos, no ejecutar `dispatch_pair`. No reintentar el par ambiguo ni alterar G3.
