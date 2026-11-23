@@ -63,7 +63,7 @@ foreach ([
     [$fixture([['g8_exact_source_key'=>$expected,
         'unexpected_extra'=>$expected]]),'unknown','row_projection_unverified'],
     [$fixture([['source_key__c'=>$expected]]),'present','exact_match'],
-    [$fixture([0=>$expected]),'present','exact_match'],
+    [$fixture([[0=>$expected]]),'present','exact_match'],
     [$fixture([['other_column'=>'value']]),'unknown','row_key_not_exact'],
     [$fixture([['g8_exact_source_key'=>123]]),'unknown','row_value_not_string'],
     [$fixture([['g8_exact_source_key'=>'wrong']]),'unknown','row_key_not_exact'],
