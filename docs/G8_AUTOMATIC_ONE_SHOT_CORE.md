@@ -11,8 +11,9 @@
 3. Comprobación **por registro** de ausencia real en DLO para no duplicar tampoco los canarios y los envíos manuales ya verificados (estado `present` o `unknown` bloquea). Este punto requerirá un adaptador de consulta Salesforce específico; no basta con un HTTP 202 anterior.
 4. Pedido **solo tras presencia exacta del cliente** verificada en DLO. `customer_source_key` se valida contra el namespace, tienda y ID real del cliente.
 5. Lectura nativa y de elegibilidad local fresca, **reserva atómica persistente antes del POST**, segunda lectura después de reservar y comprobación de huella SHA256. Si cambia cualquier dato, retener.
-6. Respuesta HTTP **202** → estado `reconcile`, pendiente de observación DLO/DMO. HTTP distinto de 202 → `held`; timeout/estado desconocido → `reconcile` sin reintento ciego. El resultado expuesto contiene **solo contadores**, nunca IDs, email, payload ni fuente.
-7. El motor **no envía campañas**, no presupone permiso por `newsletter=1` ni modifica directamente el consentimiento CRM.
+6. La reserva SQL nativa solo puede obtenerse con `delivery_attempts=0`, sin token/TTL/HTTP anteriores y sobre la última revisión del ledger. Aunque otro proceso dejara indebidamente la fila en `ready`, un intento anterior nunca vuelve a reclamarla. No se crea transición a `ready` ni se conecta ningún sender.
+7. Respuesta HTTP **202** → estado `reconcile`, pendiente de observación DLO/DMO. HTTP distinto de 202 → `held`; timeout/estado desconocido → `reconcile` sin reintento ciego. El resultado expuesto contiene **solo contadores**, nunca IDs, email, payload ni fuente.
+8. El motor **no envía campañas**, no presupone permiso por `newsletter=1` ni modifica directamente el consentimiento CRM.
 
 ## Componentes existentes que deben conectarse, sin crear una cola nueva
 

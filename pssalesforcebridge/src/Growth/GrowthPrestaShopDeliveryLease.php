@@ -124,7 +124,7 @@ final class GrowthPrestaShopDeliveryLease
             . " AND o.entity_id=$id AND o.status='blocked'"
             . " AND l.status='blocked'"
             . ' AND l.latest_accepted_sequence=o.accepted_sequence'
-            . " AND o.delivery_state='ready' AND o.delivery_attempts<3";
+            . " AND o.delivery_state='ready' AND o.delivery_attempts=0 AND o.lease_token_hash IS NULL AND o.lease_until_epoch IS NULL AND o.delivery_last_http IS NULL";
         return $this->changedOnce($sql);
     }
 
