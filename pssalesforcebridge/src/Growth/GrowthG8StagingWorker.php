@@ -28,6 +28,7 @@ final class GrowthG8StagingWorker
             || preg_match('/^[A-Za-z0-9_]{1,32}$/D',$prefix)!==1) {
             return self::report('staging_worker_blocked',null);
         }
+        $phase='source_binding';
         try {
             $shop=$scope['shop'];
             $merchant=$scope['merchant'];
@@ -35,17 +36,21 @@ final class GrowthG8StagingWorker
             $source=GrowthShopSourceBinding::sourceForSend(
                 $shop,$merchant,$namespace
             );
+            $phase='native_lease';
             // Check the extended schema before any outbound operation.
             $lease=new GrowthPrestaShopDeliveryLease(
                 $db,$version,$merchant,$namespace,$prefix
             );
+            $phase='g3_scan';
             $review=GrowthG7CurrentEventBatch::scan(
                 $db,$version,$merchant,$namespace,$prefix,
                 $shop,0,self::MAX_BATCH
             );
+            $phase='candidate_adapter';
             $candidates=GrowthG8StagingCandidateAdapter::adapt(
                 $review,$shop,0,self::MAX_BATCH
             );
+            $phase='ready_promotion';
             $promoted=0;$blocked=0;
             foreach ($candidates as $candidate) {
                 // This value is never logged or returned.
@@ -85,6 +90,7 @@ final class GrowthG8StagingWorker
                 else $blocked++;
             }
 
+            $phase='ready_scan';
             $window=GrowthG8StagingReadyGate::scanReady(
                 $db,$version,$scope,$prefix,0,self::MAX_BATCH
             );
@@ -180,6 +186,7 @@ final class GrowthG8StagingWorker
                     $callbacks['contactEligibility'],$c,$id,$phase
                 )===true;
             };
+            $phase='cas_tick';
             $outcome=GrowthAutomaticOneShotCoordinator::tick(
                 $scope,$ready,$load,$local,$presence,$parent,
                 $reserve,$post,$persist,$contact
@@ -199,7 +206,7 @@ final class GrowthG8StagingWorker
                 ]
             );
         } catch (Throwable $ignored) {
-            return self::report('staging_worker_failed_closed',null);
+            return self::report('staging_worker_failed_closed',null,$phase);
         }
     }
 
@@ -290,9 +297,13 @@ final class GrowthG8StagingWorker
         )===true;
     }
 
-    private static function report($status,$counts)
+    private static function report($status,$counts,$phase=null)
     {
-        return [
+        $safe=[
+            'source_binding','native_lease','g3_scan',
+            'candidate_adapter','ready_promotion','ready_scan','cas_tick'
+        ];
+        $result=[
             'ok'=>$counts!==null,
             'status'=>$status,'counts'=>$counts,
             'marketing_sends_authorized'=>false,
@@ -301,6 +312,10 @@ final class GrowthG8StagingWorker
             'record_identifiers_exposed'=>false,
             'credentials_exposed'=>false
         ];
+        if ($phase!==null && in_array($phase,$safe,true)) {
+            $result['failure_stage']=$phase;
+        }
+        return $result;
     }
 
     private function __construct(){}
