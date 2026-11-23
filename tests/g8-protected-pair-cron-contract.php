@@ -63,7 +63,7 @@ pairCronAssert(strpos($native,'$objectType=\'PSCustomer\'')!==false
     && strpos($native,'$objectType!==null')!==false
     && strpos($native,'GrowthG8UatPairScope::inspect(')!==false
     && strpos($native,'GrowthG8StagingWorker::run(')!==false
-    && strpos($native,'],$objectType")!==false
+    && strpos($native,'],'.'$objectType')!==false
     && strpos($native,'parentDloVerified')!==false,
     'native_pair_and_single_object_must_share_worker');
 
