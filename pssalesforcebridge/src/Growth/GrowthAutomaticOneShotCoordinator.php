@@ -24,7 +24,8 @@ final class GrowthAutomaticOneShotCoordinator
         array $scope, array $candidates,
         $loadFresh, $locallyEligible, $recordDloStatus,
         $customerDloVerified,
-        $reserveOnce, $postOnce, $persistOutcome
+        $reserveOnce, $postOnce, $persistOutcome,
+        $contactEligibility=null
     ) {
         $shop=isset($scope['shop'])?$scope['shop']:null;
         $merchant=isset($scope['merchant'])?$scope['merchant']:null;
@@ -44,7 +45,8 @@ final class GrowthAutomaticOneShotCoordinator
             || !is_callable($recordDloStatus)
             || !is_callable($customerDloVerified)
             || !is_callable($reserveOnce) || !is_callable($postOnce)
-            || !is_callable($persistOutcome)) {
+            || !is_callable($persistOutcome)
+            || !is_callable($contactEligibility)) {
             throw new RuntimeException('g8_auto_tick_not_authorized');
         }
         // Fail closed before processing anything when source identity drifted.
@@ -79,6 +81,9 @@ final class GrowthAutomaticOneShotCoordinator
                 $first=call_user_func($loadFresh,$candidate);
                 self::snapshot($first,$candidate,$namespace,$shop);
                 if (call_user_func($locallyEligible,$first)!==true
+                    || !self::contactAllowed(
+                        $contactEligibility,$candidate,$first,'before_claim'
+                    )
                     || call_user_func($recordDloStatus,$candidate,$first)
                         !=='absent_confirmed'
                     || !self::parentVerified(
@@ -118,12 +123,22 @@ final class GrowthAutomaticOneShotCoordinator
                         $shop,$merchant,$namespace
                     )!==$source
                     || call_user_func($locallyEligible,$fresh)!==true
+                    || !self::contactAllowed(
+                        $contactEligibility,$candidate,$fresh,'after_claim'
+                    )
                     || call_user_func($recordDloStatus,$candidate,$fresh)
                         !=='absent_confirmed'
                     || !self::parentVerified(
                         $candidate,$fresh,$shop,$namespace,
                         $customerDloVerified
                     )) {
+                    $state='held';
+                } elseif (!self::contactAllowed(
+                    $contactEligibility,$candidate,$fresh,'before_transport'
+                )) {
+                    // Final per-contact check immediately before invoking
+                    // transport. This is a local-only HOLD, never an HTTP
+                    // attempt. The G3 claim stays single-use and is cancelled.
                     $state='held';
                 } else {
                     // The transport adapter must itself recheck the lease
@@ -239,6 +254,31 @@ final class GrowthAutomaticOneShotCoordinator
             || $p['customer_id']!==$c['id']) {
             throw new RuntimeException('g8_auto_customer_invalid');
         }
+    }
+
+    /**
+     * Fail-closed, purpose-specific contact check.
+     *
+     * Only an independently certified local/CSC reader may back this
+     * callback in a future staging worker. An injected true in an offline
+     * test is NOT a production authorization, and does not enable a
+     * Growth campaign. Never pass email or raw source into diagnostics.
+     */
+    private static function contactAllowed(
+        $gate,$candidate,$fresh,$phase
+    ) {
+        if (!in_array(
+            $phase,['before_claim','after_claim','before_transport'],true
+        ) || !is_array($fresh) || !isset($fresh['customer_id'])
+            || !is_int($fresh['customer_id'])
+            || $fresh['customer_id']<1
+            || ($candidate['type']==='PSCustomer'
+                && $fresh['customer_id']!==$candidate['id'])) {
+            return false;
+        }
+        return call_user_func(
+            $gate,$candidate,$fresh['customer_id'],$phase
+        )===true;
     }
 
     private static function parentVerified(
