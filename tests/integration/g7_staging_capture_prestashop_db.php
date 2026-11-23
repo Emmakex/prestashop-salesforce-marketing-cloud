@@ -968,9 +968,18 @@ $workerClass=\Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthG8StagingW
 $postsFromWorker=0;$checksFromWorker=0;
 $nativeSeq901=(int)$db->getValue("SELECT MAX(accepted_sequence)"
     . " FROM $tab WHERE entity_type='customer' AND entity_id=901",false);
-g7DbCheck($nativeSeq901>0
-    && $native->inspect(1,'customer',901,$nativeSeq901)['state']
-        ==='blocked','g8_worker_fixture_not_blocked');
+g7DbCheck($nativeSeq901>0,'g8_worker_fixture_not_found');
+// The disposable G3 CI fixture has already passed other lease tests.
+// Reset ONLY this synthetic current revision inside g3_ci to exercise a
+// brand-new G8 worker attempt. Never execute this in an actual shop.
+$db->execute("UPDATE $tab SET delivery_state='blocked',"
+    . "delivery_attempts=0,lease_token_hash=NULL,"
+    . "lease_until_epoch=NULL,delivery_last_http=NULL"
+    . " WHERE source_namespace='$ns'"
+    . " AND accepted_sequence=$nativeSeq901"
+    . " AND entity_type='customer' AND entity_id=901");
+g7DbCheck($native->inspect(1,'customer',901,$nativeSeq901)['state']
+    ==='blocked','g8_worker_fixture_not_blocked');
 Configuration::updateValue(
     'PS_GROWTH_G8_STAGING_APPROVAL',$workerClass::APPROVAL
 );
