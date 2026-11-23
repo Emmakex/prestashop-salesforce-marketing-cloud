@@ -66,6 +66,8 @@ require_once dirname(__DIR__) . '/pssalesforcebridge/upgrade/upgrade-0.9.3.php';
 require_once dirname(__DIR__) . '/pssalesforcebridge/upgrade/upgrade-0.9.4.php';
 require_once dirname(__DIR__) . '/pssalesforcebridge/upgrade/upgrade-0.9.5.php';
 require_once dirname(__DIR__) . '/pssalesforcebridge/upgrade/upgrade-0.9.6.php';
+require_once dirname(__DIR__) . '/pssalesforcebridge/upgrade/upgrade-0.9.7.php';
+require_once dirname(__DIR__) . '/pssalesforcebridge/upgrade/upgrade-0.9.7.php';
 
 use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthOnlyHookPreflight as Hook;
 
@@ -181,7 +183,7 @@ growthAssert(strpos($stagingGate,'G7 schema action blocked')!==false,
     'g7_schema_action_ignored_fail_closed');
 Configuration::updateValue('PS_GROWTH_LOCAL_CAPTURE','off');
 Configuration::$writes=[];
-growthAssert($module->version === '0.9.6'
+growthAssert($module->version === '0.9.7'
     && $module->author === 'ALFABH'
     && PsSalesforceBridge::PROVIDER === 'marketing_cloud_growth'
     && PsSalesforceBridge::DATA_PLATFORM === 'data_cloud',
