@@ -65,6 +65,8 @@ final class GrowthAutomaticOneShotCoordinator
             $summary['examined']++;
             $reserved=false;
             $state='reconcile';
+            $httpStatus=null;
+            $transportStarted=false;
             try {
                 self::candidate($candidate,$shop);
                 $key=$candidate['type'].':'.$candidate['id'].':'
@@ -127,18 +129,34 @@ final class GrowthAutomaticOneShotCoordinator
                     // The transport adapter must itself recheck the lease
                     // immediately before posting. This class cannot make
                     // a network request without the injected callback.
+                    // This flag is set immediately BEFORE calling any
+                    // transport: exceptions/timeouts are uncertain, never
+                    // treated as a known local-only HOLD.
+                    $transportStarted=true;
                     $result=call_user_func(
                         $postOnce,$source,$candidate['type'],
                         $fresh['payload_private'],$candidate
                     );
-                    $state=is_array($result)
-                        && isset($result['http_status'],$result['outcome'])
-                        && $result['http_status']===202
-                        && $result['outcome']
-                            ==='accepted_asynchronously_unconfirmed'
-                        ?'reconcile':'held';
-                    if ($state==='reconcile') {
-                        $summary['accepted_202_unconfirmed']++;
+                    $httpStatus=is_array($result)
+                        && isset($result['http_status'])
+                        && is_int($result['http_status'])
+                        && $result['http_status']>=100
+                        && $result['http_status']<=599
+                        ?$result['http_status']:null;
+                    if ($httpStatus===202) {
+                        $state='reconcile';
+                        if (isset($result['outcome'])
+                            && $result['outcome']
+                                ==='accepted_asynchronously_unconfirmed') {
+                            $summary['accepted_202_unconfirmed']++;
+                        }
+                    } elseif ($httpStatus!==null) {
+                        // A known non-202 response needs a durable held
+                        // receipt with its exact HTTP status.
+                        $state='held';
+                    } else {
+                        // Missing/invalid transport response is UNKNOWN.
+                        $state='reconcile';
                     }
                 }
             } catch (Throwable $error) {
@@ -152,7 +170,8 @@ final class GrowthAutomaticOneShotCoordinator
                 if ($reserved) {
                     try {
                         $saved=call_user_func(
-                            $persistOutcome,$candidate,$state
+                            $persistOutcome,$candidate,$state,
+                            $httpStatus,$transportStarted
                         );
                         if ($saved!==true) {
                             $summary['status']='reconciliation_required';

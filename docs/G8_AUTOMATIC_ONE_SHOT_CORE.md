@@ -50,3 +50,19 @@ Dos componentes **aislados de cron y BO** completan la composición de las compr
 Los contratos offline de PHP 7.1/8.5 comprueban un cliente/pedido sintético, consulta del padre, CSC positiva no certificada, baja/negativa, READY/lease incoherente, 202 pendiente, host/tienda/namespace/origen cruzados, timeout y cero envíos. En este corte **no** se carga ninguna clase nueva en el módulo ni se añaden operaciones al cron; quedan disponibles para la futura integración bajo autorización específica de staging.
 
 **Bloqueo que sigue siendo real:** todavía no hay un lector CSC real certificado para el contacto concreto al instante de envío, ni un productor READY aprobado. Hasta cerrar ese cercado de consentimiento y el ensayo G3 CAS/reconcile de un evento sintético nuevo, el coordinador no puede ejecutar \`postOnce\`; seguimos en Test, captura OFF y campañas apagadas. No repetir los 6031/612 ni los canarios G5. No confundir la validación administrativa de Growth/CRM con permiso automático de contacto para un cliente concreto.
+
+
+## G8 — CAS y recibos duraderos: protocolo probado sin transporte (23/11/2026)
+
+El adaptador \`GrowthG8DurableReceiptBridge\` enlaza la firma del coordinador de envío único con **la misma** \`GrowthPrestaShopDeliveryLease\` nativa del outbox/ledger G3. No escribe READY ni crea colas ni incorpora clientes HTTP. Exige exclusivamente staging/Test/captura OFF/origen de la tienda/owner gate y comprueba estado READY, revisión vigente, \`delivery_attempts=0\` y ausencia de HTTP previo. Un token CAS aleatorio de 256 bits solo vive en memoria. El inspector final \`claimedForPost\` confirma que el registro sigue reclamado y su lease vigente; **no sustituye el control CSC de contacto ni autoriza envíos**.
+
+\`GrowthAutomaticOneShotCoordinator::tick\` pasa al callback de recibo \`($candidate,$state,$httpStatus,$transportStarted)\`, manteniendo compatibilidad con callbacks antiguos de menos argumentos, para registrar el resultado sin inventar un estado:
+- HTTP **202** después del transporte → \`markAcceptedUnconfirmed\`, estado G3 \`reconcile\`, no \`delivered\`.
+- HTTP **503** u otro código no 202 conocido → \`holdClaim\` con HTTP exacto, estado G3 \`held\`.
+- timeout/resultado malformado después del inicio del transporte → \`markUnknownUnconfirmed\` y \`reconcile\`, sin reintento.
+- cambio/supresión de origen **antes** de cualquier transporte → \`cancel\` y \`cancelled\`, sin POST.
+- falla la persistencia del recibo → \`reconciliation_required\` y claim no reutilizable. El eventual TTL caducado se pone en \`reconcile\`, nunca READY.
+
+\`tests/g8-durable-cas-receipt-bridge-contract.php\` certifica el circuito completo de coordinador + CAS + recibo con objetos sintéticos (sin red ni base de datos). El CAS SQL de \`GrowthPrestaShopDeliveryLease\` y el comportamiento de concurrencia siguen cubiertos por pruebas G3/G7 independientes.
+
+**Importante:** este componente no se carga en el módulo ni en el cron. G8 aún requiere la fuente CSC de envío certificada por contacto, una autorización específica del propietario y una UAT aislada de un registro nuevo en staging antes de cualquier operación de transporte real. La configuración administrativa Growth/CRM, los DLO y canarios G5, y cliente/pedido BC 6031/612 están verificados y no se repiten.
