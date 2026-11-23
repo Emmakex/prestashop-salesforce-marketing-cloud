@@ -121,6 +121,7 @@ jobs:
           php tests/g8-staging-worker-contract.php
           php tests/g8-stage-capture-admin-contract.php
           php tests/g8-exact-capture-bo-contract.php
+          php tests/g8-uat-exact-target-contract.php
           php tests/g8-staging-safety-review-contract.php
           php tests/g8-durable-cas-receipt-bridge-contract.php
           php tests/g8-scoped-dlo-read-contract.php
