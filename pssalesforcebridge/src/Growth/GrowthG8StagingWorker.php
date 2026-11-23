@@ -42,13 +42,10 @@ final class GrowthG8StagingWorker
                 $db,$version,$merchant,$namespace,$prefix
             );
             $phase='g3_scan';
-            $review=GrowthG7CurrentEventBatch::scan(
-                $db,$version,$merchant,$namespace,$prefix,
-                $shop,0,self::MAX_BATCH
-            );
-            $phase='candidate_adapter';
-            $candidates=GrowthG8StagingCandidateAdapter::adapt(
-                $review,$shop,0,self::MAX_BATCH
+            // UAT is an exact two-record operation, NEVER the first 10
+            // globally blocked rows. Other historical G3 events untouched.
+            $candidates=GrowthG8UatExactTarget::candidates(
+                $db,$version,$prefix,$scope,'blocked'
             );
             $phase='ready_promotion';
             $promoted=0;$blocked=0;
@@ -91,13 +88,11 @@ final class GrowthG8StagingWorker
             }
 
             $phase='ready_scan';
-            $window=GrowthG8StagingReadyGate::scanReady(
-                $db,$version,$scope,$prefix,0,self::MAX_BATCH
+            // Never drain READY records belonging to a different customer
+            // or another previous UAT; CAS remains single-use per row.
+            $ready=GrowthG8UatExactTarget::candidates(
+                $db,$version,$prefix,$scope,'ready'
             );
-            if ($window['status']!=='ready_candidates_private') {
-                return self::report('staging_worker_unverified',null);
-            }
-            $ready=$window['candidates_private'];
             if ($ready===[]) {
                 return self::report('staging_tick_no_ready',[
                     'reviewed'=>count($candidates),
