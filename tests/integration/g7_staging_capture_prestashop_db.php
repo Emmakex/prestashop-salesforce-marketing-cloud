@@ -63,6 +63,7 @@ foreach([
     'Growth/GrowthLocalCustomerHoldReader.php',
     'Growth/GrowthG7NativePreflight.php',
     'Growth/GrowthG7CurrentEventBatch.php',
+    'Growth/GrowthG8StagingCandidateAdapter.php',
     'Growth/GrowthCommunicationConsentHoldGate.php',
     'Growth/GrowthG7CscPreDispatchReview.php',
     'Growth/GrowthG7DryRunBatchOrchestrator.php',
