@@ -147,3 +147,10 @@ Los indicadores `newsletter` y `optin` proceden del cliente PrestaShop y se util
 ## 23/11/2026 — Error BO G8 contextual y no repetición
 
 El botón de elegibilidad G8 (`preflight`) nunca invoca `GrowthG8NativeStagingServices::run`. Si su lectura o renderizado falla, informa `preflight local inconcluso antes de cualquier envío`, sin afirmar nada acerca de otras operaciones anteriores. Si la preparación del formulario `customer/order` falla **antes** de llamar al worker, el mensaje lo distingue. Si se llega a invocar el worker, cualquier excepción en ejecución o visualización devuelve explícitamente `resultado no confirmado, puede haber existido un POST`. No se vuelcan excepciones, tokens, SQL ni datos personales. Los mensajes de BO no sustituyen las evidencias de G3 y Query V2; no habilitan reenvío, campañas ni modificaciones de consentimientos.
+
+
+## G8 — Back Office preflight unificado con diagnóstico local
+
+El botón BO **Comprobar elegibilidad G8 sin enviar** ahora invoca la misma revisión `GrowthG8LocalPreDispatchReview::inspect` que **Diagnosticar preenvío G8 sin enviar**. Antes eran dos rutas de elegibilidad locales con manejo de excepciones distinto. El preflight exige informe `local_pre_dispatch_validated_no_send`, identidad G3 vigente, inspección del lease G7, elegibilidad local y borrador PSCustomer. Exige también flags de retorno `read_only=true`, `http_request_performed=false`, `database_write_performed=false`, `dispatch_authorized=false` y `retry_authorized=false`. Cualquier fallo bloquea y presenta un mensaje estático seguro.
+
+La rama de preflight retorna *antes* del worker `GrowthG8NativeStagingServices::run`. Sigue sin OAuth, llamadas API, POST, cambios G3 ni autorización de campañas. Las acciones `customer` y `order` conservan íntegros sus controles e incertidumbre de resultado. No se deben repetir envíos con recibos ambiguos. El resultado de BO no prueba recepción en DLO ni habilita por sí mismo la ingestión.

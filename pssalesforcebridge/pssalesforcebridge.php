@@ -582,8 +582,50 @@ class PsSalesforceBridge extends Module
                 $this->l('No hay cliente y pedido fijados para esta UAT G8.')
             );
         }
-        // An exception during preflight cannot have reached the transport.
-        // For customer/order, distinguish preparation from a started worker.
+        // Use the already-certified read-only G8 local diagnostic for the
+        // BO preflight too. A separate local reader was a divergent path.
+        // This branch returns before the customer/order worker can run.
+        if ($operation==='preflight') {
+            $preflightPhase='read';
+            try {
+                $review=GrowthG8LocalPreDispatchReview::inspect(
+                    Db::getInstance(),(string)_PS_VERSION_,
+                    $merchant,$namespace,_DB_PREFIX_,$shop
+                );
+                if (!is_array($review)
+                    || !isset($review['status'],$review['read_only'],
+                        $review['http_request_performed'],
+                        $review['database_write_performed'],
+                        $review['dispatch_authorized'],
+                        $review['retry_authorized'])
+                    || $review['status']!=='local_pre_dispatch_validated_no_send'
+                    || $review['read_only']!==true
+                    || $review['http_request_performed']!==false
+                    || $review['database_write_performed']!==false
+                    || $review['dispatch_authorized']!==false
+                    || $review['retry_authorized']!==false) {
+                    return $this->displayError(
+                        $this->l('G8: preflight local no validado. Usa Diagnosticar preenvío G8 sin enviar. No se ha realizado POST, ni se autoriza ejecutar cliente o pedido.')
+                    );
+                }
+                $preflightPhase='render';
+                return $this->displayConfirmation(
+                    $this->l('Preflight local G8 correcto: mismas comprobaciones G3/G7, elegibilidad y borrador que el diagnóstico sin enviar. Ningún POST ni modificación G3. No certifica presencia en Data Cloud ni autoriza campañas.')
+                );
+            } catch (\Throwable $ignored) {
+                if ($preflightPhase==='render') {
+                    return $this->displayError(
+                        $this->l('G8: error al mostrar la confirmación del preflight local. No se ha ejecutado POST desde esta acción. No ejecutes cliente ni pedido.')
+                    );
+                }
+                return $this->displayError(
+                    $this->l('G8: error al leer el diagnóstico local del preflight. No se ha ejecutado POST desde esta acción. Usa Diagnosticar preenvío G8 sin enviar.')
+                );
+            }
+        }
+
+        // Customer/order actions retain their independent local gate.
+        // Reaching the native worker remains a potentially outbound step.
         $phase='local_customer';
         try {
             $local=GrowthLocalCustomerHoldReader::inspectPrestaShop(
@@ -598,12 +640,6 @@ class PsSalesforceBridge extends Module
             if (!$eligible) {
                 return $this->displayError(
                     $this->l('Elegibilidad local G8 no superada: revisa que la cuenta de pruebas esté activa, no sea invitada/eliminada y tenga newsletter y optin afirmativos. No se ha ejecutado ningún envío.')
-                );
-            }
-            if ($operation==='preflight') {
-                $phase='preflight_render';
-                return $this->displayConfirmation(
-                    $this->l('Preflight local G8 correcto: cliente registrado, activo y sin exclusiones locales. No certifica consentimiento de campañas ni comprueba DLO. No se ha enviado nada.')
                 );
             }
             $phase='confirmation';
@@ -648,12 +684,6 @@ class PsSalesforceBridge extends Module
                 $this->l('G8: resultado sin confirmación de recepción. Puede existir un intento en G3; no repitas la operación. Comprueba el recibo y Data Cloud.')
             );
         } catch (\Throwable $ignored) {
-            // The preflight UI is local-only; it never reaches worker/POST.
-            if ($operation==='preflight') {
-                return $this->displayError(
-                    $this->l('G8: preflight local inconcluso antes de cualquier envío. No se ha ejecutado ningún POST desde este preflight. Utiliza el diagnóstico G8 sin enviar; no ejecutes cliente ni pedido.')
-                );
-            }
             if ($phase==='local_customer' || $phase==='confirmation') {
                 return $this->displayError(
                     $this->l('G8: la preparación local falló antes de invocar el transporte. No se ha iniciado POST desde esta operación. Conserva G3 y revisa el diagnóstico local.')
