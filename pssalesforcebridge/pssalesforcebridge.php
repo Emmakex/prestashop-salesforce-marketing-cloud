@@ -62,6 +62,7 @@ require_once __DIR__ . '/src/Growth/GrowthG8StagingCandidateAdapter.php';
 require_once __DIR__ . '/src/Growth/GrowthStableBoCsrf.php';
 require_once __DIR__ . '/src/Growth/GrowthG8ExactCaptureInspector.php';
 require_once __DIR__ . '/src/Growth/GrowthG8UatPairScope.php';
+require_once __DIR__ . '/src/Growth/GrowthG8UatReceiptReview.php';
 require_once __DIR__ . '/src/Growth/GrowthG8CronReadOnly.php';
 require_once __DIR__ . '/src/DataCloud/GrowthG8DloMetadataResolver.php';
 require_once __DIR__ . '/src/DataCloud/GrowthG8DloPresenceReader.php';
@@ -95,6 +96,7 @@ use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthShopSourceBinding;
 use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthStableBoCsrf;
 use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthG8ExactCaptureInspector;
 use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthG8UatPairScope;
+use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthG8UatReceiptReview;
 use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthG8CronReadOnly;
 use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthG8StagingWorker;
 use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthG8NativeStagingServices;
@@ -223,6 +225,10 @@ class PsSalesforceBridge extends Module
             $message=$this->handleG8UatTarget('bind');
         } elseif (Tools::isSubmit('submitPsGrowthG8TargetRevoke')) {
             $message=$this->handleG8UatTarget('revoke');
+        } elseif (Tools::isSubmit('submitPsGrowthG8ReadG3')) {
+            $message=$this->handleG8UatReadOnly('g3');
+        } elseif (Tools::isSubmit('submitPsGrowthG8ReadDlo')) {
+            $message=$this->handleG8UatReadOnly('dlo');
         } elseif (Tools::isSubmit('submitPsGrowthG8Preflight')) {
             $message=$this->handleG8UatOperator('preflight');
         } elseif (Tools::isSubmit('submitPsGrowthG8RunCustomer')) {
@@ -351,6 +357,113 @@ class PsSalesforceBridge extends Module
                 $namespace,$shop,'PSOrder')
         ]);
         return $this->display(__FILE__,'views/templates/admin/console.tpl');
+    }
+
+    /**
+     * Read-only G3 receipt and tenant DLO checks for an uncertain G8 attempt.
+     * No staging approval is needed to reconcile after a safety revocation.
+     * Does NOT claim, promote, cancel, retry, resend, or enable marketing.
+     */
+    private function handleG8UatReadOnly($operation)
+    {
+        $shop=$this->credentialContextShopId();
+        $csrf=Tools::getValue('PS_GROWTH_G8_CSRF');
+        $merchant=(string)Configuration::get(self::CONFIG_MERCHANT);
+        $namespace=(string)Configuration::get(self::CONFIG_NAMESPACE);
+        if (!in_array($operation,['g3','dlo'],true)
+            || !$this->isCredentialAdmin($shop)
+            || !is_string($csrf) || $this->credentialCsrf($shop)===''
+            || !hash_equals($this->credentialCsrf($shop),$csrf)
+            || (string)Configuration::get(self::CONFIG_MODE)!=='test'
+            || (string)Configuration::get(self::CONFIG_LOCAL_CAPTURE)!=='off'
+            || !GrowthShopSourceBinding::isMerchant($merchant)
+            || !GrowthShopSourceBinding::isNamespace($namespace)
+            || preg_match(
+                '/(?:^|_)(?:stage|staging)(?:_|$)/D',$namespace
+            )!==1) {
+            return $this->displayError(
+                $this->l('Revisión G8 no autorizada para esta tienda. No se ha enviado nada nuevo.')
+            );
+        }
+        $target=GrowthG8UatPairScope::inspect(
+            $shop,$merchant,$namespace
+        );
+        if (!is_array($target)) {
+            return $this->displayError(
+                $this->l('Revisión G8 sin cliente/pedido de UAT seleccionado. No se ha enviado nada.')
+            );
+        }
+        if ($operation==='g3') {
+            try {
+                $report=GrowthG8UatReceiptReview::inspect(
+                    Db::getInstance(),(string)_PS_VERSION_,
+                    $merchant,$namespace,_DB_PREFIX_,$shop
+                );
+                if ($report['status']!=='g3_review_complete') {
+                    return $this->displayError(
+                        $this->l('G3: lectura no concluyente. No reintentes el envío.')
+                    );
+                }
+                // Both labels derive from fixed internal state enums;
+                // do not show customer IDs, source keys or SQL.
+                return $this->displayConfirmation(
+                    sprintf(
+                        $this->l('Revisión G3 (solo lectura): cliente = %s; pedido = %s. Ningún dato enviado. No repitas G8 hasta comprobar Data Cloud.'),
+                        $report['customer']['state'],
+                        $report['order']['state']
+                    )
+                );
+            } catch (\Throwable $ignored) {
+                return $this->displayError(
+                    $this->l('G3: revisión no concluyente. No reintentes el envío.')
+                );
+            }
+        }
+        try {
+            // This is a Salesforce READ-ONLY Query V2 SELECT, not ingestion.
+            $cloud=GrowthShopCredentialVault::obtainCloudToken($shop);
+            if (!is_array($cloud)
+                || !isset($cloud['instance_url'],$cloud['access_token'])) {
+                return $this->displayError(
+                    $this->l('Data Cloud: token no disponible para verificación de lectura. No reintentes el envío.')
+                );
+            }
+            $origin=$cloud['instance_url'];
+            $token=$cloud['access_token'];
+            $metadata=\Emmakex\PrestaShopSalesforceMarketingCloud\DataCloud\GrowthG8CloudMetadataClient::resolve(
+                $origin,$token
+            );
+            $source=GrowthShopSourceBinding::sourceForSend(
+                $shop,$merchant,$namespace
+            );
+            $descriptor=[
+                'shop'=>$shop,'merchant'=>$merchant,
+                'namespace'=>$namespace,'source'=>$source,
+                'origin'=>$origin,'resolved'=>$metadata
+            ];
+            $presence=\Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthG8ScopedDloRead::inspect(
+                $descriptor,$origin,$token,$shop,$namespace,
+                'PSCustomer',$target['customer_id']
+            );
+            unset($cloud,$origin,$token,$metadata,$descriptor);
+            if ($presence==='present') {
+                return $this->displayConfirmation(
+                    $this->l('Data Cloud (lectura): cliente de UAT presente en el DLO de Salesforce. No se ha enviado nada nuevo. El resultado G3 debe revisarse antes del pedido.')
+                );
+            }
+            if ($presence==='absent_confirmed') {
+                return $this->displayError(
+                    $this->l('Data Cloud (lectura): cliente todavía no localizado en el DLO. Una respuesta ausente no descarta un envío en tránsito. No reintentes.')
+                );
+            }
+            return $this->displayError(
+                $this->l('Data Cloud: consulta de presencia inconclusa. No reintentes el envío.')
+            );
+        } catch (\Throwable $ignored) {
+            return $this->displayError(
+                $this->l('Data Cloud: lectura no verificada. No reintentes el envío.')
+            );
+        }
     }
 
     /**

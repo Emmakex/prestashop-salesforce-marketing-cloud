@@ -120,6 +120,7 @@ jobs:
           php tests/g8-cloud-metadata-client-contract.php
           php tests/g8-staging-worker-contract.php
           php tests/g8-bo-one-shot-operator-contract.php
+          php tests/g8-post-attempt-readonly-review-contract.php
           php tests/g8-stage-capture-admin-contract.php
           php tests/g8-exact-capture-bo-contract.php
           php tests/g8-uat-pair-scope-contract.php

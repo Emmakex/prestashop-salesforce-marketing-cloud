@@ -117,3 +117,11 @@ El botón **Ejecutar G8: solo pedido** es una segunda acción separada (`EXECUTE
 HTTP 202 se registra como `reconcile` pendiente de confirmación DLO; un timeout es ambiguo y no reintentable. El panel no dice «entregado» tras una aceptación 202; si el resultado es incierto, no repetir la acción. Las campañas siguen fuera del módulo y pertenecen a Marketing Cloud Growth.
 
 **Pendiente para release final:** UAT real del cliente 8/pedido 11 y comprobación en DLO/DMO; tras certificación, desactivar autorización staging, preparar versión final sin etiqueta pre-beta y separar aprobación de go-live de producción.
+
+## G8 — recuperación de un primer intento con resultado desconocido (23/11/2026)
+
+Tras autorizar la UAT del cliente de staging 8 y pedido 11, el Back Office mostró `G8: no se pudo confirmar el resultado. Antes de cualquier otro intento comprueba G3 y Data Cloud.` El mensaje corresponde al `catch (Throwable)` exterior del formulario; no acredita ni fallo ni éxito del transporte. **No repetir `customer`, no ejecutar `order`, no resetear el ledger ni permitir una campaña.**
+
+`GrowthG8UatReceiptReview` consulta exclusivamente la revisión actual del cliente/pedido vinculado en las tablas originales G3 outbox+ledger, sin mutaciones: `blocked_no_attempt`, `ready_no_attempt`, `claimed_unconfirmed`, `accepted_202_unconfirmed`, `reconciliation_required`, `held_requires_review`, `cancelled`, `not_found` o `unverified`, más `attempts` y código HTTP estrictamente saneado. El BO presenta dos botones CSRF/administrador/tienda staging: **Revisar recibos G3 sin enviar**, y **Comprobar cliente en Data Cloud (lectura)**. El segundo hace OAuth Core→Data Cloud, metadata GET y Query V2 SELECT exacto por namespace/shop/cliente para devolver solo `present`, `absent_confirmed` o `unknown`; ninguna llamada al endpoint de ingesta, ningún DDL, ninguna campaña.
+
+**Regla irreversible:** el resultado `202` requiere comprobar DLO, y el resultado `absent_confirmed` en un instante no prueba que un POST incierto no esté pendiente de ingestión. Las lecturas no autorizan reintentos ni cambian consentimientos. Hasta obtener ambas evidencias y diagnóstico del origen de la excepción, suspender UAT y la release final v0.9.6. Staging y producción son entornos separados.

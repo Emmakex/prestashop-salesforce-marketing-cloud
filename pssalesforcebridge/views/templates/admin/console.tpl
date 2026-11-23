@@ -325,6 +325,21 @@
                 </details>
             {/if}
             {if !$sfmc_capture_armed}
+            {if $sfmc_g8_target_bound && $sfmc_credentials_admin_allowed}
+                <section class="sfmc-note info" aria-labelledby="sfmc-g8-receipt-title">
+                    <h4 id="sfmc-g8-receipt-title">{l s='Recuperación tras resultado G8 no confirmado' mod='pssalesforcebridge'}</h4>
+                    <p>{l s='Si hubo un error después de ejecutar G8, no vuelvas a enviar. Primero consulta el estado de los recibos G3 y después la presencia del cliente en Data Cloud. Ambas acciones son de solo lectura.' mod='pssalesforcebridge'}</p>
+                    <form method="post" action="{$sfmc_action|escape:'html':'UTF-8'}">
+                        <input type="hidden" name="PS_GROWTH_G8_CSRF" value="{$sfmc_credentials_csrf|escape:'html':'UTF-8'}" />
+                        <button type="submit" name="submitPsGrowthG8ReadG3" value="1" class="sfmc-btn sfmc-btn-secondary">{l s='1. Revisar recibos G3 sin enviar' mod='pssalesforcebridge'}</button>
+                    </form>
+                    <form method="post" action="{$sfmc_action|escape:'html':'UTF-8'}">
+                        <input type="hidden" name="PS_GROWTH_G8_CSRF" value="{$sfmc_credentials_csrf|escape:'html':'UTF-8'}" />
+                        <button type="submit" name="submitPsGrowthG8ReadDlo" value="1" class="sfmc-btn sfmc-btn-secondary">{l s='2. Comprobar cliente en Data Cloud (lectura)' mod='pssalesforcebridge'}</button>
+                    </form>
+                    <p class="sfmc-hint">{l s='HTTP 202 no certifica persistencia, y una ausencia en Data Cloud no prueba que un envío incierto nunca llegue. Estas comprobaciones no permiten reintentar.' mod='pssalesforcebridge'}</p>
+                </section>
+            {/if}
             {if $sfmc_g8_target_bound}
                 <div class="sfmc-note info" role="status">{l s='Selección UAT G8 fijada a un cliente y pedido concretos. No se procesarán eventos históricos de otros registros.' mod='pssalesforcebridge'}</div>
                 {if $sfmc_credentials_admin_allowed && !$sfmc_g8_staging_approved}
