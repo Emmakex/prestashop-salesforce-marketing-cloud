@@ -59,6 +59,34 @@ final class GrowthG8StagingSafetyReview
                 'remote_absent_review_only'=>0,
                 'parent_not_verified'=>0
             ];
+            // Validate the ENTIRE candidate set before calling even a
+            // read-only external callback. A bad second ref must not cause
+            // a partial read of the first ref.
+            $preSeen=[];$preLast=0;
+            foreach ($candidates as $candidate) {
+                if (!is_array($candidate) || count($candidate)!==4
+                    || !isset(
+                        $candidate['shop'],$candidate['type'],
+                        $candidate['id'],$candidate['sequence']
+                    )
+                    || $candidate['shop']!==$shop
+                    || !in_array(
+                        $candidate['type'],['PSCustomer','PSOrder'],true
+                    )
+                    || !is_int($candidate['id'])
+                    || $candidate['id']<1
+                    || !is_int($candidate['sequence'])
+                    || $candidate['sequence']<1
+                    || $candidate['sequence']<=$preLast) {
+                    return self::report('staging_review_failed_closed',null);
+                }
+                $preKey=$candidate['type'].':'.$candidate['id'];
+                if (isset($preSeen[$preKey])) {
+                    return self::report('staging_review_failed_closed',null);
+                }
+                $preSeen[$preKey]=true;
+                $preLast=$candidate['sequence'];
+            }
             $seen=[];$last=0;
             foreach ($candidates as $c) {
                 if (!is_array($c) || count($c)!==4
