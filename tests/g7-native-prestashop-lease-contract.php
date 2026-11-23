@@ -43,7 +43,10 @@ g7NativeLeaseAssert(
     'lease_mutation_wired_to_live_module');
 foreach ([
     'GrowthG7StagingDeliveryMigration::inspect',
-    "AND o.delivery_state='ready' AND o.delivery_attempts<3",
+    "AND o.delivery_state='ready' AND o.delivery_attempts=0",
+    "AND o.lease_token_hash IS NULL",
+    "AND o.lease_until_epoch IS NULL",
+    "AND o.delivery_last_http IS NULL",
     'l.latest_accepted_sequence=o.accepted_sequence',
     "AND o.status='blocked'",
     "AND l.status='blocked'",
@@ -67,6 +70,9 @@ foreach ([
     g7NativeLeaseAssert(strpos($code,$forbidden)===false,
         'unexpected_transport_or_ready_writer');
 }
+g7NativeLeaseAssert(strpos($code,'delivery_attempts<3')===false
+    && strpos($code,'delivery_attempts<2')===false,
+    'prior_attempt_reclaim_not_blocked');
 g7NativeLeaseAssert(strpos($code,'GrowthOutboxSchemaPlan::preview')!==false
     && strpos($code,'executeS($sql,true,false)')!==false
     && strpos($code,"getValue('SELECT ROW_COUNT()',false)")!==false,
