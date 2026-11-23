@@ -97,3 +97,11 @@ Para UAT: usar un **cliente y pedido sintéticos nuevos** en la tienda de stagin
 **Consentimiento y alcance**: la elegibilidad local es un filtro conservador de ingesta personal a Data Cloud; no es autorización para campañas. Los consentimientos específicos, preferencias y opt-outs para enviar comunicaciones se aplican en **Salesforce Marketing Cloud Growth**. El módulo no envía campañas ; las campañas operan únicamente en Marketing Cloud Growth.
 
 **No go-live todavía**: las pruebas CI y PrestaShop runtime no son la UAT de una instalación staging real. No instalar en BC producción, no repetir registros 6031/612 ni G5, no pasar a una versión final ni quitar `Pre-beta` hasta recibir prueba UAT y confirmación de segmentación/campañas Growth. No guardar tokens ni IDs en issues o logs.
+
+## G8 — Preparación de captura desde Back Office en staging
+
+Para iniciar la UAT sin acceder a SQL, el administrador principal puede utilizar **Preparar G3/G7 y activar captura para la UAT** exclusivamente en su tienda de staging. Es obligatorio confirmar un respaldo verificado y escribir la frase exacta `ENABLE_STAGING_LOCAL_CAPTURE_ONLY`; el formulario exige CSRF y mantiene Test, captura OFF y dispatcher sin autorizar. Internamente reutiliza `GrowthStagingSchemaBootstrap::install` y `GrowthG7StagingDeliveryMigration::apply` (DDL aditivo idempotente, sin nueva cola). Si una ALTER de MySQL falla, la captura queda OFF y la estructura requiere revisión manual; no se reintenta DDL automáticamente.
+
+Tras preparar la captura, crear cliente y pedido **sintéticos nuevos** mediante PrestaShop. El hook solo registra identificadores protegidos en la outbox original, nunca efectúa POST. A continuación pulsar **Detener captura local**, comprobar que OAuth y fuente siguen listos, autorizar explícitamente la UAT G8 y efectuar una llamada de cron protegida con `operation=dispatch`. Verificar DLO en Salesforce después del cliente antes de enviar el pedido. Retirar la autorización al terminar. En modo producción no se expone este panel.
+
+Esta preparación guiada no constituye una certificación de la tienda de staging ni concede permiso de comunicación comercial. La versión definitiva sigue pendiente de la UAT.
