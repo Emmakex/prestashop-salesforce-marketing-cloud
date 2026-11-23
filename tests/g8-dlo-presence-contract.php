@@ -45,6 +45,48 @@ $read=function($http)use($origin,$ns,$shop) {
         6031,'PST_PSCustomer_Test__dll','source_key__c',$http
     );
 };
+// G8 protected certification must distinguish unknown from confirmed absence
+// without exposing a query, key, token, object name, response or exception.
+$diagnose=function($http)use($origin,$ns,$shop) {
+    return Dlo::inspectWithEvidence(
+        $origin,'test_oauth_token_not_real',$ns,$shop,'PSCustomer',
+        6031,'PST_PSCustomer_Test__dll','source_key__c',$http
+    );
+};
+foreach ([
+    [$fixture([['source_key__c'=>$expected]]),'present','exact_match'],
+    [$fixture([]),'absent_confirmed','complete_empty'],
+    [$fixture([],false),'unknown','batch_unverified'],
+    [$fixture([],true,1),'unknown','batch_unverified'],
+    [$fixture([['source_key__c'=>'wrong']]),'unknown','row_unverified'],
+    [$fixture([],true,0,400),'unknown','http_status_400'],
+    [$fixture([],true,0,403),'unknown','http_status_403'],
+    [$fixture([],true,0,404),'unknown','http_status_404'],
+    [$fixture([],true,0,429),'unknown','http_status_429'],
+    [$fixture([],true,0,503),'unknown','http_status_503'],
+    [$fixture([],true,0,418),'unknown','http_status_other'],
+    [$fixture([],true,0,200,['nextBatchId'=>'next']),'unknown','batch_unverified']
+] as $case) {
+    $diag=$diagnose($case[0]);
+    dloAssert($diag===['result'=>$case[1],'reason'=>$case[2]],
+        'restricted_result_reason');
+}
+dloAssert($diagnose(function() {
+    return ['status'=>200,'body'=>'not-json'];
+})===['result'=>'unknown','reason'=>'json_unverified'],
+    'json_failure_reason');
+$privateDiagnostic=$diagnose(function() {
+    throw new RuntimeException('http://secret.invalid token=private email=x@y.test');
+});
+dloAssert($privateDiagnostic===[
+    'result'=>'unknown','reason'=>'transport_exception'
+] && strpos(json_encode($privateDiagnostic),'private')===false,
+    'exception_diagnostic_leak');
+dloAssert($diagnose(function() {
+    return ['status'=>'400','body'=>'secret'];
+})===['result'=>'unknown','reason'=>'transport_unverified'],
+    'non_numeric_status_exposed');
+
 dloAssert($read($fixture([['source_key__c'=>$expected]]))==='present',
     'present_exact_match');
 dloAssert($read($fixture([]))==='absent_confirmed',
