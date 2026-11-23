@@ -130,7 +130,7 @@ foreach ([
     'GrowthG8UatPairScope::inspect(',
     'GrowthG8UatReceiptReview::inspect(',
     'GrowthG8CloudMetadataClient::resolve(',
-    'GrowthG8ScopedDloRead::inspect(',
+    'GrowthG8ScopedDloRead::inspectWithEvidence(',
     "PSCustomer",
     "Data Cloud",
     "No reintentes"
