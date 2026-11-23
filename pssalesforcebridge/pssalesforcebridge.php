@@ -221,6 +221,8 @@ class PsSalesforceBridge extends Module
             $message = $this->runManualOneRecord('order');
         } elseif (Tools::isSubmit('submitPsGrowthBridge')) {
             $message = $this->saveGrowthSettings();
+        } elseif (Tools::isSubmit('submitPsGrowthG8CapturePrepare')) {
+            $message=$this->handleG8StageCapturePrepare();
         } elseif (Tools::isSubmit('submitPsGrowthG8UatApprove')) {
             $message=$this->handleG8StagingUat('approve');
         } elseif (Tools::isSubmit('submitPsGrowthG8UatRevoke')) {
@@ -288,6 +290,14 @@ class PsSalesforceBridge extends Module
                 && preg_match(
                     '/(?:^|_)(?:stage|staging)(?:_|$)/D',$namespace
                 )===1,
+            'sfmc_g8_capture_prepare_available'=>$canManage
+                && $identity && $source['ready'] && $credentials
+                && $mode==='test' && $capture==='off'
+                && preg_match(
+                    '/(?:^|_)(?:stage|staging)(?:_|$)/D',$namespace
+                )===1,
+            'sfmc_g8_capture_prepare_phrase'=>GrowthStagingSchemaBootstrap::CONFIRM,
+            'sfmc_g8_backup_phrase'=>'I_HAVE_A_VERIFIED_STAGING_BACKUP',
             'sfmc_g8_staging_available'=>$canManage
                 && $identity && $source['ready'] && $credentials
                 && $mode==='test' && $capture==='off'
@@ -312,6 +322,78 @@ class PsSalesforceBridge extends Module
                 $namespace,$shop,'PSOrder')
         ]);
         return $this->display(__FILE__,'views/templates/admin/console.tpl');
+    }
+
+    /**
+     * Prepare the SAME G3/G7 tables and arm local capture for the UAT.
+     * Staging only. Explicit verified backup, owner, CSRF, Test, capture OFF,
+     * immutable shop/source and exact confirmation. No outbound request.
+     * After generating a new synthetic customer/order, operator turns
+     * capture OFF and separately authorizes G8 dispatch.
+     */
+    private function handleG8StageCapturePrepare()
+    {
+        $shop=$this->credentialContextShopId();
+        $csrf=Tools::getValue('PS_GROWTH_G8_CSRF');
+        $confirm=Tools::getValue('PS_GROWTH_G8_CAPTURE_CONFIRM');
+        $backup=Tools::getValue('PS_GROWTH_G8_BACKUP_CONFIRM');
+        $merchant=(string)Configuration::get(self::CONFIG_MERCHANT);
+        $namespace=(string)Configuration::get(self::CONFIG_NAMESPACE);
+        if (!$this->isCredentialAdmin($shop)
+            || !is_string($csrf)
+            || !hash_equals($this->credentialCsrf($shop),$csrf)
+            || $confirm!==GrowthStagingSchemaBootstrap::CONFIRM
+            || $backup!=='I_HAVE_A_VERIFIED_STAGING_BACKUP'
+            || !GrowthShopSourceBinding::isMerchant($merchant)
+            || !GrowthShopSourceBinding::isNamespace($namespace)
+            || preg_match(
+                '/(?:^|_)(?:stage|staging)(?:_|$)/D',$namespace
+            )!==1
+            || (string)Configuration::get(self::CONFIG_MODE)!=='test'
+            || (string)Configuration::get(self::CONFIG_LOCAL_CAPTURE)!=='off'
+            || GrowthShopSourceBinding::inspect(
+                $shop,$merchant,$namespace
+            )['ready']!==true
+            || (string)Configuration::get('PS_GROWTH_G8_STAGING_APPROVAL')
+                ===GrowthG8StagingWorker::APPROVAL) {
+            return $this->displayError(
+                $this->l('Preparación de staging bloqueada: selecciona la tienda, confirma el respaldo y la autorización exacta, y mantén Test, captura OFF y G8 sin activar.')
+            );
+        }
+        try {
+            $db=Db::getInstance();
+            GrowthStagingSchemaBootstrap::install(
+                $db,(string)_PS_VERSION_,$merchant,$namespace,
+                _DB_PREFIX_,GrowthStagingSchemaBootstrap::CONFIRM
+            );
+            GrowthG7StagingDeliveryMigration::apply(
+                $db,(string)_PS_VERSION_,$merchant,$namespace,_DB_PREFIX_,
+                GrowthG7StagingDeliveryMigration::APPROVE,true
+            );
+            $hmac=Configuration::get(self::CONFIG_CAPTURE_HMAC);
+            if (!is_string($hmac)
+                || preg_match('/^[a-f0-9]{64}$/D',$hmac)!==1) {
+                $hmac=bin2hex(random_bytes(32));
+            }
+            if (!Configuration::updateValue(
+                self::CONFIG_CAPTURE_HMAC,$hmac
+            ) || !Configuration::updateValue(
+                self::CONFIG_LOCAL_CAPTURE,'staging_armed'
+            )) {
+                Configuration::updateValue(self::CONFIG_LOCAL_CAPTURE,'off');
+                throw new \RuntimeException('g8_capture_not_persisted');
+            }
+            return $this->displayConfirmation(
+                $this->l('G3 y G7 verificados. Captura local activada únicamente en staging. Crea un cliente y pedido sintéticos nuevos; después pulsa Detener captura local antes de ejecutar G8. No se ha enviado nada a Salesforce.')
+            );
+        } catch (\Throwable $ignored) {
+            // Partial DDL in MySQL is not automatically reversible. Never
+            // hide this possibility or retry a schema mutation by itself.
+            Configuration::updateValue(self::CONFIG_LOCAL_CAPTURE,'off');
+            return $this->displayError(
+                $this->l('Preparación de staging bloqueada. Captura OFF; si hubo un cambio parcial de esquema, revisa la estructura de G3/G7 antes de volver a intentarlo. No se ha enviado nada.')
+            );
+        }
     }
 
     /**
