@@ -44,3 +44,7 @@ La certificación de Query V2 ahora diferencia, sin imprimir columnas ni valores
 ### Alias determinista del resultado Query V2 (23/11/2026)
 
 La evidencia real del run #45136661749 muestra `row_field_missing` en ambos DLO, aunque Query V2 respondió con filas. La proyección ahora exige la columna SQL certificada usando un alias fijo y entrecomillado `g8_exact_source_key`, con `WHERE` aún sobre `source_key` real. El lector compara únicamente el valor de ese alias con la clave completa mediante `hash_equals`; si no se devuelve el alias o el valor exacto, continúa en `unknown` sin envío. No se detectan nombres a partir de filas ni se imprime ningún dato. Este cambio utiliza el soporte `SELECT ... AS` de Data Cloud SQL y se valida con datos sintéticos antes de leer los canarios históricos.
+
+### Validación por proyección única, no por rótulo JSON (23/11/2026)
+
+El run #45137327060 demuestra que el alias explícito `g8_exact_source_key` también llega con un rótulo JSON distinto, pero la consulta devuelve filas. No se deben aceptar columnas por coincidencia parcial de nombre ni debilitar las claves. En lugar de depender del rótulo, se exige que el SQL proyecte un solo campo DLO ya certificado, que cada fila de Query V2 contenga exactamente un valor de cadena y que `hash_equals` valide la clave íntegra; filas con 0 o más de una columna, valor de otro tipo o clave distinta siguen `unknown`. Se preservan HTTP 200/done/rowCount y rechazo de paginación.
