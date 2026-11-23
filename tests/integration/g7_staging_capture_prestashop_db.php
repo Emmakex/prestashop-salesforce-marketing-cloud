@@ -55,6 +55,9 @@ foreach([
     'Growth/GrowthG7DeliverySchemaPlan.php',
     'Growth/GrowthG7StagingDeliveryMigration.php',
     'Growth/GrowthPrestaShopDeliveryLease.php',
+    'Growth/GrowthShopSourceBinding.php',
+    'Growth/GrowthAutomaticOneShotCoordinator.php',
+    'Growth/GrowthG8DurableReceiptBridge.php',
     'Growth/GrowthLocalCustomerHoldReader.php',
     'Growth/GrowthG7NativePreflight.php',
     'Growth/GrowthG7CurrentEventBatch.php',
@@ -835,6 +838,75 @@ g7DbCheck($native->quarantineExpired(1,'order',905,$otherSeq)
         1,'order',905,$otherSeq,$token
     ) && $native->inspect(1,'order',905,$otherSeq)['state']==='reconcile',
     'native_expired_lease_resumed');
+
+// G8 real PrestaShop Db facade → same G3 ledger/CAS → durable receipt.
+//
+// Use ONLY the last remaining synthetic BLOCKED customer from this sandbox,
+// temporarily set READY in disposable g3_ci (never exposed by the module).
+// This is a DB-level rehearsal, not consent, transmission or go-live.
+$g8Sequence=(int)$db->getValue("SELECT accepted_sequence FROM $tab"
+    . " WHERE entity_type='customer' AND entity_id=904 LIMIT 1",false);
+g7DbCheck($g8Sequence>0,'g8_missing_synthetic_current_revision');
+$g8RawBefore=$native->inspect(1,'customer',904,$g8Sequence);
+g7DbCheck($g8RawBefore['state']==='blocked'
+    && $g8RawBefore['attempts']===0
+    && $g8RawBefore['ledger_current'],
+    'g8_fixture_not_blocked');
+$db->execute("UPDATE $tab SET delivery_state='ready'"
+    . " WHERE accepted_sequence=$g8Sequence"
+    . " AND entity_type='customer' AND entity_id=904"
+    . " AND delivery_state='blocked' AND delivery_attempts=0");
+$g8Scope=[
+    'shop'=>1,'merchant'=>'ABH','namespace'=>$ns,
+    'mode'=>'test','capture'=>'off',
+    'owner_gate'=>\Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthAutomaticOneShotCoordinator::OWNER_GATE
+];
+$g8Bridge=new \Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthG8DurableReceiptBridge(
+    $native,$g8Scope
+);
+$g8Candidate=[
+    'shop'=>1,'type'=>'PSCustomer','id'=>904,'sequence'=>$g8Sequence
+];
+$g8Fingerprint=hash('sha256','synthetic-native-904');
+g7DbCheck($g8Bridge->reserveOnce($g8Candidate,$g8Fingerprint)
+    ==='reserved_once'
+    && $g8Bridge->claimedForPost($g8Candidate,$g8Fingerprint),
+    'g8_native_cas_not_claimed');
+$g8Claimed=$native->inspect(1,'customer',904,$g8Sequence);
+g7DbCheck($g8Claimed['state']==='claimed'
+    && $g8Claimed['attempts']===1 && $g8Claimed['lease_active'],
+    'g8_native_claim_not_durable');
+g7DbCheck($g8Bridge->persistOutcome(
+    $g8Candidate,'reconcile',202,true
+)===true,'g8_native_receipt_failed');
+$g8Receipt=$native->inspect(1,'customer',904,$g8Sequence);
+g7DbCheck($g8Receipt['state']==='reconcile'
+    && $g8Receipt['last_http']===202
+    && $g8Receipt['attempts']===1
+    && !$g8Receipt['record_delivered_certified']
+    && !$g8Bridge->claimedForPost($g8Candidate,$g8Fingerprint),
+    'g8_native_202_overstated');
+$g8OtherBridge=new \Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthG8DurableReceiptBridge(
+    $native,$g8Scope
+);
+g7DbCheck($g8OtherBridge->reserveOnce(
+    $g8Candidate,$g8Fingerprint
+)==='previous_attempt'
+    && $g8Bridge->reserveOnce(
+        $g8Candidate,$g8Fingerprint
+    )==='previous_attempt'
+    && $g8Bridge->persistOutcome(
+        $g8Candidate,'reconcile',202,true
+    )===false
+    && $native->inspect(1,'customer',904,$g8Sequence)['attempts']===1,
+    'g8_native_replay_or_duplicate_receipt');
+$g8Summary=json_encode([$g8RawBefore,$g8Claimed,$g8Receipt]);
+g7DbCheck(is_string($g8Summary)
+    && strpos($g8Summary,'ci-synthetic@example.invalid')===false
+    && strpos($g8Summary,$ns)===false
+    && strpos($g8Summary,'904')===false
+    && strpos($g8Summary,'source_key')===false,
+    'g8_native_receipt_leaked_pii');
 
 // Stage Test revocation must deny all DB access and writes.
 Configuration::updateValue('PS_GROWTH_LOCAL_CAPTURE','staging_armed');
