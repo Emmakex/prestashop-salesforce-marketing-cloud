@@ -61,7 +61,7 @@ require_once __DIR__ . '/src/Growth/GrowthG7CurrentEventBatch.php';
 require_once __DIR__ . '/src/Growth/GrowthG8StagingCandidateAdapter.php';
 require_once __DIR__ . '/src/Growth/GrowthStableBoCsrf.php';
 require_once __DIR__ . '/src/Growth/GrowthG8ExactCaptureInspector.php';
-require_once __DIR__ . '/src/Growth/GrowthG8UatExactTarget.php';
+require_once __DIR__ . '/src/Growth/GrowthG8UatPairScope.php';
 require_once __DIR__ . '/src/Growth/GrowthG8CronReadOnly.php';
 require_once __DIR__ . '/src/DataCloud/GrowthG8DloMetadataResolver.php';
 require_once __DIR__ . '/src/DataCloud/GrowthG8DloPresenceReader.php';
@@ -94,7 +94,7 @@ use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthShopCredentialVault;
 use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthShopSourceBinding;
 use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthStableBoCsrf;
 use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthG8ExactCaptureInspector;
-use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthG8UatExactTarget;
+use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthG8UatPairScope;
 use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthG8CronReadOnly;
 use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthG8StagingWorker;
 use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthG8NativeStagingServices;
@@ -271,7 +271,7 @@ class PsSalesforceBridge extends Module
         $credentialStatus=GrowthShopCredentialVault::inspect($shop);
         $credentials=$credentialStatus['ready'];
         $canManage=$this->isCredentialAdmin($shop);
-        $g8Target=GrowthG8UatExactTarget::inspect(
+        $g8Target=GrowthG8UatPairScope::inspect(
             $shop,$merchant,$namespace
         );
         $customerInput=Tools::getValue('PS_GROWTH_ONE_CUSTOMER_ID');
@@ -374,7 +374,7 @@ class PsSalesforceBridge extends Module
             );
         }
         if ($operation==='revoke') {
-            if (!GrowthG8UatExactTarget::clear(
+            if (!GrowthG8UatPairScope::clear(
                 $shop,$merchant,$namespace
             ) || !Configuration::updateValue(
                 'PS_GROWTH_G8_STAGING_APPROVAL',
@@ -422,7 +422,7 @@ class PsSalesforceBridge extends Module
                 $customerId,$orderId
             );
             if ($proof['status']!=='both_events_captured'
-                || !GrowthG8UatExactTarget::bind(
+                || !GrowthG8UatPairScope::bind(
                     $shop,$merchant,$namespace,$customerId,$orderId
                 )) {
                 return $this->displayError(
@@ -606,7 +606,7 @@ class PsSalesforceBridge extends Module
                 )!==1
                 || (string)Configuration::get(self::CONFIG_MODE)!=='test'
                 || (string)Configuration::get(self::CONFIG_LOCAL_CAPTURE)!=='off'
-                || GrowthG8UatExactTarget::inspect(
+                || GrowthG8UatPairScope::inspect(
                     $shop,$merchant,$namespace
                 )===null
                 || (string)Configuration::get(
