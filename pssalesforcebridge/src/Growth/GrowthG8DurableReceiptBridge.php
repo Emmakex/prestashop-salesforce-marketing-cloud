@@ -244,5 +244,4 @@ final class GrowthG8DurableReceiptBridge
             && $r['ledger_current']===true
             && $r['lease_active']===true;
     }
-    private function __constructBlocked(){}
 }
