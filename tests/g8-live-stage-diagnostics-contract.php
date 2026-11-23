@@ -14,7 +14,8 @@ if (!is_string($text)
 }
 foreach([
     "'oauth_core'","'oauth_exchange'","'catalog_get'",
-    "'metadata_resolve'","'canary_customer'","'canary_order'",
+    "'metadata_resolve'","'metadata_customer_get'","'metadata_order_get'",
+    "'canary_customer'","'canary_order'",
     "'g8_dlo_metadata_field_ambiguous'",
     "'g8_dlo_metadata_entity_ambiguous'",
     "'g8_metadata_http_status_403'",
