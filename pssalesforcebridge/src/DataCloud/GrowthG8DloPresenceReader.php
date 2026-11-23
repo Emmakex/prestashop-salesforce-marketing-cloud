@@ -21,10 +21,26 @@ final class GrowthG8DloPresenceReader
     const MAX_RESPONSE_BYTES=65536;
 
     /**
-     * @param callable|null $http function($url,$jsonBody,$accessToken)
-     *   Expected: ['status'=>int,'body'=>string].
+     * Stable three-state contract for the automatic coordinator.
+     * No diagnostic detail escapes to the shop via this method.
      */
     public static function inspect(
+        $origin,$accessToken,$namespace,$shop,$object,$id,
+        $dloApiName,$sourceKeyField,$http=null
+    ) {
+        $result=self::inspectWithEvidence(
+            $origin,$accessToken,$namespace,$shop,$object,$id,
+            $dloApiName,$sourceKeyField,$http
+        );
+        return $result['result'];
+    }
+
+    /**
+     * Restricted diagnostics for the protected historical synthetic G8 audit.
+     * Only static result/reason enums; never include URL, SQL, API names,
+     * namespace, keys, tokens, response body or exception messages.
+     */
+    public static function inspectWithEvidence(
         $origin,$accessToken,$namespace,$shop,$object,$id,
         $dloApiName,$sourceKeyField,$http=null
     ) {
@@ -41,57 +57,69 @@ final class GrowthG8DloPresenceReader
                 || !self::identifier($dloApiName)
                 || !self::identifier($sourceKeyField)
                 || ($http!==null && !is_callable($http))) {
-                return 'unknown';
+                return self::evidence('unknown','request_invalid');
             }
             $key=$namespace.':'.$shop.':'
                 .($object==='PSCustomer'?'customer':'order').':'.$id;
-            // Table and field are restricted SQL identifiers. The literal
-            // key consists exclusively of validated components.
             $q='SELECT "'.$sourceKeyField.'" FROM "'.$dloApiName
                 .'" WHERE "'.$sourceKeyField.'" = '."'".$key."'"
                 .' LIMIT 2';
             $json=json_encode(['sql'=>$q],JSON_UNESCAPED_SLASHES);
             if (!is_string($json) || strlen($json)>1024) {
-                return 'unknown';
+                return self::evidence('unknown','request_invalid');
             }
             $response=$http===null
                 ?self::execute($url,$json,$accessToken)
                 :call_user_func($http,$url,$json,$accessToken);
             if (!is_array($response)
                 || !isset($response['status'],$response['body'])
-                || $response['status']!==200
-                || !is_string($response['body'])
+                || !is_int($response['status'])) {
+                return self::evidence('unknown','transport_unverified');
+            }
+            if ($response['status']!==200) {
+                // Never propagate the server response, only a fixed HTTP code.
+                $allowed=[0,400,401,403,404,405,408,422,429,500,502,503,504];
+                $status=in_array($response['status'],$allowed,true)
+                    ?(string)$response['status']:'other';
+                return self::evidence('unknown','http_status_'.$status);
+            }
+            if (!is_string($response['body'])
                 || strlen($response['body'])>self::MAX_RESPONSE_BYTES) {
-                return 'unknown';
+                return self::evidence('unknown','response_unverified');
             }
             $data=json_decode($response['body'],true);
-            if (!is_array($data)
-                || !isset($data['done'],$data['rowCount'],$data['data'])
+            if (!is_array($data)) {
+                return self::evidence('unknown','json_unverified');
+            }
+            if (!isset($data['done'],$data['rowCount'],$data['data'])
                 || $data['done']!==true
                 || !is_int($data['rowCount']) || $data['rowCount']<0
                 || $data['rowCount']>2 || !is_array($data['data'])
                 || count($data['data'])!==$data['rowCount']
-                || (isset($data['nextBatchId']) && $data['nextBatchId']!=='')
-            ) {
-                return 'unknown';
+                || (isset($data['nextBatchId']) && $data['nextBatchId']!=='')) {
+                return self::evidence('unknown','batch_unverified');
             }
-            // Even when the rowCount is zero, absence is accepted only
-            // from a completed HTTP 200 Query API V2 response.
             if ($data['rowCount']===0) {
-                return 'absent_confirmed';
+                return self::evidence('absent_confirmed','complete_empty');
             }
             foreach ($data['data'] as $row) {
                 if (!is_array($row)
                     || !array_key_exists($sourceKeyField,$row)
                     || !is_string($row[$sourceKeyField])
                     || !hash_equals($key,$row[$sourceKeyField])) {
-                    return 'unknown';
+                    return self::evidence('unknown','row_unverified');
                 }
             }
-            return 'present';
+            return self::evidence('present','exact_match');
         } catch (Throwable $ignored) {
-            return 'unknown';
+            return self::evidence('unknown','transport_exception');
         }
+    }
+
+    private static function evidence($result,$reason)
+    {
+        // All callers receive only two fixed, non-identifying strings.
+        return ['result'=>$result,'reason'=>$reason];
     }
 
     private static function identifier($name)

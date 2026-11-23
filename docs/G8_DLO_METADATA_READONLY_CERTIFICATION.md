@@ -6,7 +6,7 @@ El lector de duplicados por clave exacta (PR #164) ya está certificado, pero **
 
 ## Implementado
 
-`GrowthG8DloMetadataResolver` reutiliza el patrón de `G7ExistingCanaryReadOnly`: identifica en el catálogo GET `/api/v1/metadataEntities?entityType=DataLakeObject` **exactamente una** entrada con cada displayName histórico (`PST-PSCustomer`, `PST-PSOrder`) y a continuación valida el nombre de la entidad en sus metadatos GET `/api/v1/metadata/?entityType=DataLakeObject&entityName=...`.
+`GrowthG8DloMetadataResolver` reutiliza el patrón de `G7ExistingCanaryReadOnly`: identifica en el catálogo GET `/api/v1/metadataEntities?entityType=DataLakeObject` **exactamente una** entrada con cada displayName histórico (`PST-PSCustomer`, `PST-PSOrder`) y a continuación valida el nombre de la entidad en sus metadatos GET `/api/v1/metadata?entityType=DataLakeObject&entityName=...`.
 
 En el detalle localiza por igualdad exacta **una sola columna `source_key` o `source_key__c`** para ambas entidades y **`customer_source_key` o `customer_source_key__c`** para pedido; rechaza duplicados, catálogos paginados, nombres SQL inseguros, ausencia de campo, confusión con objetos DMO o respuestas incompletas. El resultado interno aporta únicamente los nombres API que requiere el lector Query V2, no perfiles.
 
@@ -30,3 +30,9 @@ Resolver metadatos y leer un canario sintético **no demuestra que un DLO perten
 - [Get Metadata Entities](https://developer.salesforce.com/docs/data/data-cloud-query-guide/references/data-cloud-query-api-reference/c360a-api-v1-metadata-entities.html)
 - [Get Metadata](https://developer.salesforce.com/docs/data/data-cloud-query-guide/references/data-cloud-query-api-reference/c360a-api-v1-metadata.html)
 - [Query API V2](https://developer.salesforce.com/docs/data/data-cloud-query-guide/references/data-cloud-query-api-reference/c360a-api-query-v2.html)
+
+## Consulta de canarios sintéticos y diagnóstico de solo lectura (23/11/2026)
+
+Una vez certificados los nombres DLO y campos, el informe G8 distingue por canario los estados cerrados `present`, `absent_confirmed` y `unknown`, además de `not_checked` cuando no se ejecutó la consulta. Los motivos son categorías de lista blanca: HTTP numérico, JSON inválido, respuesta incompleta/paginada, fila no verificable, excepción de transporte, coincidencia exacta o respuesta completa sin filas.
+
+El artifact no contiene la respuesta, SQL, nombre API, namespace, clave, datos de personas, host ni token. Un HTTP 200 vacío **solo** permite `absent_confirmed` si `done=true`, `rowCount=0` y no hay paginación. `unknown` bloquea cualquier envío. No se repite el POST de los canarios G5 ni las pruebas reales BC 6031/612. El cron y las campañas siguen desconectados.
