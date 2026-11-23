@@ -19,6 +19,8 @@ class Configuration
 require_once dirname(__DIR__)
     .'/pssalesforcebridge/src/Growth/GrowthShopSourceBinding.php';
 require_once dirname(__DIR__)
+    .'/pssalesforcebridge/src/Growth/GrowthG8StagingCandidateAdapter.php';
+require_once dirname(__DIR__)
     .'/pssalesforcebridge/src/Growth/GrowthG8CronReadOnly.php';
 use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthG8CronReadOnly as Cron;
 function cronAssert($ok,$label) {
