@@ -103,11 +103,17 @@ final class GrowthG8DloPresenceReader
                 return self::evidence('absent_confirmed','complete_empty');
             }
             foreach ($data['data'] as $row) {
-                if (!is_array($row)
-                    || !array_key_exists($sourceKeyField,$row)
-                    || !is_string($row[$sourceKeyField])
-                    || !hash_equals($key,$row[$sourceKeyField])) {
-                    return self::evidence('unknown','row_unverified');
+                if (!is_array($row)) {
+                    return self::evidence('unknown','row_not_object');
+                }
+                if (!array_key_exists($sourceKeyField,$row)) {
+                    return self::evidence('unknown','row_field_missing');
+                }
+                if (!is_string($row[$sourceKeyField])) {
+                    return self::evidence('unknown','row_value_not_string');
+                }
+                if (!hash_equals($key,$row[$sourceKeyField])) {
+                    return self::evidence('unknown','row_key_not_exact');
                 }
             }
             return self::evidence('present','exact_match');
