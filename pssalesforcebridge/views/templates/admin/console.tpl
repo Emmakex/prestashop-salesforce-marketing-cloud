@@ -290,6 +290,27 @@
         <section class="sfmc-panel" aria-labelledby="sfmc-g8-uat-title">
             <h3 id="sfmc-g8-uat-title">{l s='Sincronización automática G8 · Staging' mod='pssalesforcebridge'}</h3>
             <p class="sfmc-hint">{l s='Operación de pruebas para esta tienda: utiliza la misma outbox G3, valida cada contacto y consulta Data Cloud antes de realizar un único envío. No activa campañas, reintentos ni producción.' mod='pssalesforcebridge'}</p>
+            {if $sfmc_capture_armed}
+                <div class="sfmc-note info" role="status">
+                    {l s='Captura local de staging activa: crea ahora un cliente y un pedido sintéticos. Después usa Detener captura local antes de ejecutar el cron G8.' mod='pssalesforcebridge'}
+                </div>
+            {elseif $sfmc_g8_capture_prepare_available && !$sfmc_g8_staging_approved}
+                <details>
+                    <summary>{l s='1. Preparar G3/G7 y activar captura para la UAT' mod='pssalesforcebridge'}</summary>
+                    <p class="sfmc-hint">{l s='Solo en la tienda de pruebas. Requiere copia de seguridad verificada e instala o comprueba las tablas G3/G7 existentes; no envía datos a Salesforce.' mod='pssalesforcebridge'}</p>
+                    <form method="post" action="{$sfmc_action|escape:'html':'UTF-8'}" autocomplete="off">
+                        <label for="sfmc-g8-capture-phrase">{l s='Confirmación exacta para preparar captura' mod='pssalesforcebridge'}</label>
+                        <input id="sfmc-g8-capture-phrase" type="text" name="PS_GROWTH_G8_CAPTURE_CONFIRM" placeholder="{$sfmc_g8_capture_prepare_phrase|escape:'html':'UTF-8'}" required autocomplete="off" />
+                        <label>
+                            <input type="checkbox" name="PS_GROWTH_G8_BACKUP_CONFIRM" value="{$sfmc_g8_backup_phrase|escape:'html':'UTF-8'}" required />
+                            {l s='Confirmo que existe una copia de seguridad verificada de esta tienda de staging.' mod='pssalesforcebridge'}
+                        </label>
+                        <input type="hidden" name="PS_GROWTH_G8_CSRF" value="{$sfmc_credentials_csrf|escape:'html':'UTF-8'}" />
+                        <button class="sfmc-btn sfmc-btn-secondary" type="submit" name="submitPsGrowthG8CapturePrepare" value="1">{l s='Preparar staging y activar captura' mod='pssalesforcebridge'}</button>
+                    </form>
+                </details>
+            {/if}
+            {if !$sfmc_capture_armed}
             {if $sfmc_g8_staging_approved}
                 <div class="sfmc-note info" role="status">{l s='UAT G8 autorizada en esta tienda. Solo se ejecuta mediante operación dispatch y token cron. Desactívala después de verificar la recepción en Data Cloud.' mod='pssalesforcebridge'}</div>
                 {if $sfmc_credentials_admin_allowed}
@@ -311,13 +332,14 @@
                     <div class="sfmc-note info" role="status">{l s='Para preparar la UAT, selecciona una tienda concreta, configura su origen y OAuth, mantén Test y captura OFF y utiliza la política marketing_optin.' mod='pssalesforcebridge'}</div>
                 {/if}
             {/if}
+            {/if}
         </section>
     {/if}
 
     {if $sfmc_capture_armed}
         <section class="sfmc-panel" aria-labelledby="sfmc-capture-alert">
-            <h3 id="sfmc-capture-alert">{l s='Captura local anterior activa' mod='pssalesforcebridge'}</h3>
-            <p class="sfmc-note">{l s='Hay un modo de diagnóstico antiguo activo. Detenlo antes de continuar con la prueba individual.' mod='pssalesforcebridge'}</p>
+            <h3 id="sfmc-capture-alert">{l s='Captura local de staging activa' mod='pssalesforcebridge'}</h3>
+            <p class="sfmc-note">{l s='Los eventos nuevos quedan registrados como bloqueados en G3. Cuando hayas creado el cliente y pedido sintéticos, detén la captura para poder verificar y ejecutar la UAT G8.' mod='pssalesforcebridge'}</p>
             <form method="post" action="{$sfmc_action|escape:'html':'UTF-8'}">
                 <button type="submit" name="submitPsGrowthStagingCaptureStop" value="1" class="sfmc-btn sfmc-btn-secondary">{l s='Detener captura local' mod='pssalesforcebridge'}</button>
             </form>
