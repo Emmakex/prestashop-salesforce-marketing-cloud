@@ -59,6 +59,7 @@ require_once __DIR__ . '/src/Growth/GrowthShopSourceBinding.php';
 require_once __DIR__ . '/src/Growth/GrowthPrestaShopDeliveryLease.php';
 require_once __DIR__ . '/src/Growth/GrowthG7CurrentEventBatch.php';
 require_once __DIR__ . '/src/Growth/GrowthG8StagingCandidateAdapter.php';
+require_once __DIR__ . '/src/Growth/GrowthStableBoCsrf.php';
 require_once __DIR__ . '/src/Growth/GrowthG8CronReadOnly.php';
 require_once __DIR__ . '/src/DataCloud/GrowthG8DloMetadataResolver.php';
 require_once __DIR__ . '/src/DataCloud/GrowthG8DloPresenceReader.php';
@@ -89,6 +90,7 @@ use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthOneRecordSafeDiagnos
 use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthOneRecordManualSender;
 use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthShopCredentialVault;
 use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthShopSourceBinding;
+use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthStableBoCsrf;
 use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthG8CronReadOnly;
 use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthG8StagingWorker;
 use Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthG8NativeStagingServices;
@@ -488,10 +490,18 @@ class PsSalesforceBridge extends Module
 
     private function credentialCsrf($shop)
     {
-        $employee=$this->context->employee;
-        $adminToken=(string)Tools::getAdminTokenLite('AdminModules');
-        return hash_hmac('sha256','pssfmc-credentials-v1:shop:'.$shop
-            .':employee:'.(int)$employee->id,$adminToken);
+        // The action URL still carries PrestaShop's AdminModules token.
+        // The module's additional CSRF must survive a route/token refresh
+        // between GET and POST, without making credentials public.
+        $employee=isset($this->context,$this->context->employee)
+            ?$this->context->employee:null;
+        if (!$this->isCredentialAdmin($shop) || !is_object($employee)
+            || !defined('_COOKIE_KEY_')) {
+            return '';
+        }
+        return GrowthStableBoCsrf::issue(
+            (string)_COOKIE_KEY_,(int)$shop,(int)$employee->id
+        );
     }
 
     /**
@@ -508,7 +518,8 @@ class PsSalesforceBridge extends Module
             );
         }
         $csrf=Tools::getValue('PS_GROWTH_OAUTH_CSRF');
-        if (!is_string($csrf) || !hash_equals($this->credentialCsrf($shop),$csrf)) {
+        if (!is_string($csrf) || $this->credentialCsrf($shop)===''
+            || !hash_equals($this->credentialCsrf($shop),$csrf)) {
             return $this->displayError(
                 $this->l('La autorización del formulario ha caducado. Vuelve a abrir la configuración.')
             );
