@@ -304,6 +304,16 @@
         <section class="sfmc-panel" aria-labelledby="sfmc-g8-uat-title">
             <h3 id="sfmc-g8-uat-title">{l s='Sincronización automática G8 · Staging' mod='pssalesforcebridge'}</h3>
             <p class="sfmc-hint">{l s='Operación de pruebas para esta tienda: utiliza la misma outbox G3, valida cada contacto y consulta Data Cloud antes de realizar un único envío. No activa campañas, reintentos ni producción.' mod='pssalesforcebridge'}</p>
+            {if $sfmc_credentials_admin_allowed && !$sfmc_g8_staging_approved && !$sfmc_capture_armed}
+                <details>
+                    <summary>{l s='Token protegido de cron para GitHub Actions (sin enviar)' mod='pssalesforcebridge'}</summary>
+                    <p class="sfmc-hint">{l s='Solo un superadministrador de staging puede consultar el token existente. No se cambia ni se activa el cron. Nunca compartas el token en el chat o en una incidencia.' mod='pssalesforcebridge'}</p>
+                    <form method="post" action="{$sfmc_action|escape:'html':'UTF-8'}" autocomplete="off">
+                        <input type="hidden" name="PS_GROWTH_G8_CSRF" value="{$sfmc_credentials_csrf|escape:'html':'UTF-8'}" />
+                        <button type="submit" class="sfmc-btn sfmc-btn-secondary" name="submitPsGrowthG8CronTokenReveal" value="1">{l s='Mostrar token protegido para copiar' mod='pssalesforcebridge'}</button>
+                    </form>
+                </details>
+            {/if}
             {if $sfmc_capture_armed}
                 <div class="sfmc-note info" role="status">
                     {l s='Captura local de staging activa: crea ahora un cliente y un pedido sintéticos. Después usa Detener captura local antes de ejecutar el cron G8.' mod='pssalesforcebridge'}
