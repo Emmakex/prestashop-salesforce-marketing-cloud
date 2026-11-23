@@ -27,7 +27,7 @@ $lease=file_get_contents($root
 $upgrade=file_get_contents($root.'/pssalesforcebridge/upgrade/upgrade-0.9.8.php');
 
 pairCronAssert(strpos($module,"\$this->version = '0.9.8';")!==false
-    && strpos($upgrade,'function upgrade_module_0_9_7(')!==false
+    && strpos($upgrade,'function upgrade_module_0_9_8(')!==false
     && strpos($upgrade,'return true;')!==false
     && strpos($upgrade,'Configuration::updateValue(')===false
     && strpos($upgrade,'Db::')===false,
