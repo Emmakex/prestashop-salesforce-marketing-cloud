@@ -338,8 +338,8 @@
 
     {if $sfmc_capture_armed}
         <section class="sfmc-panel" aria-labelledby="sfmc-capture-alert">
-            <h3 id="sfmc-capture-alert">{l s='Captura local anterior activa' mod='pssalesforcebridge'}</h3>
-            <p class="sfmc-note">{l s='Hay un modo de diagnóstico antiguo activo. Detenlo antes de continuar con la prueba individual.' mod='pssalesforcebridge'}</p>
+            <h3 id="sfmc-capture-alert">{l s='Captura local de staging activa' mod='pssalesforcebridge'}</h3>
+            <p class="sfmc-note">{l s='Los eventos nuevos quedan registrados como bloqueados en G3. Cuando hayas creado el cliente y pedido sintéticos, detén la captura para poder verificar y ejecutar la UAT G8.' mod='pssalesforcebridge'}</p>
             <form method="post" action="{$sfmc_action|escape:'html':'UTF-8'}">
                 <button type="submit" name="submitPsGrowthStagingCaptureStop" value="1" class="sfmc-btn sfmc-btn-secondary">{l s='Detener captura local' mod='pssalesforcebridge'}</button>
             </form>
