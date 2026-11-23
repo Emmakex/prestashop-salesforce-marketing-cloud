@@ -60,7 +60,7 @@ foreach([
     'Growth/GrowthG8DurableReceiptBridge.php',
     'Growth/GrowthG8StagingReadyGate.php',
     'Growth/GrowthG8StagingWorker.php',
-    'Growth/GrowthG8UatExactTarget.php',
+    'Growth/GrowthG8UatPairScope.php',
     'Growth/GrowthLocalCustomerHoldReader.php',
     'Growth/GrowthG7NativePreflight.php',
     'Growth/GrowthG7CurrentEventBatch.php',
@@ -1003,7 +1003,7 @@ $db->execute("UPDATE $tab SET delivery_state='blocked',"
     . " AND entity_type='customer' AND entity_id=901");
 g7DbCheck($native->inspect(1,'customer',901,$nativeSeq901)['state']
     ==='blocked','g8_worker_fixture_not_blocked');
-$uatTarget=\Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthG8UatExactTarget::class;
+$uatTarget=\Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthG8UatPairScope::class;
 g7DbCheck($uatTarget::bind(1,'ABH',$ns,901,902),
     'g8_exact_uat_target_not_bound');
 $targetRead=$uatTarget::inspect(1,'ABH',$ns);
