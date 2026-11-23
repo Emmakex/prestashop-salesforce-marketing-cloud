@@ -125,4 +125,28 @@ metadataReject(function()use($entities){
         throw new RuntimeException('sensitive_sql=private@example.test');
     });
 },'private_error_propagation'); // handled by a safe outer wrapper below
+
+/* HTTP diagnostic is safe to expose ONLY if its value is allowlisted. */
+foreach (['g8_metadata_http_status_403','g8_metadata_http_status_404',
+    'g8_metadata_http_status_0','g8_metadata_http_status_other',
+    'g8_metadata_json_unverified'] as $httpCode) {
+    try {
+        Resolver::resolve($entities,function()use($httpCode) {
+            throw new RuntimeException($httpCode);
+        });
+        metadataAssert(false,'http_status_should_fail');
+    } catch (RuntimeException $error) {
+        metadataAssert($error->getMessage()===$httpCode,
+            'allowlisted_detail_http_not_preserved');
+    }
+}
+try {
+    Resolver::resolve($entities,function(){
+        throw new RuntimeException('tenant_host_api_token_private');
+    });
+    metadataAssert(false,'private_callback_not_blocked');
+} catch (RuntimeException $error) {
+    metadataAssert($error->getMessage()==='g8_dlo_metadata_lookup_failed',
+        'private_callback_error_not_scrubbed');
+}
 echo "G8 metadata resolver PASS: strict PST DLOs and source key fields, ambiguity/no guess; no network.\n";
