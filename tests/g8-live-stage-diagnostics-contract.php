@@ -38,4 +38,15 @@ if (preg_match('/echo\s+.*(?:getMessage|failure_code|failure_stage|token|origin)
     $text)) {
     throw new RuntimeException('g8_stage_diagnostic_contract_stdout_leak');
 }
+foreach ([
+    "'previous_customer_canary_status'",
+    "'previous_order_canary_status'",
+    "'previous_customer_canary_reason'",
+    "'previous_order_canary_reason'",
+    "Presence::inspectWithEvidence("
+] as $required) {
+    if (strpos($text,$required)===false) {
+        throw new RuntimeException('g8_canary_diagnostics_contract_missing');
+    }
+}
 echo "G8 safe live stage diagnostics PASS: only fixed codes and phases, never raw metadata failure.\n";
