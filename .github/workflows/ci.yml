@@ -25,6 +25,7 @@ jobs:
           python3 scripts/ci/verify-project-focus.py
           python3 -m unittest discover -s tests -p 'test_project_focus.py'
           python3 -m unittest discover -s tests -p 'test_g8_cron_readonly_workflow.py'
+          php tests/g8-cron-token-admin-contract.php
 
   growth-product-boundary:
     name: Growth + Data Cloud source boundary
@@ -306,13 +307,13 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          VERSION=0.9.6
+          VERSION=0.9.7
           mkdir -p build
           ZIP="build/pssalesforcebridge-${VERSION}.zip"
           zip -r "$ZIP" pssalesforcebridge \
             -x '*/vendor/*' '*.DS_Store'
           unzip -Z1 "$ZIP" | grep -qx 'pssalesforcebridge/pssalesforcebridge.php'
-          unzip -Z1 "$ZIP" | grep -qx 'pssalesforcebridge/upgrade/upgrade-0.9.6.php'
+          unzip -Z1 "$ZIP" | grep -qx 'pssalesforcebridge/upgrade/upgrade-0.9.7.php'
           if unzip -Z1 "$ZIP" | awk -F/ '$1=="pssalesforcebridge" && $2=="src" && NF>=4 {print $3}' | sort -u | grep -Ev '^(Compatibility|DataCloud|Growth|Provider)$'; then
             echo 'Unrecognized package source directory'
             exit 1
@@ -325,15 +326,15 @@ jobs:
             echo 'vendor directory must not be packaged'
             exit 1
           fi
-          unzip -p "$ZIP" pssalesforcebridge/pssalesforcebridge.php | grep -Fq "\$this->version = '0.9.6';"
+          unzip -p "$ZIP" pssalesforcebridge/pssalesforcebridge.php | grep -Fq "\$this->version = '0.9.7';"
           unzip -p "$ZIP" pssalesforcebridge/pssalesforcebridge.php | grep -Fq "\$this->author = 'ALFABH';"
           unzip -p "$ZIP" pssalesforcebridge/composer.json | grep -Fq '"name": "ALFABH"'
           unzip -p "$ZIP" pssalesforcebridge/composer.json | grep -Fq '"php": ">=7.1"'
           sha256sum "$ZIP" > "${ZIP}.sha256"
       - uses: actions/upload-artifact@v4
         with:
-          name: pssalesforcebridge-0.9.6
+          name: pssalesforcebridge-0.9.7
           path: |
-            build/pssalesforcebridge-0.9.6.zip
-            build/pssalesforcebridge-0.9.6.zip.sha256
+            build/pssalesforcebridge-0.9.7.zip
+            build/pssalesforcebridge-0.9.7.zip.sha256
           if-no-files-found: error
