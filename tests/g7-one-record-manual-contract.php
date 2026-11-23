@@ -276,7 +276,7 @@ $hooks=substr($module,strpos($module,'public function hookActionCustomerAccountA
     -strpos($module,'public function hookActionCustomerAccountAdd'));
 g7OnceAssert(strpos($module,'renderManualOneRecordForms')!==false
     && strpos($module,'runManualOneRecord')!==false
-    && strpos($module,"$"."this->version = '0.9.6'")!==false
+    && strpos($module,"$"."this->version = '0.9.7'")!==false
     && strpos($hooks,'GrowthOneRecordManualSender')===false
     && strpos($cron,'GrowthOneRecordManualSender')===false,
     'unapproved_auto_wiring');
