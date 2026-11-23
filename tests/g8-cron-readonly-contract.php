@@ -39,12 +39,12 @@ $scanner=function($db,$ver,$merchant,$ns,$prefix,$shop,$after,$limit)
         'status'=>'bounded_review_candidates_only',
         'candidate_refs_internal'=>[
             ['shop_id'=>1,'entity_type'=>'customer','entity_id'=>555,
-                'accepted_sequence'=>200,'sensitive'=>'private@example.test'],
+                'accepted_sequence'=>200],
             ['shop_id'=>1,'entity_type'=>'order','entity_id'=>889,
-                'accepted_sequence'=>201,'secret'=>'do-not-expose'],
+                'accepted_sequence'=>201],
         ],
         'has_more'=>true,'next_cursor'=>201,
-        'can_claim'=>false,'http_request_performed'=>false,
+        'can_set_ready'=>false,'can_claim'=>false,'http_request_performed'=>false,
         'data_cloud_ingestion_authorized'=>false,
         'marketing_sends_authorized'=>false,
     ];
