@@ -343,6 +343,7 @@ class PsSalesforceBridge extends Module
         $namespace=(string)Configuration::get(self::CONFIG_NAMESPACE);
         if (!$this->isCredentialAdmin($shop)
             || !is_string($csrf)
+            || $this->credentialCsrf($shop)===''
             || !hash_equals($this->credentialCsrf($shop),$csrf)
             || $confirm!==GrowthStagingSchemaBootstrap::CONFIRM
             || $backup!=='I_HAVE_A_VERIFIED_STAGING_BACKUP'
@@ -409,6 +410,7 @@ class PsSalesforceBridge extends Module
         if (!in_array($operation,['approve','revoke'],true)
             || !$this->isCredentialAdmin($shop)
             || !is_string($csrf)
+            || $this->credentialCsrf($shop)===''
             || !hash_equals($this->credentialCsrf($shop),$csrf)) {
             return $this->displayError(
                 $this->l('Autorización de staging no válida. No se ha cambiado nada.')
