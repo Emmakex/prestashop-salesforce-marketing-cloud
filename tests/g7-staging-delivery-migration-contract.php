@@ -35,7 +35,7 @@ $upgrade=file_get_contents(dirname(__DIR__)
     .'/pssalesforcebridge/upgrade/upgrade-0.8.8.php');
 $service=file_get_contents(dirname(__DIR__)
     .'/pssalesforcebridge/src/Growth/GrowthG7StagingDeliveryMigration.php');
-g7MigrationAssert(strpos($module,"$"."this->version = '0.9.6'")!==false
+g7MigrationAssert(strpos($module,"$"."this->version = '0.9.7'")!==false
     && strpos($module,'submitPsG7SchemaInspect')!==false
     && strpos($module,'submitPsG7SchemaPrepare')!==false
     && strpos($module,'submitPsG7SchemaRollback')!==false
