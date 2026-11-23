@@ -182,29 +182,6 @@ g7DbCheck((int)$db->getValue(
 g7DbCheck((int)$db->getValue(
     "SELECT COUNT(*) FROM `$tab` WHERE entity_id=905 AND entity_type='order'"
 )===1,'order_pre_state_not_recorded');
-// G8 exact capture inspector against disposable real MySQL/MariaDB,
-// using the same customer/order event history, without SQL writes.
-// Mirror the real operator's flow: stop local capture before review.
-Configuration::updateValue('PS_GROWTH_LOCAL_CAPTURE','off');
-$exact=\Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthG8ExactCaptureInspector::inspect(
-    $db,_PS_VERSION_,'ABH',$ns,_DB_PREFIX_,1,901,902
-);
-g7DbCheck($exact['status']==='both_events_captured'
-    && $exact['customer_event_captured']
-    && $exact['order_event_captured']
-    && $exact['read_only']
-    && !$exact['data_cloud_ingestion_authorized']
-    && !$exact['database_write_performed'],
-    'g8_exact_capture_not_confirmed');
-$missing=\Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthG8ExactCaptureInspector::inspect(
-    $db,_PS_VERSION_,'ABH',$ns,_DB_PREFIX_,1,901,99991
-);
-g7DbCheck($missing['status']==='capture_not_confirmed'
-    && $missing['customer_event_captured']
-    && !$missing['order_event_captured'],
-    'g8_exact_capture_false_positive');
-// Restore the earlier G7 fixture configuration for subsequent assertions.
-Configuration::updateValue('PS_GROWTH_LOCAL_CAPTURE','staging_armed');
 // G7 0.8.5: read actual local outbox + ledger through PrestaShop Db API,
 // then use injected native-object loaders (no real PII or external requests).
 $createdFresh=clone $created;
@@ -319,6 +296,26 @@ g7DbCheck($applied['status']==='extended_blocked_no_sends'
         "SELECT COUNT(*) FROM $tab WHERE delivery_state='blocked'"
         . " AND delivery_attempts=0"
     )===5,'migration_changed_local_events');
+
+// G8 exact capture inspector against disposable real MySQL/MariaDB,
+// using the same customer/order event history, without SQL writes.
+$exact=\Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthG8ExactCaptureInspector::inspect(
+    $db,_PS_VERSION_,'ABH',$ns,_DB_PREFIX_,1,901,902
+);
+g7DbCheck($exact['status']==='both_events_captured'
+    && $exact['customer_event_captured']
+    && $exact['order_event_captured']
+    && $exact['read_only']
+    && !$exact['data_cloud_ingestion_authorized']
+    && !$exact['database_write_performed'],
+    'g8_exact_capture_not_confirmed');
+$missing=\Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthG8ExactCaptureInspector::inspect(
+    $db,_PS_VERSION_,'ABH',$ns,_DB_PREFIX_,1,901,99991
+);
+g7DbCheck($missing['status']==='capture_not_confirmed'
+    && $missing['customer_event_captured']
+    && !$missing['order_event_captured'],
+    'g8_exact_capture_false_positive');
 
 // G7 source/ledger/customer negative evidence on the extended G3 CI table.
 // Customer source is synthetic and injected: g3_ci has no merchant PII.
