@@ -59,6 +59,7 @@ foreach([
     'Growth/GrowthAutomaticOneShotCoordinator.php',
     'Growth/GrowthG8DurableReceiptBridge.php',
     'Growth/GrowthG8StagingReadyGate.php',
+    'Growth/GrowthG8StagingWorker.php',
     'Growth/GrowthLocalCustomerHoldReader.php',
     'Growth/GrowthG7NativePreflight.php',
     'Growth/GrowthG7CurrentEventBatch.php',
@@ -960,6 +961,90 @@ g7DbCheck(is_string($g8Summary)
     && strpos($g8Summary,'904')===false
     && strpos($g8Summary,'source_key')===false,
     'g8_native_receipt_leaked_pii');
+
+// G8 full bounded worker with *real* G3 MySQL/MariaDB, one synthetic
+// customer and an injected HTTP-202 response. No Salesforce traffic.
+$workerClass=\Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthG8StagingWorker::class;
+$postsFromWorker=0;$checksFromWorker=0;
+$nativeSeq901=(int)$db->getValue("SELECT MAX(accepted_sequence)"
+    . " FROM $tab WHERE entity_type='customer' AND entity_id=901",false);
+g7DbCheck($nativeSeq901>0
+    && $native->inspect(1,'customer',901,$nativeSeq901)['state']
+        ==='blocked','g8_worker_fixture_not_blocked');
+Configuration::updateValue(
+    'PS_GROWTH_G8_STAGING_APPROVAL',$workerClass::APPROVAL
+);
+$services=[
+    'loadFresh'=>function($candidate)use($ns,$nativeSeq901) {
+        if ($candidate['type']!=='PSCustomer'
+            || $candidate['id']!==901
+            || $candidate['sequence']!==$nativeSeq901)return null;
+        return [
+            'shop'=>1,'type'=>'PSCustomer',
+            'id'=>901,'sequence'=>$nativeSeq901,'customer_id'=>901,
+            'fingerprint'=>hash('sha256','synthetic-g8-native-901'),
+            'payload_private'=>[
+                'source_key'=>$ns.':1:customer:901',
+                'source_namespace'=>$ns,'shop_id'=>1,'customer_id'=>901
+            ]
+        ];
+    },
+    'locallyEligible'=>function($fresh) {
+        return $fresh['customer_id']===901;
+    },
+    'contactEligibility'=>function($candidate,$customerId,$phase)
+        use(&$checksFromWorker) {
+        ++$checksFromWorker;
+        return $customerId===901
+            && in_array($phase,[
+                'before_claim','after_claim','before_transport'
+            ],true);
+    },
+    'recordDloStatus'=>function($candidate,$fresh) {
+        return $fresh['id']===901?'absent_confirmed':'unknown';
+    },
+    'parentDloVerified'=>function(){return false;},
+    'postOnce'=>function($source,$type,$payload,$candidate,$finalFence)
+        use(&$postsFromWorker) {
+        g7DbCheck(
+            $source==='ABH_PrestaShop_Data_Cloud'
+            && $type==='PSCustomer' && $payload['customer_id']===901
+            && $finalFence()===true,'g8_worker_final_fence_denied'
+        );
+        ++$postsFromWorker;
+        return [
+            'http_status'=>202,
+            'outcome'=>'accepted_asynchronously_unconfirmed'
+        ];
+    }
+];
+$runWorker=$workerClass::run(
+    $db,_PS_VERSION_,$g8Scope,_DB_PREFIX_,$services
+);
+$workerReceipt=$native->inspect(1,'customer',901,$nativeSeq901);
+g7DbCheck($runWorker['status']==='staging_tick_completed_unconfirmed'
+    && $runWorker['counts']['accepted_202_unconfirmed']===1
+    && $postsFromWorker===1
+    && $checksFromWorker>=3
+    && $workerReceipt['state']==='reconcile'
+    && $workerReceipt['last_http']===202
+    && $workerReceipt['attempts']===1,
+    'g8_worker_real_db_end_to_end_failed');
+$againWorker=$workerClass::run(
+    $db,_PS_VERSION_,$g8Scope,_DB_PREFIX_,$services
+);
+g7DbCheck($postsFromWorker===1
+    && $againWorker['counts']['accepted_202_unconfirmed']===0,
+    'g8_worker_replayed_claim');
+Configuration::updateValue('PS_GROWTH_G8_STAGING_APPROVAL','off');
+$blockedWorker=$workerClass::run(
+    $db,_PS_VERSION_,$g8Scope,_DB_PREFIX_,$services
+);
+g7DbCheck($blockedWorker['status']==='staging_worker_blocked'
+    && $postsFromWorker===1
+    && strpos(json_encode($runWorker),$ns)===false
+    && strpos(json_encode($runWorker),'901')===false,
+    'g8_worker_approval_or_privacy_failed');
 
 // Stage Test revocation must deny all DB access and writes.
 Configuration::updateValue('PS_GROWTH_LOCAL_CAPTURE','staging_armed');
