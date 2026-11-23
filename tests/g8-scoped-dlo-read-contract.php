@@ -121,10 +121,11 @@ $module=file_get_contents(dirname(__DIR__)
     .'/pssalesforcebridge/pssalesforcebridge.php');
 $cron=file_get_contents(dirname(__DIR__)
     .'/pssalesforcebridge/controllers/front/cron.php');
-sdAssert(strpos($module,'GrowthG8ScopedDloRead')===false
+sdAssert(strpos($module,'GrowthG8ScopedDloRead.php')!==false
+    && strpos($module,'GrowthG8NativeStagingServices::run(')!==false
     && strpos($cron,'GrowthG8ScopedDloRead')===false
     && strpos($source,'GrowthG8DloPresenceReader::inspect(')!==false,
-    'unsafe_live_wiring');
+    'stage_dlo_wiring_missing');
 foreach (['->claim(', '->execute(', 'Mail::send(', '->post(',
     'GrowthDataCloudUpsertTransport'] as $forbidden) {
     sdAssert(strpos($source,$forbidden)===false,'unexpected_sender');
