@@ -36,3 +36,7 @@ Resolver metadatos y leer un canario sintético **no demuestra que un DLO perten
 Una vez certificados los nombres DLO y campos, el informe G8 distingue por canario los estados cerrados `present`, `absent_confirmed` y `unknown`, además de `not_checked` cuando no se ejecutó la consulta. Los motivos son categorías de lista blanca: HTTP numérico, JSON inválido, respuesta incompleta/paginada, fila no verificable, excepción de transporte, coincidencia exacta o respuesta completa sin filas.
 
 El artifact no contiene la respuesta, SQL, nombre API, namespace, clave, datos de personas, host ni token. Un HTTP 200 vacío **solo** permite `absent_confirmed` si `done=true`, `rowCount=0` y no hay paginación. `unknown` bloquea cualquier envío. No se repite el POST de los canarios G5 ni las pruebas reales BC 6031/612. El cron y las campañas siguen desconectados.
+
+### Diagnóstico de fila sin contenido (23/11/2026)
+
+La certificación de Query V2 ahora diferencia, sin imprimir columnas ni valores, `row_not_object`, `row_field_missing`, `row_value_not_string` y `row_key_not_exact`. Los cuatro casos mantienen el resultado `unknown` y prohíben reingesta o autorización de un worker. El HTTP 200 con filas, por sí solo, no equivale a clave exacta. Esta distinción se añade para explicar el `row_unverified` observado simultáneamente para ambos canarios en el run #45136049771.
