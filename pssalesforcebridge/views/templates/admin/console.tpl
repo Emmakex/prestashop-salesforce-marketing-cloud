@@ -204,6 +204,12 @@
                     {l s='Comprobar captura G3 sin enviar' mod='pssalesforcebridge'}
                 </button>
                 <p class="sfmc-hint">{l s='Comprueba que este cliente y este pedido aparecen en G3 como eventos vigentes bloqueados y sin intentos. No consulta ni envía nada a Salesforce.' mod='pssalesforcebridge'}</p>
+                {if $sfmc_g8_target_can_bind}
+                    <button class="sfmc-btn sfmc-btn-secondary" name="submitPsGrowthG8TargetBind" value="1" type="submit">
+                        {l s='Fijar este cliente y pedido para UAT G8' mod='pssalesforcebridge'}
+                    </button>
+                    <p class="sfmc-hint">{l s='Exige los dos eventos G3 verificados. Después G8 procesará únicamente estos registros; no entrarán otros clientes o pedidos pendientes.' mod='pssalesforcebridge'}</p>
+                {/if}
             {/if}
 
             <details>
@@ -319,6 +325,17 @@
                 </details>
             {/if}
             {if !$sfmc_capture_armed}
+            {if $sfmc_g8_target_bound}
+                <div class="sfmc-note info" role="status">{l s='Selección UAT G8 fijada a un cliente y pedido concretos. No se procesarán eventos históricos de otros registros.' mod='pssalesforcebridge'}</div>
+                {if $sfmc_credentials_admin_allowed && !$sfmc_g8_staging_approved}
+                    <form method="post" action="{$sfmc_action|escape:'html':'UTF-8'}">
+                        <input type="hidden" name="PS_GROWTH_G8_CSRF" value="{$sfmc_credentials_csrf|escape:'html':'UTF-8'}" />
+                        <button type="submit" class="sfmc-btn sfmc-btn-secondary" name="submitPsGrowthG8TargetRevoke" value="1">{l s='Retirar selección de UAT G8' mod='pssalesforcebridge'}</button>
+                    </form>
+                {/if}
+            {else}
+                <div class="sfmc-note info" role="status">{l s='Antes de autorizar la UAT, fija el cliente y pedido validados mediante el botón de la sección 2. No se enviarán registros hasta la autorización y la operación cron protegida.' mod='pssalesforcebridge'}</div>
+            {/if}
             {if $sfmc_g8_staging_approved}
                 <div class="sfmc-note info" role="status">{l s='UAT G8 autorizada en esta tienda. Solo se ejecuta mediante operación dispatch y token cron. Desactívala después de verificar la recepción en Data Cloud.' mod='pssalesforcebridge'}</div>
                 {if $sfmc_credentials_admin_allowed}
