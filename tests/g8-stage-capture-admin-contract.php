@@ -64,6 +64,6 @@ stageCaptureAssert(strpos($template,
     'staging_capture_ui_not_guided');
 stageCaptureAssert(
     strpos($module,"Tools::isSubmit('submitPsGrowthG8CapturePrepare')")!==false
-    && strpos($module,"$"."this->version = '0.9.7';")!==false,
+    && strpos($module,"$"."this->version = '0.9.8';")!==false,
     'release_version_changed_before_uat');
 echo "G8 capture UAT admin contract PASS: owner/CSRF/backup/staging/DDLs before local capture; no sends.\n";

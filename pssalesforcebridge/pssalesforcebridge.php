@@ -123,7 +123,7 @@ class PsSalesforceBridge extends Module
     {
         $this->name = 'pssalesforcebridge';
         $this->tab = 'advertising_marketing';
-        $this->version = '0.9.7';
+        $this->version = '0.9.8';
         $this->author = 'ALFABH';
         $this->need_instance = 0;
         $this->bootstrap = true;
@@ -1168,10 +1168,14 @@ class PsSalesforceBridge extends Module
     }
 
     /**
-     * Explicit super-admin secret hand-off for staging only. This is the
-     * current cron token, not a new token or an authorization to dispatch.
-     * POST + existing AdminModules token + stable CSRF; no GET exposure.
-     * Never log, serialize to Smarty, add to URL, or send to Salesforce.
+     * Explicit, one-time staging secret handoff. Never rotate an existing
+     * token: legacy installations may have longer valid hex values.
+     * Missing token may be initialized ONLY after an admin POST + CSRF.
+     *
+     * Return the small HTML fragment directly as module content. In
+     * PrestaShop 9, displayInformation() wraps/escapes HTML and cannot
+     * render interactive form fields. This is never a GET/Smarty variable,
+     * redirect, query string, Salesforce call or persisted log.
      */
     private function handleG8CronTokenReveal()
     {
@@ -1191,32 +1195,68 @@ class PsSalesforceBridge extends Module
                 $this->l('Acceso al token de cron bloqueado. Requiere superadministrador, staging de una sola tienda, modo Test, captura OFF y UAT G8 desactivada.')
             );
         }
+
         $token=Configuration::get(self::CONFIG_CRON_TOKEN);
+        if ($token===false || $token===null || $token==='') {
+            // The existing install() normally creates this automatically.
+            // Explicit recovery is permitted here ONLY for a missing value.
+            // NEVER silently replace an existing token or ledger receipt.
+            try {
+                $generated=bin2hex(random_bytes(24));
+                if (!Configuration::updateValue(
+                    self::CONFIG_CRON_TOKEN,$generated
+                )) {
+                    return $this->displayError(
+                        $this->l('No se ha podido crear el token protegido de staging. No se han activado envios.')
+                    );
+                }
+                $token=Configuration::get(self::CONFIG_CRON_TOKEN);
+                if (!is_string($token)
+                    || !hash_equals($generated,$token)) {
+                    return $this->displayError(
+                        $this->l('No se pudo verificar el nuevo token. No se ha activado ningun envio.')
+                    );
+                }
+            } catch (\Throwable $ignored) {
+                return $this->displayError(
+                    $this->l('No se ha podido crear un token seguro. Comprueba la configuracion del servidor.')
+                );
+            } finally {
+                unset($generated);
+            }
+        }
+        // The existing cron controller checks the full value by hash_equals,
+        // not a length of exactly 48. Preserve valid older secrets intact.
         if (!is_string($token)
-            || preg_match('/^[a-f0-9]{48}$/D',$token)!==1) {
+            || preg_match('/^[a-fA-F0-9]{40,128}$/D',$token)!==1) {
             return $this->displayError(
-                $this->l('El token de cron no esta disponible o tiene formato inesperado. No se ha modificado.')
+                $this->l('El token de cron ya guardado tiene formato inesperado. No se ha sobrescrito ni rotado.')
             );
         }
         if (!headers_sent()) {
             header('Cache-Control: private, no-store, no-cache, max-age=0');
             header('Pragma: no-cache');
             header('Referrer-Policy: no-referrer');
+            header('X-Robots-Tag: noindex, nofollow');
         }
-        // Masked/read-only input is rendered ONLY in this privileged POST
-        // response, outside Smarty; refreshing the BO no longer shows it.
-        $html='<div class="sfmc-cron-secret" role="group">'
-            .'<label for="sfmc-cron-secret-value">'
-            .$this->l('Token de cron de staging: copia el valor en el secreto G8_STAGING_CRON_TOKEN de GitHub Actions. No lo pegues en el chat.')
+        // Escaped attribute value only. Render as direct module markup:
+        // PS 9 can escape markup passed to displayInformation().
+        $html='<section class="sfmc-cron-secret" role="group" '
+            .'style="background:#eaf1fa;border:1px solid #abc4df;'
+            .'padding:16px;border-radius:8px;margin-bottom:16px">'
+            .'<label for="sfmc-cron-secret-value" style="display:block">'
+            .$this->l('Token de cron de staging para GitHub Actions. Copialo directamente en G8_STAGING_CRON_TOKEN. Nunca lo compartas en el chat.')
             .'</label>'
             .'<input id="sfmc-cron-secret-value" type="password" readonly '
-            .'autocomplete="off" spellcheck="false" '
+            .'autocomplete="off" autocapitalize="off" spellcheck="false" '
+            .'onfocus="this.select()" '
             .'value="'.$this->escape($token).'" '
-            .'style="display:block;width:100%;max-width:460px;margin-top:8px" />'
-            .'<p>'.$this->l('Selecciona el campo y copia con Ctrl/Cmd+A, Ctrl/Cmd+C. Al recargar desaparece; este acceso no ejecuta ni autoriza ningun envio.').'</p>'
-            .'</div>';
+            .'style="display:block;width:100%;max-width:520px;'
+            .'padding:9px;margin:8px 0" />'
+            .'<p>'.$this->l('Selecciona el campo y copia con Ctrl/Cmd+A y Ctrl/Cmd+C. Al recargar desaparece. No se ha enviado nada ni activado ningun cron.')
+            .'</p></section>';
         unset($token);
-        return $this->displayInformation($html);
+        return $html;
     }
 
     /**

@@ -128,6 +128,6 @@ g8OperatorAssert(strpos($cron,"'dispatch'")!==false
     && strpos($cron,"hash_equals(")!==false
     && strpos($module,"GrowthG8NativeStagingServices::run(")!==false,
     'protected_cron_or_bo_removed');
-g8OperatorAssert(strpos($module,"$"."this->version = '0.9.7';")!==false,
+g8OperatorAssert(strpos($module,"$"."this->version = '0.9.8';")!==false,
     'premature_final_release');
 echo "G8 BO one-shot PASS: local preflight, separate customer/order, CSRF and no retry.\n";
