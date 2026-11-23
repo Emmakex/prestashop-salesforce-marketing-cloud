@@ -337,7 +337,33 @@
                 <div class="sfmc-note info" role="status">{l s='Antes de autorizar la UAT, fija el cliente y pedido validados mediante el botón de la sección 2. No se enviarán registros hasta la autorización y la operación cron protegida.' mod='pssalesforcebridge'}</div>
             {/if}
             {if $sfmc_g8_staging_approved}
-                <div class="sfmc-note info" role="status">{l s='UAT G8 autorizada en esta tienda. Solo se ejecuta mediante operación dispatch y token cron. Desactívala después de verificar la recepción en Data Cloud.' mod='pssalesforcebridge'}</div>
+                <div class="sfmc-note info" role="status">{l s='UAT G8 autorizada para los dos registros seleccionados. Primero verifica elegibilidad local, luego envía solo el cliente y comprueba su DLO antes de enviar el pedido. No hay campañas ni reintentos.' mod='pssalesforcebridge'}</div>
+                {if $sfmc_credentials_admin_allowed}
+                    <form method="post" action="{$sfmc_action|escape:'html':'UTF-8'}">
+                        <input type="hidden" name="PS_GROWTH_G8_CSRF" value="{$sfmc_credentials_csrf|escape:'html':'UTF-8'}" />
+                        <button type="submit" class="sfmc-btn sfmc-btn-secondary" name="submitPsGrowthG8Preflight" value="1">{l s='1. Comprobar elegibilidad G8 sin enviar' mod='pssalesforcebridge'}</button>
+                    </form>
+                    <details>
+                        <summary>{l s='2. Ejecutar UAT G8 del cliente (un único intento)' mod='pssalesforcebridge'}</summary>
+                        <p class="sfmc-hint">{l s='Esta acción puede enviar el cliente seleccionado a Salesforce Data Cloud. Exige preflight local y confirmación escrita. HTTP 202 no significa entrega verificada; comprueba Data Cloud antes de enviar el pedido. No reintentes ante respuestas inciertas.' mod='pssalesforcebridge'}</p>
+                        <form method="post" action="{$sfmc_action|escape:'html':'UTF-8'}" autocomplete="off">
+                            <label for="sfmc-g8-execute-customer">{l s='Confirmación exacta de ejecución del cliente' mod='pssalesforcebridge'}</label>
+                            <input type="text" id="sfmc-g8-execute-customer" name="PS_GROWTH_G8_RUN_CONFIRM" placeholder="EXECUTE_G8_CUSTOMER_ONCE" required autocomplete="off" />
+                            <input type="hidden" name="PS_GROWTH_G8_CSRF" value="{$sfmc_credentials_csrf|escape:'html':'UTF-8'}" />
+                            <button type="submit" class="sfmc-btn sfmc-btn-secondary" name="submitPsGrowthG8RunCustomer" value="1">{l s='Ejecutar G8: solo cliente' mod='pssalesforcebridge'}</button>
+                        </form>
+                    </details>
+                    <details>
+                        <summary>{l s='3. Ejecutar UAT G8 del pedido (tras verificar cliente en Data Cloud)' mod='pssalesforcebridge'}</summary>
+                        <p class="sfmc-hint">{l s='No utilizar hasta confirmar que el cliente aparece en Data Cloud. El worker vuelve a exigir cliente padre presente, consentimiento local y reserva G3. No envía campañas.' mod='pssalesforcebridge'}</p>
+                        <form method="post" action="{$sfmc_action|escape:'html':'UTF-8'}" autocomplete="off">
+                            <label for="sfmc-g8-execute-order">{l s='Confirmación exacta de ejecución del pedido' mod='pssalesforcebridge'}</label>
+                            <input type="text" id="sfmc-g8-execute-order" name="PS_GROWTH_G8_RUN_CONFIRM" placeholder="EXECUTE_G8_ORDER_ONCE" required autocomplete="off" />
+                            <input type="hidden" name="PS_GROWTH_G8_CSRF" value="{$sfmc_credentials_csrf|escape:'html':'UTF-8'}" />
+                            <button type="submit" class="sfmc-btn sfmc-btn-secondary" name="submitPsGrowthG8RunOrder" value="1">{l s='Ejecutar G8: solo pedido' mod='pssalesforcebridge'}</button>
+                        </form>
+                    </details>
+                {/if}
                 {if $sfmc_credentials_admin_allowed}
                     <form method="post" action="{$sfmc_action|escape:'html':'UTF-8'}">
                         <input type="hidden" name="PS_GROWTH_G8_CSRF" value="{$sfmc_credentials_csrf|escape:'html':'UTF-8'}" />

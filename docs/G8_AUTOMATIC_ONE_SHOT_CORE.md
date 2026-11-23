@@ -105,3 +105,15 @@ Para iniciar la UAT sin acceder a SQL, el administrador principal puede utilizar
 Tras preparar la captura, crear cliente y pedido **sintéticos nuevos** mediante PrestaShop. El hook solo registra identificadores protegidos en la outbox original, nunca efectúa POST. A continuación pulsar **Detener captura local**, comprobar que OAuth y fuente siguen listos, autorizar explícitamente la UAT G8 y efectuar una llamada de cron protegida con `operation=dispatch`. Verificar DLO en Salesforce después del cliente antes de enviar el pedido. Retirar la autorización al terminar. En modo producción no se expone este panel.
 
 Esta preparación guiada no constituye una certificación de la tienda de staging ni concede permiso de comunicación comercial. La versión definitiva sigue pendiente de la UAT.
+
+## Operación G8 UAT desde Back Office (staging, aún v0.9.5)
+
+Para no exponer el secreto del cron al responsable de la tienda, la sección G8 autorizada permite **comprobar elegibilidad G8 sin enviar** y dos envíos UAT estrictamente separados. El preflight es local y consulta los indicadores `newsletter`, `optin`, `active`, `deleted`, `is_guest` del cliente seleccionado. Un valor negativo bloquea la prueba sin cambiar preferencias ni asumir consentimiento de campañas.
+
+El botón **Ejecutar G8: solo cliente** exige administrador principal, CSRF, tienda/namespace exactos, aprobación existente, Test, captura OFF, par UAT fijado, elegibilidad local sin negativos y confirmación escrita `EXECUTE_G8_CUSTOMER_ONCE`. Utiliza el mismo `GrowthG8NativeStagingServices`, worker G3/CAS y transporte ya certificado; no utiliza la ruta manual de un registro. En la ejecución de UAT, el trabajador solo examina filas `PSCustomer` y no incluye el pedido.
+
+El botón **Ejecutar G8: solo pedido** es una segunda acción separada (`EXECUTE_G8_ORDER_ONCE`). Exige también cliente padre `present` confirmado en el DLO, con comprobación repetida justo antes del transporte. Es necesario verificar manualmente el cliente en Data Cloud antes de habilitar la segunda acción. El cron `operation=dispatch` se limita por defecto a PSCustomer para evitar el envío accidental de un pedido.
+
+HTTP 202 se registra como `reconcile` pendiente de confirmación DLO; un timeout es ambiguo y no reintentable. El panel no dice «entregado» tras una aceptación 202; si el resultado es incierto, no repetir la acción. Las campañas siguen fuera del módulo y pertenecen a Marketing Cloud Growth.
+
+**Pendiente para release final:** UAT real del cliente 8/pedido 11 y comprobación en DLO/DMO; tras certificación, desactivar autorización staging, preparar versión final sin etiqueta pre-beta y separar aprobación de go-live de producción.

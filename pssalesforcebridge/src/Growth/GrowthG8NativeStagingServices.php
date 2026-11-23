@@ -18,9 +18,12 @@ use Throwable;
  */
 final class GrowthG8NativeStagingServices
 {
-    public static function run($db,$version,$prefix,$shop)
+    public static function run(
+        $db,$version,$prefix,$shop,$objectType='PSCustomer'
+    )
     {
-        if (!is_int($shop) || $shop<1
+        if (!in_array($objectType,['PSCustomer','PSOrder'],true)
+            || !is_int($shop) || $shop<1
             || !class_exists('Configuration')
             || !class_exists('Customer')
             || !class_exists('Order')
@@ -162,7 +165,7 @@ final class GrowthG8NativeStagingServices
                     'recordDloStatus'=>$dlo,
                     'parentDloVerified'=>$parent,
                     'postOnce'=>$post
-                ]
+                ],$objectType
             );
             unset($cloud,$token,$origin,$descriptor,$resolved);
             return $result;
