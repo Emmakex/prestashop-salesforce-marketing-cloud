@@ -116,6 +116,8 @@ jobs:
           php tests/g8-automatic-one-shot-coordinator-contract.php
           php tests/g8-cron-readonly-contract.php
           php tests/g8-staging-candidate-adapter-contract.php
+          php tests/g8-staging-safety-review-contract.php
+          php tests/g8-scoped-dlo-read-contract.php
           php tests/g8-dlo-presence-contract.php
           php tests/g8-dlo-metadata-resolver-contract.php
           php tests/g8-live-stage-diagnostics-contract.php
