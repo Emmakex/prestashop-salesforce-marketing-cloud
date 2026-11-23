@@ -134,7 +134,7 @@ $bad=$scope;$bad['namespace']='pssfmc_bc_prod_20261120';
 srAssert($run($bad,$c)['status']==='blocked_by_configuration',
     'production_namespace_allowed');
 $bad=$scope;$bad['shop']=2;
-srAssert($run($bad,$c)['status']==='blocked_by_configuration',
+srAssert($run($bad,$c)['status']==='staging_review_failed_closed',
     'shop_drift_allowed');
 $bad=$scope;$bad['mode']='production';
 srAssert($run($bad,$c)['status']==='blocked_by_configuration',
@@ -149,7 +149,9 @@ $bad=$c;$bad[1]=$c[0];
 srAssert($run($scope,$bad)['status']==='staging_review_failed_closed',
     'duplicate_candidate_allowed');
 $bad=$c;$bad[1]['shop']=2;
-srAssert($run($scope,$bad)['status']==='staging_review_failed_closed',
+$beforeLease=$lease->calls;
+srAssert($run($scope,$bad)['status']==='staging_review_failed_closed'
+    && $lease->calls===$beforeLease,
     'cross_shop_candidate_allowed');
 $lots=array_fill(0,11,$c[0]);
 srAssert($run($scope,$lots)['status']==='blocked_by_configuration',
