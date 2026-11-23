@@ -28,6 +28,12 @@ foreach([
         throw new RuntimeException('g8_stage_diagnostic_contract_missing_allowlist');
     }
 }
+// Salesforce's by-entity request must not have a trailing slash.
+if (strpos($text,"'/api/v1/metadata?entityType=DataLakeObject&entityName='")===false
+    || strpos($text,'/api/v1/metadata/?entityType=DataLakeObject')!==false
+    || strpos($text,'/api/v1/metadata/\\?entityType=DataLakeObject')!==false) {
+    throw new RuntimeException('g8_detail_route_not_canonical');
+}
 if (preg_match('/echo\s+.*(?:getMessage|failure_code|failure_stage|token|origin)/i',
     $text)) {
     throw new RuntimeException('g8_stage_diagnostic_contract_stdout_leak');
