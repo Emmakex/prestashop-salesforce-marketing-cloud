@@ -83,11 +83,29 @@ sdAssert($read($descriptor,1,$ns,'PSOrder',99222)==='absent_confirmed',
 $remote='http_error';
 sdAssert($read($descriptor,1,$ns,'PSCustomer',99111)==='unknown',
     'error_misclassified_as_absent');
+$evidence=Reader::inspectWithEvidence(
+    $descriptor,$origin,'token_synthetic_not_private',
+    1,$ns,'PSCustomer',99111,$http
+);
+sdAssert($evidence===['result'=>'unknown','reason'=>'http_status_503'],
+    'http_503_reason_enum');
 $remote='present';
+$evidence=Reader::inspectWithEvidence(
+    $descriptor,$origin,'token_synthetic_not_private',
+    1,$ns,'PSCustomer',99111,$http
+);
+sdAssert($evidence===['result'=>'present','reason'=>'exact_match'],
+    'exact_match_reason_enum');
 $previous=$requests;
 $bad=$descriptor;$bad['shop']=2;
 sdAssert($read($bad,1,$ns,'PSCustomer',99111)==='unknown'
     && $previous===$requests,'cross_shop_sent');
+$evidence=Reader::inspectWithEvidence(
+    $bad,$origin,'token_synthetic_not_private',
+    1,$ns,'PSCustomer',99111,$http
+);
+sdAssert($evidence===['result'=>'unknown','reason'=>'scope_unverified']
+    && $previous===$requests,'scope_evidence_no_network');
 $bad=$descriptor;$bad['merchant']='DOABH';
 sdAssert($read($bad,1,$ns,'PSCustomer',99111)==='unknown'
     && $previous===$requests,'cross_merchant_sent');
@@ -124,7 +142,9 @@ $cron=file_get_contents(dirname(__DIR__)
 sdAssert(strpos($module,'GrowthG8ScopedDloRead.php')!==false
     && strpos($module,'GrowthG8NativeStagingServices::run(')!==false
     && strpos($cron,'GrowthG8ScopedDloRead')===false
-    && strpos($source,'GrowthG8DloPresenceReader::inspect(')!==false,
+    && strpos($source,'GrowthG8DloPresenceReader::inspectWithEvidence(')!==false
+    && strpos($module,'GrowthG8ScopedDloRead::inspectWithEvidence(')!==false
+    && strpos($module,'http_status_503')!==false,
     'stage_dlo_wiring_missing');
 foreach (['->claim(', '->execute(', 'Mail::send(', '->post(',
     'GrowthDataCloudUpsertTransport'] as $forbidden) {

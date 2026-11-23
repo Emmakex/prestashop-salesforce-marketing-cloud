@@ -18,6 +18,22 @@ final class GrowthG8ScopedDloRead
         array $descriptor,$origin,$accessToken,
         $shop,$namespace,$object,$id,$http=null
     ) {
+        $evidence=self::inspectWithEvidence(
+            $descriptor,$origin,$accessToken,
+            $shop,$namespace,$object,$id,$http
+        );
+        return $evidence['result'];
+    }
+
+    /**
+     * Same strict scoped SELECT, exposing ONLY non-identifying reason enums
+     * to the protected Back Office read-only presence diagnostic. Worker
+     * callers still receive only the original three-state value above.
+     */
+    public static function inspectWithEvidence(
+        array $descriptor,$origin,$accessToken,
+        $shop,$namespace,$object,$id,$http=null
+    ) {
         try {
             if (!is_int($shop) || $shop<1
                 || !GrowthShopSourceBinding::isNamespace($namespace)
@@ -55,7 +71,7 @@ final class GrowthG8ScopedDloRead
                     $descriptor['resolved']['PSOrder']
                 )
                 || ($http!==null && !is_callable($http))) {
-                return 'unknown';
+                return self::evidence('unknown','scope_unverified');
             }
             $binding=GrowthShopSourceBinding::inspect(
                 $shop,$descriptor['merchant'],$namespace
@@ -63,7 +79,7 @@ final class GrowthG8ScopedDloRead
             if (!isset($binding['ready'],$binding['source'])
                 || $binding['ready']!==true
                 || $binding['source']!==$descriptor['source']) {
-                return 'unknown';
+                return self::evidence('unknown','scope_unverified');
             }
             $entry=$descriptor['resolved'][$object];
             if (!is_array($entry) || count($entry)
@@ -72,17 +88,54 @@ final class GrowthG8ScopedDloRead
                 || ($object==='PSOrder'
                     && (!isset($entry['customer_key'])
                         || $entry['customer_key']===$entry['key']))) {
-                return 'unknown';
+                return self::evidence('unknown','scope_unverified');
             }
             // All SQL identifier and domain checks remain enforced by
             // GrowthG8DloPresenceReader. No raw rows escape this adapter.
-            return GrowthG8DloPresenceReader::inspect(
+            $evidence=GrowthG8DloPresenceReader::inspectWithEvidence(
                 $origin,$accessToken,$namespace,$shop,$object,$id,
                 $entry['dlo'],$entry['key'],$http
             );
+            if (!is_array($evidence)
+                || !isset($evidence['result'],$evidence['reason'])
+                || !in_array($evidence['result'],
+                    ['present','absent_confirmed','unknown'],true)
+                || !is_string($evidence['reason'])
+                || !self::safeReason($evidence['reason'])) {
+                return self::evidence('unknown','query_evidence_unverified');
+            }
+            return $evidence;
         } catch (Throwable $ignored) {
-            return 'unknown';
+            return self::evidence('unknown','scope_exception');
         }
     }
+
+    private static function evidence($result,$reason)
+    {
+        return ['result'=>$result,'reason'=>$reason];
+    }
+
+    /** Fixed, source-independent codes only. Never echo server strings. */
+    private static function safeReason($reason)
+    {
+        if (in_array($reason,[
+            'request_invalid','transport_unverified',
+            'response_unverified','json_unverified',
+            'batch_unverified','row_not_object',
+            'row_projection_unverified','row_value_not_string',
+            'row_key_not_exact','transport_exception',
+            'complete_empty','exact_match'
+        ],true))return true;
+        return in_array($reason,[
+            'http_status_0','http_status_400',
+            'http_status_401','http_status_403',
+            'http_status_404','http_status_405',
+            'http_status_408','http_status_422',
+            'http_status_429','http_status_500',
+            'http_status_502','http_status_503',
+            'http_status_504','http_status_other'
+        ],true);
+    }
+
     private function __construct(){}
 }
