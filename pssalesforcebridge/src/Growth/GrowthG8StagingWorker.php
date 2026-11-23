@@ -44,7 +44,7 @@ final class GrowthG8StagingWorker
             $phase='g3_scan';
             // UAT is an exact two-record operation, NEVER the first 10
             // globally blocked rows. Other historical G3 events untouched.
-            $candidates=GrowthG8UatExactTarget::candidates(
+            $candidates=GrowthG8UatPairScope::candidates(
                 $db,$version,$prefix,$scope,'blocked'
             );
             $phase='ready_promotion';
@@ -90,7 +90,7 @@ final class GrowthG8StagingWorker
             $phase='ready_scan';
             // Never drain READY records belonging to a different customer
             // or another previous UAT; CAS remains single-use per row.
-            $ready=GrowthG8UatExactTarget::candidates(
+            $ready=GrowthG8UatPairScope::candidates(
                 $db,$version,$prefix,$scope,'ready'
             );
             if ($ready===[]) {
