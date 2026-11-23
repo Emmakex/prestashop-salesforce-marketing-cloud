@@ -66,3 +66,12 @@ El adaptador \`GrowthG8DurableReceiptBridge\` enlaza la firma del coordinador de
 \`tests/g8-durable-cas-receipt-bridge-contract.php\` certifica el circuito completo de coordinador + CAS + recibo con objetos sintéticos (sin red ni base de datos). El CAS SQL de \`GrowthPrestaShopDeliveryLease\` y el comportamiento de concurrencia siguen cubiertos por pruebas G3/G7 independientes.
 
 **Importante:** este componente no se carga en el módulo ni en el cron. G8 aún requiere la fuente CSC de envío certificada por contacto, una autorización específica del propietario y una UAT aislada de un registro nuevo en staging antes de cualquier operación de transporte real. La configuración administrativa Growth/CRM, los DLO y canarios G5, y cliente/pedido BC 6031/612 están verificados y no se repiten.
+
+
+## G8 — Cierre de la valla por contacto antes de liberar una versión (23/11/2026)
+
+El coordinador `GrowthAutomaticOneShotCoordinator::tick` ahora exige un callback **obligatorio y sin valor predeterminado permisivo** de elegibilidad por contacto. La firma del callback es `($candidate, $nativeCustomerId, $phase): bool` y se ejecuta en tres puntos: `before_claim`, `after_claim` y `before_transport`. Solo el booleano literal `true` permite continuar. El cliente se deriva del objeto nativo (para pedidos) o coincide con el propio cliente (para PSCustomer); jamás se acepta la identidad de contacto de otra tienda.
+
+La valla tiene finalidad **Data Cloud ingestion**, no autorización de campañas de Marketing Cloud Growth. Una autorización de administrador en CRM tampoco sustituye esta comprobación para un contacto. Si el lector falta, es ambiguo, falla, cambia la elegibilidad, se revoca o devuelve un valor distinto de `true`, la operación se bloquea. Si ya se reservó la fila G3, el callback de recibo la cancela sin POST y sin reintentos. El transporte continúa obligado a validar nuevamente el lease nativo y a guardar `202→reconcile` / timeout → conciliación.
+
+**Importante**: los callbacks `true` de los contratos son exclusivamente sintéticos. La conexión a un lector de consentimiento/supresión realmente certificado por contacto y la UAT en la tienda de staging son requisitos restantes antes de conectar un worker o publicar el paquete final. **No crear v0.9.6 ni retirar Pre-beta en el módulo hasta terminar estas certificaciones.**
