@@ -76,9 +76,14 @@ final class GrowthG8CronReadOnly
             }
             // Inspect only the allowed count, NEVER expose candidate refs,
             // entity IDs, cursor, namespace, source keys or source PII.
+            // Validate every scoped G3 ref against the exact G8 candidate
+            // contract; the mapped refs remain local, NEVER in cron JSON.
+            $privateCandidates=GrowthG8StagingCandidateAdapter::adapt(
+                $batch,$shop,0,$limit
+            );
             return self::report(
                 'staging_events_review_only',
-                count($batch['candidate_refs_internal']),
+                count($privateCandidates),
                 $batch['has_more']
             );
         } catch (Throwable $error) {

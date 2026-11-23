@@ -31,3 +31,10 @@ Este corte es **núcleo de la automatización, no go-live**. La interfaz abstrac
 **Resta antes de beta operativa:** adaptar G3 de staging a la instalación BC sin relajación de checks SQL; cablear callbacks a eventos actuales + DLO GET con permisos, enlazar al cron protegido y botón Stop; certificar error/rollback, conciliación 202 y dedupe real en staging; pedir autorización para habilitar *ese flujo de envío automático concreto*. No usar esta clase directamente para POST productivo hasta completar esos pasos.
 
 **Próximo PR recomendado:** runtime de cron **captura local y conciliación solamente**, luego activar el envío acotado con CAS tras UAT. No ampliar alcance hacia sistemas ajenos ni crear una segunda cola.
+
+
+## G8 — Adaptador G3 → coordinador en preflight de staging (23/11/2026)
+
+El componente `GrowthG8StagingCandidateAdapter` traduce **solo en memoria** las referencias del escáner `GrowthG7CurrentEventBatch` a `shop/type/id/sequence` que admite `GrowthAutomaticOneShotCoordinator`. Verifica identidad de tienda, tipos `customer/order`, secuencias crecientes, cursor, ausencia de referencias duplicadas, límite de diez y que las banderas `can_set_ready/can_claim/HTTP/ingesta/campañas` sean todas **false**. Ningún ID se presenta al usuario.
+
+El cron actual `inspect` ya utiliza este adaptador dentro de su recorrido G3 de staging, pero **solo publica un contador** y no expone las referencias transformadas. `status` sigue inmóvil. Este corte no crea productor READY, reserva CAS, sender, OAuth ni campaña. La conexión efectiva del coordinador y del reader DLO a un worker quedará bloqueada hasta UAT staging Test, lectura fresca/CSC por contacto, persistencia `reconcile/held` y aprobación explícita del responsable. Evitar extender esta función a namespaces de producción o DO sin un origen certificado.
