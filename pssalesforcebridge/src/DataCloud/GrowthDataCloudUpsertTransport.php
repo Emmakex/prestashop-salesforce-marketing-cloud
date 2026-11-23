@@ -82,10 +82,16 @@ final class GrowthDataCloudUpsertTransport
         $outcome=GrowthStreamingIngestionPlan::classify(
             $result['status'],$result['response_received']
         );
+        // Exact HTTP status for G3 durable held/reconcile receipts ONLY.
+        // A timeout or unverified response must never become a known HTTP.
+        $safeHttp=$result['response_received']===true
+            && $result['status']>=100 && $result['status']<=599
+            ?$result['status']:null;
         unset($plan,$result);
         return [
             'status'=>'ingestion_transport_result_requires_reconciliation',
             'outcome_state'=>$outcome['outcome_state'],
+            'http_status'=>$safeHttp,
             'accepted_asynchronously_unconfirmed'=>
                 $outcome['request_accepted_asynchronously'],
             'reconciliation_required'=>true,
