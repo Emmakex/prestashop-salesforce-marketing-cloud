@@ -57,6 +57,7 @@ require_once __DIR__ . '/src/Growth/GrowthShopCredentialVault.php';
 require_once __DIR__ . '/src/Growth/GrowthShopSourceBinding.php';
 require_once __DIR__ . '/src/Growth/GrowthPrestaShopDeliveryLease.php';
 require_once __DIR__ . '/src/Growth/GrowthG7CurrentEventBatch.php';
+require_once __DIR__ . '/src/Growth/GrowthG8StagingCandidateAdapter.php';
 require_once __DIR__ . '/src/Growth/GrowthG8CronReadOnly.php';
 require_once __DIR__ . '/src/DataCloud/GrowthStreamingIngestionPlan.php';
 require_once __DIR__ . '/src/DataCloud/GrowthDataCloudUpsertTransport.php';
