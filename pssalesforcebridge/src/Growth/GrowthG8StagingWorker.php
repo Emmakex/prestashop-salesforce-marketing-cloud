@@ -19,9 +19,12 @@ final class GrowthG8StagingWorker
     const APPROVAL='OWNER_APPROVES_STAGING_G8_INGESTION';
 
     public static function run(
-        $db,$version,array $scope,$prefix,array $callbacks
+        $db,$version,array $scope,$prefix,array $callbacks,
+        $objectType=null
     ) {
-        if (!self::allowed($scope,$callbacks)
+        if (($objectType!==null
+                && !in_array($objectType,['PSCustomer','PSOrder'],true))
+            || !self::allowed($scope,$callbacks)
             || !is_object($db) || !is_callable([$db,'executeS'])
             || !is_string($version) || $version===''
             || !is_string($prefix)
@@ -47,6 +50,13 @@ final class GrowthG8StagingWorker
             $candidates=GrowthG8UatPairScope::candidates(
                 $db,$version,$prefix,$scope,'blocked'
             );
+            if ($objectType!==null) {
+                $candidates=array_values(array_filter(
+                    $candidates,function($row)use($objectType) {
+                        return $row['type']===$objectType;
+                    }
+                ));
+            }
             $phase='ready_promotion';
             $promoted=0;$blocked=0;
             foreach ($candidates as $candidate) {
@@ -93,6 +103,13 @@ final class GrowthG8StagingWorker
             $ready=GrowthG8UatPairScope::candidates(
                 $db,$version,$prefix,$scope,'ready'
             );
+            if ($objectType!==null) {
+                $ready=array_values(array_filter(
+                    $ready,function($row)use($objectType) {
+                        return $row['type']===$objectType;
+                    }
+                ));
+            }
             if ($ready===[]) {
                 return self::report('staging_tick_no_ready',[
                     'reviewed'=>count($candidates),
