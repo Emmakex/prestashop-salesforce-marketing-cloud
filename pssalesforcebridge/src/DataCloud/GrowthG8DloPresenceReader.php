@@ -107,13 +107,18 @@ final class GrowthG8DloPresenceReader
                 if (!is_array($row)) {
                     return self::evidence('unknown','row_not_object');
                 }
-                if (!array_key_exists(self::RESULT_ALIAS,$row)) {
-                    return self::evidence('unknown','row_field_missing');
+                // The SQL above projects EXACTLY ONE certified DLO field.
+                // Salesforce may rename its JSON result key. Accept only a
+                // one-column row with one string value, irrespective of the
+                // display key. Extra columns remain ambiguous and blocked.
+                if (count($row)!==1) {
+                    return self::evidence('unknown','row_projection_unverified');
                 }
-                if (!is_string($row[self::RESULT_ALIAS])) {
+                $value=reset($row);
+                if (!is_string($value)) {
                     return self::evidence('unknown','row_value_not_string');
                 }
-                if (!hash_equals($key,$row[self::RESULT_ALIAS])) {
+                if (!hash_equals($key,$value)) {
                     return self::evidence('unknown','row_key_not_exact');
                 }
             }
