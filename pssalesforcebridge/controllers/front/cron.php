@@ -20,7 +20,7 @@ class PsSalesforceBridgeCronModuleFrontController extends ModuleFrontController
         }
         $operation=Tools::getValue('operation','status');
         if (!is_string($operation)
-            || !in_array($operation,['status','inspect'],true)) {
+            || !in_array($operation,['status','inspect','dispatch'],true)) {
             $this->respond(['ok'=>false,'error'=>'invalid_operation'],400);
         }
         try {
