@@ -58,6 +58,7 @@ foreach([
     'Growth/GrowthShopSourceBinding.php',
     'Growth/GrowthAutomaticOneShotCoordinator.php',
     'Growth/GrowthG8DurableReceiptBridge.php',
+    'Growth/GrowthG8StagingReadyGate.php',
     'Growth/GrowthLocalCustomerHoldReader.php',
     'Growth/GrowthG7NativePreflight.php',
     'Growth/GrowthG7CurrentEventBatch.php',
@@ -852,26 +853,78 @@ g7DbCheck($g8RawBefore['state']==='blocked'
     && $g8RawBefore['attempts']===0
     && $g8RawBefore['ledger_current'],
     'g8_fixture_not_blocked');
-$db->execute("UPDATE $tab SET delivery_state='ready'"
-    . " WHERE accepted_sequence=$g8Sequence"
-    . " AND entity_type='customer' AND entity_id=904"
-    . " AND delivery_state='blocked' AND delivery_attempts=0");
 $g8Scope=[
     'shop'=>1,'merchant'=>'ABH','namespace'=>$ns,
     'mode'=>'test','capture'=>'off',
     'owner_gate'=>\Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthAutomaticOneShotCoordinator::OWNER_GATE
 ];
-$g8Bridge=new \Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthG8DurableReceiptBridge(
-    $native,$g8Scope
-);
 $g8Candidate=[
     'shop'=>1,'type'=>'PSCustomer','id'=>904,'sequence'=>$g8Sequence
 ];
+$readyClass=\Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthG8StagingReadyGate::class;
+$policy=function($candidate)use($g8Sequence) {
+    return $candidate['shop']===1 && $candidate['id']===904
+        && $candidate['sequence']===$g8Sequence;
+};
+$dloAbsent=function($candidate) {return 'absent_confirmed';};
+$parentVerified=function($candidate) {return false;};
+// No access to READY unless owner gate and current native evidence
+// agree, even in disposable g3_ci.
+$badScope=$g8Scope;
+$badScope['owner_gate']='';
+$beforeBlocked=$readyClass::promote(
+    $db,_PS_VERSION_,$badScope,_DB_PREFIX_,
+    $g8Candidate,$policy,$dloAbsent,$parentVerified
+);
+g7DbCheck($beforeBlocked['status']==='blocked_by_configuration'
+    && $native->inspect(1,'customer',904,$g8Sequence)['state']
+        ==='blocked','g8_ready_missing_owner_allowed');
+$remotePresent=function($candidate) {return 'present';};
+g7DbCheck($readyClass::promote(
+    $db,_PS_VERSION_,$g8Scope,_DB_PREFIX_,
+    $g8Candidate,$policy,$remotePresent,$parentVerified
+)['status']==='blocked_remote_not_absent',
+    'g8_ready_remote_present_allowed');
+$denyContact=function($candidate) {return false;};
+g7DbCheck($readyClass::promote(
+    $db,_PS_VERSION_,$g8Scope,_DB_PREFIX_,
+    $g8Candidate,$denyContact,$dloAbsent,$parentVerified
+)['status']==='blocked_contact_or_source',
+    'g8_ready_contact_denied_allowed');
+$ready=$readyClass::promote(
+    $db,_PS_VERSION_,$g8Scope,_DB_PREFIX_,
+    $g8Candidate,$policy,$dloAbsent,$parentVerified
+);
+g7DbCheck($ready['status']==='ready_for_one_cas_only'
+    && $native->inspect(1,'customer',904,$g8Sequence)['state']
+        ==='ready','g8_ready_promotion_failed');
+$readyWindow=$readyClass::scanReady(
+    $db,_PS_VERSION_,$g8Scope,_DB_PREFIX_,0,10
+);
+g7DbCheck($readyWindow['status']==='ready_candidates_private'
+    && $readyWindow['candidates_private']===[$g8Candidate]
+    && $readyWindow['has_more']===false
+    && !$readyWindow['data_cloud_ingestion_authorized'],
+    'g8_ready_scanner_not_exact');
+g7DbCheck($readyClass::promote(
+    $db,_PS_VERSION_,$g8Scope,_DB_PREFIX_,
+    $g8Candidate,$policy,$dloAbsent,$parentVerified
+)['status']==='blocked_old_or_attempted',
+    'g8_ready_double_promotion_allowed');
+$g8Bridge=new \Emmakex\PrestaShopSalesforceMarketingCloud\Growth\GrowthG8DurableReceiptBridge(
+    $native,$g8Scope
+);
 $g8Fingerprint=hash('sha256','synthetic-native-904');
 g7DbCheck($g8Bridge->reserveOnce($g8Candidate,$g8Fingerprint)
     ==='reserved_once'
     && $g8Bridge->claimedForPost($g8Candidate,$g8Fingerprint),
     'g8_native_cas_not_claimed');
+$g8AfterClaimScan=$readyClass::scanReady(
+    $db,_PS_VERSION_,$g8Scope,_DB_PREFIX_,0,10
+);
+g7DbCheck($g8AfterClaimScan['status']==='ready_candidates_private'
+    && $g8AfterClaimScan['candidates_private']===[],
+    'g8_claimed_still_scannable');
 $g8Claimed=$native->inspect(1,'customer',904,$g8Sequence);
 g7DbCheck($g8Claimed['state']==='claimed'
     && $g8Claimed['attempts']===1 && $g8Claimed['lease_active'],

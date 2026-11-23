@@ -75,3 +75,13 @@ El coordinador `GrowthAutomaticOneShotCoordinator::tick` ahora exige un callback
 La valla tiene finalidad **Data Cloud ingestion**, no autorización de campañas de Marketing Cloud Growth. Una autorización de administrador en CRM tampoco sustituye esta comprobación para un contacto. Si el lector falta, es ambiguo, falla, cambia la elegibilidad, se revoca o devuelve un valor distinto de `true`, la operación se bloquea. Si ya se reservó la fila G3, el callback de recibo la cancela sin POST y sin reintentos. El transporte continúa obligado a validar nuevamente el lease nativo y a guardar `202→reconcile` / timeout → conciliación.
 
 **Importante**: los callbacks `true` de los contratos son exclusivamente sintéticos. La conexión a un lector de consentimiento/supresión realmente certificado por contacto y la UAT en la tienda de staging son requisitos restantes antes de conectar un worker o publicar el paquete final. **No crear v0.9.6 ni retirar Pre-beta en el módulo hasta terminar estas certificaciones.**
+
+## G8 — Transición G3 bloqueado → READY (staging)
+
+El componente `GrowthG8StagingReadyGate` habilita un CAS atómico sobre la **misma** outbox y ledger G3: `blocked → ready`, únicamente en staging, modo Test, captura OFF y con permiso de propietario. Comprueba que el evento sigue siendo la revisión vigente, intentos=0, sin lease ni HTTP previo, origen por tienda y tres verificaciones independientes: fuente/contacto elegible, ausencia DLO confirmada, y para pedidos, cliente padre verificado.
+
+`scanReady` solo devuelve referencias privadas acotadas a 10 y vigentes. No autoriza un envío ni genera tablas, campañas, credenciales o rutas de cron nuevas. El siguiente enlace es el worker autorizado que une estos eventos al coordinador, token Data Cloud, `GrowthG8DurableReceiptBridge` y respuesta Query V2.
+
+Pruebas: `tests/integration/g7_staging_capture_prestashop_db.php` comprueba la promoción real a READY (reemplaza el UPDATE manual anterior), selección antes/después de claim, 202→reconcile y ausencia de segundo intento, en los tres motores MySQL/MariaDB de la CI. Este sandbox no reemplaza la UAT en la tienda de staging ni concede autorización de campañas.
+
+**Bloqueo de versión:** no publicar 0.9.6 ni retirar «Pre-beta» hasta completar el worker real, la UAT en PrestaShop staging y la validación en Marketing Cloud Growth.
