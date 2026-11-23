@@ -123,7 +123,7 @@ class PsSalesforceBridge extends Module
     {
         $this->name = 'pssalesforcebridge';
         $this->tab = 'advertising_marketing';
-        $this->version = '0.9.6';
+        $this->version = '0.9.7';
         $this->author = 'ALFABH';
         $this->need_instance = 0;
         $this->bootstrap = true;
@@ -224,6 +224,8 @@ class PsSalesforceBridge extends Module
             $message = $this->handleSalesforceCredentials('test');
         } elseif (Tools::isSubmit('submitPsGrowthOauthRemove')) {
             $message = $this->handleSalesforceCredentials('remove');
+        } elseif (Tools::isSubmit('submitPsGrowthG8CronTokenReveal')) {
+            $message=$this->handleG8CronTokenReveal();
         } elseif (Tools::isSubmit('submitPsGrowthG8TargetBind')) {
             $message=$this->handleG8UatTarget('bind');
         } elseif (Tools::isSubmit('submitPsGrowthG8TargetRevoke')) {
@@ -1163,6 +1165,58 @@ class PsSalesforceBridge extends Module
                     :$this->l('No se pudo completar la operación de conexión. Comprueba el servidor y la configuración; ningún dato se ha enviado.')
             );
         }
+    }
+
+    /**
+     * Explicit super-admin secret hand-off for staging only. This is the
+     * current cron token, not a new token or an authorization to dispatch.
+     * POST + existing AdminModules token + stable CSRF; no GET exposure.
+     * Never log, serialize to Smarty, add to URL, or send to Salesforce.
+     */
+    private function handleG8CronTokenReveal()
+    {
+        $shop=$this->credentialContextShopId();
+        $csrf=Tools::getValue('PS_GROWTH_G8_CSRF');
+        $namespace=(string)Configuration::get(self::CONFIG_NAMESPACE);
+        if (!$this->isCredentialAdmin($shop)
+            || !is_string($csrf) || $csrf===''
+            || $this->credentialCsrf($shop)===''
+            || !hash_equals($this->credentialCsrf($shop),$csrf)
+            || !class_exists('Shop') || Shop::isFeatureActive()
+            || (string)Configuration::get(self::CONFIG_MODE)!=='test'
+            || (string)Configuration::get(self::CONFIG_LOCAL_CAPTURE)!=='off'
+            || preg_match('/(?:^|_)(?:stage|staging)(?:_|$)/D',$namespace)!==1
+            || (string)Configuration::get('PS_GROWTH_G8_STAGING_APPROVAL')!=='off') {
+            return $this->displayError(
+                $this->l('Acceso al token de cron bloqueado. Requiere superadministrador, staging de una sola tienda, modo Test, captura OFF y UAT G8 desactivada.')
+            );
+        }
+        $token=Configuration::get(self::CONFIG_CRON_TOKEN);
+        if (!is_string($token)
+            || preg_match('/^[a-f0-9]{48}$/D',$token)!==1) {
+            return $this->displayError(
+                $this->l('El token de cron no esta disponible o tiene formato inesperado. No se ha modificado.')
+            );
+        }
+        if (!headers_sent()) {
+            header('Cache-Control: private, no-store, no-cache, max-age=0');
+            header('Pragma: no-cache');
+            header('Referrer-Policy: no-referrer');
+        }
+        // Masked/read-only input is rendered ONLY in this privileged POST
+        // response, outside Smarty; refreshing the BO no longer shows it.
+        $html='<div class="sfmc-cron-secret" role="group">'
+            .'<label for="sfmc-cron-secret-value">'
+            .$this->l('Token de cron de staging: copia el valor en el secreto G8_STAGING_CRON_TOKEN de GitHub Actions. No lo pegues en el chat.')
+            .'</label>'
+            .'<input id="sfmc-cron-secret-value" type="password" readonly '
+            .'autocomplete="off" spellcheck="false" '
+            .'value="'.$this->escape($token).'" '
+            .'style="display:block;width:100%;max-width:460px;margin-top:8px" />'
+            .'<p>'.$this->l('Selecciona el campo y copia con Ctrl/Cmd+A, Ctrl/Cmd+C. Al recargar desaparece; este acceso no ejecuta ni autoriza ningun envio.').'</p>'
+            .'</div>';
+        unset($token);
+        return $this->displayInformation($html);
     }
 
     /**
