@@ -424,12 +424,42 @@ class PsSalesforceBridge extends Module
                 if (!in_array($status,$safe,true)) {
                     $status='stage_scope_invalid';
                 }
-                return $this->displayConfirmation(
-                    sprintf(
-                        $this->l('Diagnóstico local G8 sin enviar: %s. Ningún intento nuevo ni modificación G3. Este resultado no autoriza reintentar ni activar campañas.'),
-                        $status
-                    )
+                // Only fixed, PII-free reason codes may appear in the BO.
+                $detail='';
+                if ($status==='local_customer_excluded') {
+                    $allowed=[
+                        'local_customer_deleted',
+                        'local_customer_inactive',
+                        'local_customer_guest',
+                        'local_newsletter_negative',
+                        'local_optin_negative'
+                    ];
+                    $reasons=isset($report['local_exclusion_reasons'])
+                        ?$report['local_exclusion_reasons']:null;
+                    $valid=is_array($reasons) && count($reasons)>0
+                        && count($reasons)<=count($allowed);
+                    if ($valid) {
+                        foreach ($reasons as $reason) {
+                            if (!is_string($reason)
+                                || !in_array($reason,$allowed,true)) {
+                                $valid=false;
+                                break;
+                            }
+                        }
+                    }
+                    $detail=sprintf(
+                        $this->l(' Motivos locales: %s.'),
+                        $valid?implode(', ',array_unique($reasons))
+                            :'local_customer_reason_unverified'
+                    );
+                }
+                $message=sprintf(
+                    $this->l('Diagnóstico local G8 sin enviar: %s.%s Ningún intento nuevo ni modificación G3. Este resultado no autoriza reintentar ni activar campañas.'),
+                    $status,$detail
                 );
+                return $status==='local_customer_excluded'
+                    ?$this->displayError($message)
+                    :$this->displayConfirmation($message);
             } catch (\Throwable $ignored) {
                 return $this->displayError(
                     $this->l('Diagnóstico local G8 inconcluso. No se ha realizado ningún envío ni cambio de G3.')
