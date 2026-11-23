@@ -25,7 +25,7 @@ $fixture=function($rows,$done=true,$count=null,$code=200,$other=[])
         dloAssert(
             is_array($q) && isset($q['sql'])
             && $q['sql']===
-                'SELECT "source_key__c" FROM "PST_PSCustomer_Test__dll"'
+                'SELECT "source_key__c" AS "g8_exact_source_key" FROM "PST_PSCustomer_Test__dll"'
                 ." WHERE \"source_key__c\" = '".$expected."' LIMIT 2",
             'not_exact_readonly_key_sql');
         return [
@@ -34,7 +34,7 @@ $fixture=function($rows,$done=true,$count=null,$code=200,$other=[])
                 'data'=>$rows,
                 'done'=>$done,
                 'rowCount'=>$count===null?count($rows):$count,
-                'metadata'=>['source_key__c'=>['type'=>'VARCHAR']],
+                'metadata'=>['g8_exact_source_key'=>['type'=>'VARCHAR']],
             ],$other))
         ];
     };
@@ -54,14 +54,14 @@ $diagnose=function($http)use($origin,$ns,$shop) {
     );
 };
 foreach ([
-    [$fixture([['source_key__c'=>$expected]]),'present','exact_match'],
+    [$fixture([['g8_exact_source_key'=>$expected]]),'present','exact_match'],
     [$fixture([]),'absent_confirmed','complete_empty'],
     [$fixture([],false),'unknown','batch_unverified'],
     [$fixture([],true,1),'unknown','batch_unverified'],
     [$fixture(['not_a_row_object']),'unknown','row_not_object'],
     [$fixture([['other_column'=>'value']]),'unknown','row_field_missing'],
-    [$fixture([['source_key__c'=>123]]),'unknown','row_value_not_string'],
-    [$fixture([['source_key__c'=>'wrong']]),'unknown','row_key_not_exact'],
+    [$fixture([['g8_exact_source_key'=>123]]),'unknown','row_value_not_string'],
+    [$fixture([['g8_exact_source_key'=>'wrong']]),'unknown','row_key_not_exact'],
     [$fixture([],true,0,400),'unknown','http_status_400'],
     [$fixture([],true,0,403),'unknown','http_status_403'],
     [$fixture([],true,0,404),'unknown','http_status_404'],
@@ -74,6 +74,11 @@ foreach ([
     dloAssert($diag===['result'=>$case[1],'reason'=>$case[2]],
         'restricted_result_reason');
 }
+// A row whose returned field name ignores the explicit SQL alias cannot
+// certify an exact source key even if its value happens to look correct.
+dloAssert($diagnose($fixture([['source_key__c'=>$expected]]))===[
+    'result'=>'unknown','reason'=>'row_field_missing'
+],'unexpected_unaliased_column_accepted');
 dloAssert($diagnose(function() {
     return ['status'=>200,'body'=>'not-json'];
 })===['result'=>'unknown','reason'=>'json_unverified'],
@@ -90,17 +95,17 @@ dloAssert($diagnose(function() {
 })===['result'=>'unknown','reason'=>'transport_unverified'],
     'non_numeric_status_exposed');
 
-dloAssert($read($fixture([['source_key__c'=>$expected]]))==='present',
+dloAssert($read($fixture([['g8_exact_source_key'=>$expected]]))==='present',
     'present_exact_match');
 dloAssert($read($fixture([]))==='absent_confirmed',
     'complete_empty_not_absent');
 dloAssert($read($fixture([],false))==='unknown','partial_empty_claimed_absent');
 dloAssert($read($fixture([],true,1))==='unknown','count_mismatch');
-dloAssert($read($fixture([['source_key__c'=>'other']]))==='unknown',
+dloAssert($read($fixture([['g8_exact_source_key'=>'other']]))==='unknown',
     'wrong_key_claimed_present');
 dloAssert($read($fixture([['other'=>'value']]))==='unknown',
     'missing_column_claimed_present');
-dloAssert($read($fixture([['source_key__c'=>$expected]],true,1,401))
+dloAssert($read($fixture([['g8_exact_source_key'=>$expected]],true,1,401))
     ==='unknown','401_claimed_present');
 dloAssert($read($fixture([],true,0,500))==='unknown','500_claimed_absent');
 dloAssert($read($fixture([],true,0,200,['nextBatchId'=>'more']))
@@ -110,7 +115,7 @@ dloAssert($read($fixture([],true,0,200,['done'=>false]))
 dloAssert($read($fixture([],true,0,200,['rowCount'=>'0']))
     ==='unknown','string_count_claimed_absent');
 dloAssert($read($fixture(
-    [['source_key__c'=>$expected],['source_key__c'=>$expected]]
+    [['g8_exact_source_key'=>$expected],['g8_exact_source_key'=>$expected]]
 ))==='present','multi_matches_not_present');
 $throws=function(){throw new RuntimeException(
     'sql body email=private@example.test access_token=private'

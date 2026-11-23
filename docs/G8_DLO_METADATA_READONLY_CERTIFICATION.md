@@ -40,3 +40,7 @@ El artifact no contiene la respuesta, SQL, nombre API, namespace, clave, datos d
 ### Diagnóstico de fila sin contenido (23/11/2026)
 
 La certificación de Query V2 ahora diferencia, sin imprimir columnas ni valores, `row_not_object`, `row_field_missing`, `row_value_not_string` y `row_key_not_exact`. Los cuatro casos mantienen el resultado `unknown` y prohíben reingesta o autorización de un worker. El HTTP 200 con filas, por sí solo, no equivale a clave exacta. Esta distinción se añade para explicar el `row_unverified` observado simultáneamente para ambos canarios en el run #45136049771.
+
+### Alias determinista del resultado Query V2 (23/11/2026)
+
+La evidencia real del run #45136661749 muestra `row_field_missing` en ambos DLO, aunque Query V2 respondió con filas. La proyección ahora exige la columna SQL certificada usando un alias fijo y entrecomillado `g8_exact_source_key`, con `WHERE` aún sobre `source_key` real. El lector compara únicamente el valor de ese alias con la clave completa mediante `hash_equals`; si no se devuelve el alias o el valor exacto, continúa en `unknown` sin envío. No se detectan nombres a partir de filas ni se imprime ningún dato. Este cambio utiliza el soporte `SELECT ... AS` de Data Cloud SQL y se valida con datos sintéticos antes de leer los canarios históricos.
