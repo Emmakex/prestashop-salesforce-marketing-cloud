@@ -132,7 +132,7 @@ $module=file_get_contents(dirname(__DIR__)
     .'/pssalesforcebridge/pssalesforcebridge.php');
 $controller=file_get_contents(dirname(__DIR__)
     .'/pssalesforcebridge/controllers/front/cron.php');
-cronAssert(strpos($module,"$"."this->version = '0.9.7';")!==false
+cronAssert(strpos($module,"$"."this->version = '0.9.8';")!==false
     && strpos($module,"GrowthG8CronReadOnly::inspect(")!==false
     && strpos($controller,"hash_equals(")!==false
     && strpos($controller,"$"."this->module->cronReport($"."operation)")!==false
