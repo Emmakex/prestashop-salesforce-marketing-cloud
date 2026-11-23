@@ -223,6 +223,12 @@ class PsSalesforceBridge extends Module
             $message=$this->handleG8UatTarget('bind');
         } elseif (Tools::isSubmit('submitPsGrowthG8TargetRevoke')) {
             $message=$this->handleG8UatTarget('revoke');
+        } elseif (Tools::isSubmit('submitPsGrowthG8Preflight')) {
+            $message=$this->handleG8UatOperator('preflight');
+        } elseif (Tools::isSubmit('submitPsGrowthG8RunCustomer')) {
+            $message=$this->handleG8UatOperator('customer');
+        } elseif (Tools::isSubmit('submitPsGrowthG8RunOrder')) {
+            $message=$this->handleG8UatOperator('order');
         } elseif (Tools::isSubmit('submitPsGrowthG8CaptureInspect')) {
             $message = $this->handleG8ExactCaptureInspect();
         } elseif (Tools::isSubmit('submitPsGrowthOnePreview')) {
@@ -345,6 +351,112 @@ class PsSalesforceBridge extends Module
                 $namespace,$shop,'PSOrder')
         ]);
         return $this->display(__FILE__,'views/templates/admin/console.tpl');
+    }
+
+    /**
+     * Operator-controlled exact G8 UAT from Back Office: no cron secret.
+     * Preflight is local-only and no-send. Sending is object-by-object,
+     * requires deliberate typed confirmation, and uses the SAME worker,
+     * CAS, DLO and durable receipts as the protected cron operation.
+     *
+     * Re-submitting a form can NEVER override the G3 no-replay claim.
+     */
+    private function handleG8UatOperator($operation)
+    {
+        $shop=$this->credentialContextShopId();
+        $csrf=Tools::getValue('PS_GROWTH_G8_CSRF');
+        $merchant=(string)Configuration::get(self::CONFIG_MERCHANT);
+        $namespace=(string)Configuration::get(self::CONFIG_NAMESPACE);
+        if (!in_array($operation,['preflight','customer','order'],true)
+            || !$this->isCredentialAdmin($shop)
+            || !is_string($csrf) || $this->credentialCsrf($shop)===''
+            || !hash_equals($this->credentialCsrf($shop),$csrf)
+            || (string)Configuration::get(self::CONFIG_MODE)!=='test'
+            || (string)Configuration::get(self::CONFIG_LOCAL_CAPTURE)!=='off'
+            || (string)Configuration::get(
+                'PS_GROWTH_G8_STAGING_APPROVAL'
+            )!==GrowthG8StagingWorker::APPROVAL
+            || (string)Configuration::get(
+                'PS_SFMC_CART_CONSENT_MODE'
+            )!=='marketing_optin'
+            || !GrowthShopSourceBinding::isMerchant($merchant)
+            || !GrowthShopSourceBinding::isNamespace($namespace)
+            || preg_match(
+                '/(?:^|_)(?:stage|staging)(?:_|$)/D',$namespace
+            )!==1) {
+            return $this->displayError(
+                $this->l('UAT G8 bloqueada por configuración, tienda o autorización. No se ha iniciado ningún envío nuevo.')
+            );
+        }
+        $target=GrowthG8UatPairScope::inspect(
+            $shop,$merchant,$namespace
+        );
+        if (!is_array($target)) {
+            return $this->displayError(
+                $this->l('No hay cliente y pedido fijados para esta UAT G8.')
+            );
+        }
+        try {
+            $local=GrowthLocalCustomerHoldReader::inspectPrestaShop(
+                $shop,$target['customer_id']
+            );
+            $eligible=is_array($local)
+                && isset($local['status'],
+                    $local['local_customer_source_state'])
+                && $local['status']==='hold_for_review'
+                && $local['local_customer_source_state']
+                    ==='no_local_negative_observed';
+            if (!$eligible) {
+                return $this->displayError(
+                    $this->l('Elegibilidad local G8 no superada: revisa que la cuenta de pruebas esté activa, no sea invitada/eliminada y tenga newsletter y optin afirmativos. No se ha ejecutado ningún envío.')
+                );
+            }
+            if ($operation==='preflight') {
+                return $this->displayConfirmation(
+                    $this->l('Preflight local G8 correcto: cliente registrado, activo y sin exclusiones locales. No certifica consentimiento de campañas ni comprueba DLO. No se ha enviado nada.')
+                );
+            }
+            $confirm=Tools::getValue('PS_GROWTH_G8_RUN_CONFIRM');
+            $expected=$operation==='customer'
+                ?'EXECUTE_G8_CUSTOMER_ONCE':'EXECUTE_G8_ORDER_ONCE';
+            if (!is_string($confirm) || $confirm!==$expected) {
+                return $this->displayError(
+                    $this->l('Confirmación exacta de ejecución G8 incorrecta. No se ha enviado nada.')
+                );
+            }
+            // Do not reuse the one-record manual send path. Ingest only
+            // the selected object via the protected native G8 worker.
+            $outcome=GrowthG8NativeStagingServices::run(
+                Db::getInstance(),(string)_PS_VERSION_,_DB_PREFIX_,
+                $shop,$operation==='customer'?'PSCustomer':'PSOrder'
+            );
+            $count=is_array($outcome) && isset($outcome['counts'])
+                && is_array($outcome['counts'])?$outcome['counts']:null;
+            if ($count!==null
+                && isset($count['accepted_202_unconfirmed'])
+                && (int)$count['accepted_202_unconfirmed']===1) {
+                return $this->displayConfirmation(
+                    $operation==='customer'
+                    ?$this->l('G8 cliente: HTTP 202 recibido y registrado como pendiente de conciliación. Comprueba el cliente en Data Cloud antes de autorizar el pedido. No repitas la ejecución.')
+                    :$this->l('G8 pedido: HTTP 202 recibido y registrado como pendiente de conciliación. Verifica el pedido en Data Cloud y no repitas la ejecución.')
+                );
+            }
+            if ($count!==null && isset($count['reserved'])
+                && (int)$count['reserved']===0
+                && isset($count['pending_reconciliation'])
+                && (int)$count['pending_reconciliation']===0) {
+                return $this->displayError(
+                    $this->l('G8 no ha reservado ningún evento nuevo. Revisa elegibilidad, presencia DLO y estado de G3; no repitas dispatch automáticamente.')
+                );
+            }
+            return $this->displayError(
+                $this->l('G8: resultado sin confirmación de recepción. Puede existir un intento en G3; no repitas la operación. Comprueba el recibo y Data Cloud.')
+            );
+        } catch (\Throwable $ignored) {
+            return $this->displayError(
+                $this->l('G8: no se pudo confirmar el resultado. Antes de cualquier otro intento comprueba G3 y Data Cloud.')
+            );
+        }
     }
 
     /**
