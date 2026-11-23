@@ -624,23 +624,51 @@ class PsSalesforceBridge extends Module
             }
         }
 
-        // Customer/order actions retain their independent local gate.
-        // Reaching the native worker remains a potentially outbound step.
-        $phase='local_customer';
+        // Customer execution uses the SAME fresh, no-send, exact-pair G3/G7
+        // review as successful preflight. Order retains its own fresh local
+        // customer gate because its parent may already have been delivered.
+        // Native worker independently rechecks consent, source, lease and
+        // DLO immediately before ANY transport. Never rely on a past click.
+        $phase='customer_local_review';
         try {
-            $local=GrowthLocalCustomerHoldReader::inspectPrestaShop(
-                $shop,$target['customer_id']
-            );
-            $eligible=is_array($local)
-                && isset($local['status'],
-                    $local['local_customer_source_state'])
-                && $local['status']==='hold_for_review'
-                && $local['local_customer_source_state']
-                    ==='no_local_negative_observed';
-            if (!$eligible) {
-                return $this->displayError(
-                    $this->l('Elegibilidad local G8 no superada: revisa que la cuenta de pruebas esté activa, no sea invitada/eliminada y tenga newsletter y optin afirmativos. No se ha ejecutado ningún envío.')
+            if ($operation==='customer') {
+                $review=GrowthG8LocalPreDispatchReview::inspect(
+                    Db::getInstance(),(string)_PS_VERSION_,
+                    $merchant,$namespace,_DB_PREFIX_,$shop
                 );
+                $eligible=is_array($review)
+                    && isset($review['status'],$review['read_only'],
+                        $review['http_request_performed'],
+                        $review['database_write_performed'],
+                        $review['dispatch_authorized'],
+                        $review['retry_authorized'])
+                    && $review['status']==='local_pre_dispatch_validated_no_send'
+                    && $review['read_only']===true
+                    && $review['http_request_performed']===false
+                    && $review['database_write_performed']===false
+                    && $review['dispatch_authorized']===false
+                    && $review['retry_authorized']===false;
+                if (!$eligible) {
+                    return $this->displayError(
+                        $this->l('G8: preparación de cliente no validada por el diagnóstico local G3/G7. No se ha iniciado POST; conserva los recibos y no repitas un envío incierto.')
+                    );
+                }
+            } else {
+                $phase='order_local_reader';
+                $local=GrowthLocalCustomerHoldReader::inspectPrestaShop(
+                    $shop,$target['customer_id']
+                );
+                $eligible=is_array($local)
+                    && isset($local['status'],
+                        $local['local_customer_source_state'])
+                    && $local['status']==='hold_for_review'
+                    && $local['local_customer_source_state']
+                        ==='no_local_negative_observed';
+                if (!$eligible) {
+                    return $this->displayError(
+                        $this->l('G8: elegibilidad local de pedido no superada. No se ha iniciado POST; comprueba el cliente sin cambiar consentimientos.')
+                    );
+                }
             }
             $phase='confirmation';
             $confirm=Tools::getValue('PS_GROWTH_G8_RUN_CONFIRM');
@@ -684,9 +712,19 @@ class PsSalesforceBridge extends Module
                 $this->l('G8: resultado sin confirmación de recepción. Puede existir un intento en G3; no repitas la operación. Comprueba el recibo y Data Cloud.')
             );
         } catch (\Throwable $ignored) {
-            if ($phase==='local_customer' || $phase==='confirmation') {
+            if ($phase==='customer_local_review') {
                 return $this->displayError(
-                    $this->l('G8: la preparación local falló antes de invocar el transporte. No se ha iniciado POST desde esta operación. Conserva G3 y revisa el diagnóstico local.')
+                    $this->l('G8: excepción en revisión local G3/G7 de cliente, antes del transporte. Sin POST en esta operación; usa Diagnosticar preenvío G8 sin enviar.')
+                );
+            }
+            if ($phase==='order_local_reader') {
+                return $this->displayError(
+                    $this->l('G8: excepción en lectura local del cliente para pedido, antes del transporte. Sin POST en esta operación; no envíes el pedido.')
+                );
+            }
+            if ($phase==='confirmation') {
+                return $this->displayError(
+                    $this->l('G8: excepción leyendo o mostrando la confirmación, antes del transporte. Sin POST en esta operación. Mantén G3 intacto.')
                 );
             }
             // The worker may have reached the transport even if this UI
