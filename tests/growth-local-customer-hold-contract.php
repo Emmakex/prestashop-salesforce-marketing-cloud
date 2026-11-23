@@ -228,9 +228,10 @@ localCustomerAssert($skip === 0, 'bad_signals_reached_sql');
 $module = file_get_contents(dirname(__DIR__) . '/pssalesforcebridge/pssalesforcebridge.php');
 $source = file_get_contents(dirname(__DIR__)
     . '/pssalesforcebridge/src/Growth/GrowthLocalCustomerHoldReader.php');
-localCustomerAssert(strpos($module, 'GrowthLocalCustomerHoldReader') === false
+localCustomerAssert(strpos($module, 'GrowthLocalCustomerHoldReader.php') !== false
+    && strpos($module, 'GrowthG8NativeStagingServices::run(') !== false
     && strpos($module, 'inspectWithLocalCustomer') === false,
-    'unapproved_reader_wired_to_live_hooks');
+    'customer_reader_outside_protected_stage');
 foreach (['\`email\`', '\`firstname\`', '\`lastname\`',
     'CURLOPT_', '/api/v1/ingest/', '->insert(', '->execute(', 'file_put_contents('] as $bad) {
     localCustomerAssert(strpos($source, $bad) === false,
