@@ -25,6 +25,7 @@ jobs:
           python3 scripts/ci/verify-project-focus.py
           python3 -m unittest discover -s tests -p 'test_project_focus.py'
           python3 -m unittest discover -s tests -p 'test_g8_cron_readonly_workflow.py'
+          python3 -m unittest discover -s tests -p 'test_proprietary_license.py'
           php tests/g8-cron-token-admin-contract.php
 
   growth-product-boundary:
@@ -313,6 +314,10 @@ jobs:
           zip -r "$ZIP" pssalesforcebridge \
             -x '*/vendor/*' '*.DS_Store'
           unzip -Z1 "$ZIP" | grep -qx 'pssalesforcebridge/pssalesforcebridge.php'
+          unzip -Z1 "$ZIP" | grep -qx 'pssalesforcebridge/LICENSE'
+          unzip -p "$ZIP" pssalesforcebridge/LICENSE | grep -Fq 'Copyright © 2026 Eduardo Yauri.'
+          unzip -p "$ZIP" pssalesforcebridge/LICENSE | grep -Fq 'Todos los derechos reservados.'
+          unzip -p "$ZIP" pssalesforcebridge/composer.json | grep -Fq '"license": "proprietary"'
           unzip -Z1 "$ZIP" | grep -qx 'pssalesforcebridge/upgrade/upgrade-0.9.8.php'
           if unzip -Z1 "$ZIP" | awk -F/ '$1=="pssalesforcebridge" && $2=="src" && NF>=4 {print $3}' | sort -u | grep -Ev '^(Compatibility|DataCloud|Growth|Provider)$'; then
             echo 'Unrecognized package source directory'

@@ -6,6 +6,10 @@
 
 # Puente PrestaShop ↔ Salesforce Marketing Cloud Growth + Data Cloud
 
+> **Titularidad y licencia:** © 2026 **Eduardo Yauri** — **Todos los derechos reservados**. Licencia propietaria para las versiones distribuidas bajo este aviso. El autor comercial visible del módulo permanece **ALFABH**. Consulta [LICENSE](LICENSE). Las versiones anteriores publicadas bajo MIT mantienen los permisos que les correspondan.
+
+
+
 **Producto único:** integración reusable para **PrestaShop 1.7.8.x, 8.x y 9.x** con **Salesforce Marketing Cloud Growth (Next)** y **Data Cloud**. No hay selección de proveedor, transporte alternativo ni motor de campañas propio. Las reglas vinculantes están en [AGENTS.md](AGENTS.md), [normas de desarrollo](docs/PROJECT_DEVELOPMENT_RULES.md), [contrato](config/project-contract.json) y [roadmap](ROADMAP.md).
 
 ## Estado verificado y objetivo de negocio
