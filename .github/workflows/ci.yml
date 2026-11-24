@@ -25,6 +25,7 @@ jobs:
           python3 scripts/ci/verify-project-focus.py
           python3 -m unittest discover -s tests -p 'test_project_focus.py'
           python3 -m unittest discover -s tests -p 'test_g8_cron_readonly_workflow.py'
+          python3 -m unittest discover -s tests -p 'test_proprietary_license.py'
           php tests/g8-cron-token-admin-contract.php
 
   growth-product-boundary:
