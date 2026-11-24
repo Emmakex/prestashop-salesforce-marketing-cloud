@@ -2,6 +2,8 @@
 
 /**
  * PrestaShop -> Salesforce Marketing Cloud Growth + Data Cloud.
+ * Copyright (c) 2026 Eduardo Yauri. Todos los derechos reservados.
+ * Proprietary software; see LICENSE. ALFABH remains the module publisher.
  *
  * v0.9.6 beta: protected staging pair cron, customer before order (OFF by default).
  * v0.9.5: staging G8 controlled UAT dispatcher (OFF until owner approval).
